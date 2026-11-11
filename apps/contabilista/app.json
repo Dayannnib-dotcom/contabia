@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Contabia Contabilista",
+    "slug": "contabia-contabilista",
+    "scheme": "contabia-cc",
+    "version": "0.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#12232E",
+    "ios": { "bundleIdentifier": "pt.contabia.contabilista", "supportsTablet": true },
+    "android": { "package": "pt.contabia.contabilista" },
+    "plugins": ["expo-router", "expo-secure-store", "expo-local-authentication"]
+  }
+}

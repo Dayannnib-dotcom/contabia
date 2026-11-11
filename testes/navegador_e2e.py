@@ -1,0 +1,138 @@
+import os, time
+from playwright.sync_api import sync_playwright, expect
+
+SHOTS = os.environ.get("PASTA_CAPTURAS", "capturas")
+import os; os.makedirs(SHOTS, exist_ok=True)
+
+def shot(page, nome):
+    page.screenshot(path=f"{SHOTS}/{nome}.png")
+
+with sync_playwright() as p:
+    b = p.chromium.launch(args=["--no-sandbox"])
+    vp = {"width": 390, "height": 844}
+    emp = b.new_page(viewport=vp)
+    cc = b.new_page(viewport={"width": 1024, "height": 900})
+    erros = []
+    for pg, n in [(emp, "empresa"), (cc, "cc")]:
+        pg.on("pageerror", lambda e, n=n: erros.append(f"{n}: {e}"))
+
+    try:
+        # ── Empresa cria conta ──
+        emp.goto("http://localhost:8081/")
+        emp.get_by_text("Criar conta").first.wait_for(timeout=20000)
+        time.sleep(2.5)
+        shot(emp, "01_entrada")
+        emp.get_by_text("Criar conta").first.click()
+        emp.get_by_label("Nome da empresa").fill("Atlântico Serviços, Lda.")
+        emp.get_by_label("Utilizador da empresa").fill("atlantico.servicos")
+        emp.get_by_label("NIF da empresa").fill("509999998")
+        emp.get_by_text("NIF inválido").wait_for()
+        emp.get_by_label("NIF da empresa").fill("509999999")
+        emp.get_by_text("✓ NIF válido").wait_for()
+        emp.get_by_label("Senha").fill("segredo123")
+        shot(emp, "02_registo")
+        emp.get_by_role("button", name="Criar conta").click()
+        emp.get_by_text("Precisa da sua atenção").wait_for(timeout=15000)
+        time.sleep(1)
+        shot(emp, "03_painel")
+
+        # ── Contabilista cria conta e pede ligação ──
+        cc.goto("http://localhost:8082/")
+        cc.get_by_text("Criar conta").first.wait_for(timeout=20000)
+        cc.get_by_text("Criar conta").first.click()
+        cc.get_by_label("Nome").fill("Ana Ferreira")
+        cc.get_by_label("E-mail profissional").fill("ana@gabinete.pt")
+        cc.get_by_label("N.º de Contabilista Certificado (OCC)").fill("12345")
+        cc.get_by_label("Senha").fill("segredo123")
+        cc.get_by_role("button", name="Criar conta").click()
+        cc.get_by_text("Carteira").first.wait_for(timeout=15000)
+        cc.get_by_role("tab", name="Ligar empresa").click()
+        cc.get_by_label("Utilizador da empresa").fill("atlantico.servicos")
+        cc.get_by_label("NIF da empresa").fill("500000000")
+        cc.get_by_role("button", name="Enviar pedido de ligação").click()
+        cc.get_by_text("Utilizador e NIF não coincidem").wait_for()
+        cc.get_by_label("NIF da empresa").fill("509 999 999")
+        cc.get_by_role("button", name="Enviar pedido de ligação").click()
+        cc.get_by_text("À espera da empresa").wait_for()
+        shot(cc, "04_cc_pedido")
+
+        # ── Empresa recebe o pedido em tempo real e aceita ──
+        emp.get_by_text("Pedido de ligação do contabilista").wait_for(timeout=15000)
+        shot(emp, "05_painel_pedido")
+        emp.get_by_text("Pedido de ligação do contabilista").click()
+        emp.get_by_text("Ana Ferreira").first.wait_for()
+        shot(emp, "06_ligacao")
+        emp.get_by_role("button", name="Aceitar com biometria").click()
+        emp.get_by_text("Ligação ativa").wait_for()
+        cc.get_by_text("Ligada").wait_for(timeout=15000)
+        shot(cc, "07_cc_ligada")
+
+        # ── Empresa regista uma compra e uma venda ──
+        emp.go_back()
+        emp.get_by_role("tab", name="Digitalizar").click() if emp.get_by_role("tab", name="Digitalizar").count() else emp.get_by_text("Digitalizar").last.click()
+        emp.get_by_text("Introduzir documento").wait_for()
+        emp.get_by_label("NIF do fornecedor").fill("500000000")
+        emp.get_by_label("Nome").fill("Papelaria Atlântico")
+        emp.get_by_label("N.º do documento").fill("FT 2026/418")
+        emp.get_by_label("Data (AAAA-MM-DD)").fill("2026-09-15")
+        emp.get_by_label("Valor sem IVA (€)").fill("120")
+        shot(emp, "08_documento_manual")
+        emp.get_by_role("button", name="Guardar documento").click()
+        emp.get_by_text("Papelaria Atlântico").first.wait_for()
+        shot(emp, "09_documentos")
+        emp.get_by_text("Papelaria Atlântico").first.click()
+        emp.get_by_role("button", name="Validar documento").wait_for()
+        shot(emp, "10_validar")
+        emp.get_by_role("button", name="Validar documento").click()
+        emp.get_by_text("Validado").first.wait_for()
+
+        # ── Contabilista revê, apura IVA, regista submissão ──
+        cc.get_by_role("tab", name="Carteira").click()
+        cc.get_by_text("Atlântico Serviços, Lda.").first.wait_for(timeout=15000)
+        time.sleep(1)
+        shot(cc, "11_cc_carteira")
+        cc.get_by_text("Atlântico Serviços, Lda.").first.click()
+        cc.get_by_role("button", name="Aprovar", exact=True).wait_for()
+        shot(cc, "12_cc_revisao")
+        cc.get_by_role("button", name="Aprovar", exact=True).click()
+        cc.get_by_text("Todos os lançamentos desta empresa estão revistos.").wait_for()
+        cc.get_by_role("button", name="Seguir para o IVA").click()
+        cc.get_by_text("Imposto a favor do sujeito passivo").wait_for()
+        shot(cc, "13_cc_iva")
+        cc.get_by_role("button", name="1. Gerar ficheiro da declaração").click()
+        cc.get_by_label("N.º do comprovativo de entrega").fill("AT-2026-778899")
+        cc.get_by_role("button", name="Registar submissão").click()
+        cc.get_by_text("já está submetida e registada").wait_for()
+        shot(cc, "14_cc_submetida")
+
+        # ── Pedido do contabilista chega à empresa ──
+        cc.get_by_role("tab", name="Pedidos").click()
+        cc.get_by_label("Detalhe").fill("extrato do banco de outubro")
+        cc.get_by_role("button", name="Enviar pedido").click()
+        cc.get_by_text("extrato do banco de outubro").first.wait_for()
+        emp.get_by_role("tab", name="Painel").click()
+        emp.get_by_text("Pedido do contabilista: Extrato bancário").wait_for(timeout=15000)
+        shot(emp, "15_painel_pedido_cc")
+
+        # ── Assistente ──
+        emp.get_by_role("tab", name="Assistente").click()
+        emp.get_by_placeholder("Escreva a sua pergunta…").fill("Posso deduzir o IVA de um almoço com um cliente?")
+        emp.get_by_role("button", name="Enviar pergunta").click()
+        emp.get_by_text("CIVA, art. 21.º").wait_for()
+        shot(emp, "16_assistente")
+
+        # ── SAF-T e prazos ──
+        cc.get_by_role("tab", name="SAF-T").click()
+        cc.get_by_role("button", name="Gerar e validar ficheiro").click()
+        cc.get_by_text("SAFT_509999999").wait_for()
+        shot(cc, "17_cc_saft")
+        emp.get_by_role("tab", name="Prazos").click()
+        emp.get_by_text("Submetida").first.wait_for()
+        shot(emp, "18_prazos")
+
+
+    except Exception:
+        shot(emp, "FALHA_empresa"); shot(cc, "FALHA_cc"); print("ERROS JS:", erros); raise
+    print("ERROS JS:", erros)
+    print("OK — fluxo completo")
+    b.close()

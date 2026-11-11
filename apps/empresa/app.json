@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Contabia",
+    "slug": "contabia-empresa",
+    "scheme": "contabia",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#12232E",
+    "ios": {
+      "bundleIdentifier": "pt.contabia.empresa",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "A Contabia usa a câmara para ler o código QR das faturas.",
+        "NSFaceIDUsageDescription": "A Contabia usa o Face ID para confirmar ligações ao seu contabilista."
+      }
+    },
+    "android": {
+      "package": "pt.contabia.empresa",
+      "permissions": ["CAMERA", "USE_BIOMETRIC"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-camera", { "cameraPermission": "A Contabia usa a câmara para ler o código QR das faturas." }],
+      ["expo-local-authentication", { "faceIDPermission": "A Contabia usa o Face ID para confirmar ligações ao seu contabilista." }]
+    ],
+    "experiments": { "typedRoutes": false }
+  }
+}

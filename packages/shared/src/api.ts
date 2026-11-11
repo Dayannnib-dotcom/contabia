@@ -103,7 +103,7 @@ export class ApiContabia {
   criarDocumento(empresaId: string, d: Partial<Documento>) {
     return this.pedido<Documento>("POST", `/v1/empresas/${empresaId}/documentos`, d);
   }
-  validarDocumento(empresaId: string, id: string, alteracoes: { contaSugerida?: string; ivaDedutivel?: boolean } = {}) {
+  validarDocumento(empresaId: string, id: string, alteracoes: { contaSugerida?: string; ivaDedutivel?: boolean; terceiroNome?: string } = {}) {
     return this.pedido<Documento>("POST", `/v1/empresas/${empresaId}/documentos/${id}/validar`, alteracoes);
   }
 

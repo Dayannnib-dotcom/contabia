@@ -1,0 +1,25 @@
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { ProvedorSessao, cor } from "@contabia/ui";
+
+const URL_API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+
+export default function Raiz() {
+  return (
+    <SafeAreaProvider>
+      <ProvedorSessao urlApi={URL_API}>
+        <StatusBar style="dark" />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: cor.fundo } }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="entrar" options={{ headerShown: true, title: "Entrar", headerBackTitle: "Voltar" }} />
+          <Stack.Screen name="registar" options={{ headerShown: true, title: "Criar conta", headerBackTitle: "Voltar" }} />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="documento/[id]" options={{ headerShown: true, title: "Documento", headerBackTitle: "Voltar" }} />
+          <Stack.Screen name="ligacao" options={{ headerShown: true, title: "Ligação ao contabilista", headerBackTitle: "Voltar" }} />
+          <Stack.Screen name="atualizacoes" options={{ headerShown: true, title: "Atualizações fiscais", headerBackTitle: "Voltar" }} />
+        </Stack>
+      </ProvedorSessao>
+    </SafeAreaProvider>
+  );
+}

@@ -1,0 +1,87 @@
+# Contabia
+
+Plataforma de faturação, contabilidade SNC e SAF-T para empresas em Portugal, com o assistente virtual Luís.
+Duas apps móveis (iOS e Android) e um servidor partilhado:
+
+| Pasta | O que é |
+| --- | --- |
+| `apps/empresa` | App da empresa (Expo / React Native): painel, digitalização por código QR, documentos, Luís, prazos, ligação ao contabilista, atualizações fiscais |
+| `apps/contabilista` | App do Contabilista Certificado (telemóvel e tablet): carteira, ligar empresa, revisão de lançamentos, IVA, pedidos, SAF-T, fecho de período |
+| `apps/server` | API + tempo real (Fastify, PostgreSQL, WebSocket) |
+| `packages/shared` | Regras de negócio partilhadas: NIF, código QR da AT, taxas de IVA por região, calendário fiscal, cliente da API |
+| `packages/ui` | Tema, logótipo, Luís, componentes e sessão partilhados pelas duas apps |
+| `testes/` | Teste de ponta a ponta no navegador (Playwright) |
+
+## Começar em 5 minutos
+
+Requisitos: Node.js 20 ou mais recente, e a app **Expo Go** no telemóvel.
+
+```bash
+npm install
+npm run server          # API em http://localhost:3000 (base de dados local PGlite em ./data)
+```
+
+Noutro terminal, com o endereço do computador na rede local:
+
+```bash
+EXPO_PUBLIC_API_URL=http://192.168.1.10:3000 npm run empresa        # leia o QR com o Expo Go
+EXPO_PUBLIC_API_URL=http://192.168.1.10:3000 npm run contabilista
+```
+
+Experimente o fluxo completo:
+
+1. Na app da empresa, **Criar conta** (utilizador, NIF válido, região, regime de IVA).
+2. Na app do contabilista, **Criar conta** e **Ligar empresa** com o mesmo utilizador e NIF.
+3. A empresa recebe o pedido em tempo real e **aceita com biometria**.
+4. A empresa digitaliza uma fatura (código QR) ou introdu-la à mão e **valida**.
+5. O contabilista **aprova** o lançamento, **gera o ficheiro de IVA**, regista o comprovativo, faz **pedidos**, gera o **SAF-T** e **fecha o período**.
+
+## Testes
+
+```bash
+npm test             # testes de regras partilhadas + 10 testes de ponta a ponta da API
+npm run typecheck    # tipos de todos os pacotes
+```
+
+Teste no navegador (as duas apps contra o servidor real):
+
+```bash
+npm run server
+(cd apps/empresa && npx expo export -p web --output-dir /tmp/web-empresa) && (cd /tmp/web-empresa && python3 -m http.server 8081 &)
+(cd apps/contabilista && npx expo export -p web --output-dir /tmp/web-cc) && (cd /tmp/web-cc && python3 -m http.server 8082 &)
+pip install playwright && playwright install chromium
+python3 testes/navegador_e2e.py
+```
+
+## Produção
+
+```bash
+cp .env.example .env    # preencha JWT_SECRET, POSTGRES_PASSWORD, ADMIN_TOKEN
+docker compose up -d    # PostgreSQL + API na porta 3000
+```
+
+| Variável | Para quê |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL. Sem ela, usa PGlite local (só desenvolvimento) |
+| `JWT_SECRET` | Assinatura das sessões (obrigatória em produção) |
+| `ADMIN_TOKEN` | Publicar novas regras fiscais em `POST /v1/admin/regras` |
+| `ANTHROPIC_API_KEY` | Opcional: o Luís responde com IA; sem chave, usa regras locais |
+| `EXPO_PUBLIC_API_URL` | Endereço da API usado pelas apps |
+
+Builds para as lojas: `npx eas build -p ios` / `-p android` em cada app (precisa de conta Expo, Apple Developer e Google Play).
+
+## Como funciona
+
+- **Ligação em duas vias**: o contabilista pede com *utilizador + NIF* (validados e coincidentes); a empresa aceita na app com biometria; pedidos expiram em 72 h; qualquer lado pode revogar.
+- **Sem falhas de ligação**: cada alteração é um evento numerado; as apps recebem-no por WebSocket e, ao reconectar, pedem o que falta pelo cursor; escritas com chave de idempotência e reenvio automático; concorrência otimista por versão.
+- **Regras fiscais automáticas**: taxas, prazos e prorrogações são dados versionados; uma nova versão publicada chega a todas as apps e aplica-se na data legal, sem atualizar a app.
+- **Contabilidade**: a IA sugere a conta SNC (histórico do fornecedor + palavras-chave), propõe o lançamento em partidas dobradas, e só o contabilista lança. Apuramento de IVA por campos da declaração periódica (Continente, Madeira, Açores). Estornos em vez de alterações. Períodos fechados ficam bloqueados.
+
+## Antes de entrar em produção (não se resolve só com código)
+
+- [ ] **Certificação da AT** do módulo de faturação (Portaria n.º 363/2010): a emissão de faturas certificadas (assinatura/hash, ATCUD) ainda não está incluída — as apps registam faturas recebidas e emitidas por outros programas.
+- [ ] **Webservices da AT** (comunicação de faturas, séries ATCUD): exigem credenciais e certificado da empresa produtora.
+- [ ] **Formato oficial da declaração periódica**: o ficheiro gerado (`xmlDP`) usa uma estrutura interna; mapear para o formato de importação do Portal das Finanças.
+- [ ] **Taxonomias SNC** (`TAXONOMIAS` em `apps/server/src/contabilidade.ts`): preencher e validar com um Contabilista Certificado; validar o SAF-T no validador oficial da AT.
+- [ ] Guardar imagens/PDF dos documentos (armazenamento de objetos na UE), recuperação de senha, notificações push (APNs/FCM).
+- [ ] Revisão jurídica (RGPD, termos) e testes de intrusão.

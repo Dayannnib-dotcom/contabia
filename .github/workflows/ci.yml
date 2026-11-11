@@ -1,0 +1,27 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Testes (partilhado + servidor de ponta a ponta)
+        run: npm test
+      - name: Tipos (todas as apps)
+        run: |
+          npx tsc -p packages/shared/tsconfig.json
+          npx tsc -p apps/server/tsconfig.json
+          (cd apps/empresa && npx tsc --noEmit)
+          (cd apps/contabilista && npx tsc --noEmit)
+      - name: Compilar as apps (web)
+        run: |
+          (cd apps/empresa && npx expo export --platform web --output-dir ../../dist/empresa)
+          (cd apps/contabilista && npx expo export --platform web --output-dir ../../dist/contabilista)
