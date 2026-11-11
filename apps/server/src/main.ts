@@ -1,5 +1,7 @@
 import { abrirDb } from "./db.ts";
 import { criarApp } from "./app.ts";
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
 const porta = Number(process.env.PORT ?? 3000);
 const segredo = process.env.JWT_SECRET;
@@ -10,6 +12,7 @@ const { app } = await criarApp(db, {
   segredoJWT: segredo ?? "desenvolvimento-apenas-mude-isto",
   tokenAdmin: process.env.ADMIN_TOKEN,
   chaveIA: process.env.ANTHROPIC_API_KEY,
+  pastaWeb: process.env.PASTA_WEB ?? resolve(fileURLToPath(import.meta.url), "../../../../web"),
 });
 
 await app.listen({ port: porta, host: "0.0.0.0" });

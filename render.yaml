@@ -1,0 +1,14 @@
+# Publicação em Render (render.com): «New» → «Blueprint» → este repositório.
+services:
+  - type: web
+    name: contabia
+    runtime: docker
+    plan: free
+    healthCheckPath: /v1/saude
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: PASTA_DADOS
+        value: /tmp/contabia-dados

@@ -2,13 +2,15 @@ import os, time
 from playwright.sync_api import sync_playwright, expect
 
 SHOTS = os.environ.get("PASTA_CAPTURAS", "capturas")
+BASE = os.environ.get("CONTABIA_URL", "http://localhost:3000")
+CHROME = os.environ.get("CHROME")
 import os; os.makedirs(SHOTS, exist_ok=True)
 
 def shot(page, nome):
     page.screenshot(path=f"{SHOTS}/{nome}.png")
 
 with sync_playwright() as p:
-    b = p.chromium.launch(args=["--no-sandbox"])
+    b = p.chromium.launch(args=["--no-sandbox"], **({"executable_path": CHROME} if CHROME else {}))
     vp = {"width": 390, "height": 844}
     emp = b.new_page(viewport=vp)
     cc = b.new_page(viewport={"width": 1024, "height": 900})
@@ -18,7 +20,7 @@ with sync_playwright() as p:
 
     try:
         # ── Empresa cria conta ──
-        emp.goto("http://localhost:8081/")
+        emp.goto(BASE + "/empresa/")
         emp.get_by_text("Criar conta").first.wait_for(timeout=20000)
         time.sleep(2.5)
         shot(emp, "01_entrada")
@@ -37,7 +39,7 @@ with sync_playwright() as p:
         shot(emp, "03_painel")
 
         # ── Contabilista cria conta e pede ligação ──
-        cc.goto("http://localhost:8082/")
+        cc.goto(BASE + "/contabilista/")
         cc.get_by_text("Criar conta").first.wait_for(timeout=20000)
         cc.get_by_text("Criar conta").first.click()
         cc.get_by_label("Nome").fill("Ana Ferreira")

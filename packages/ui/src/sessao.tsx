@@ -7,19 +7,26 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { ApiContabia, TempoReal, type Evento, type Sessao } from "@contabia/shared";
 
-const CHAVE = "contabia.sessao";
-const guardar = {
+const cofre = (CHAVE: string) => ({
   async ler(): Promise<string | null> {
-    return Platform.OS === "web" ? globalThis.localStorage?.getItem(CHAVE) ?? null : SecureStore.getItemAsync(CHAVE);
+    try {
+      return Platform.OS === "web" ? globalThis.localStorage?.getItem(CHAVE) ?? null : await SecureStore.getItemAsync(CHAVE);
+    } catch {
+      return null;
+    }
   },
   async escrever(v: string | null) {
-    if (Platform.OS === "web") {
-      if (v) globalThis.localStorage?.setItem(CHAVE, v); else globalThis.localStorage?.removeItem(CHAVE);
-      return;
+    try {
+      if (Platform.OS === "web") {
+        if (v) globalThis.localStorage?.setItem(CHAVE, v); else globalThis.localStorage?.removeItem(CHAVE);
+        return;
+      }
+      if (v) await SecureStore.setItemAsync(CHAVE, v); else await SecureStore.deleteItemAsync(CHAVE);
+    } catch {
+      /* armazenamento indisponível: a sessão dura só enquanto a app estiver aberta */
     }
-    if (v) await SecureStore.setItemAsync(CHAVE, v); else await SecureStore.deleteItemAsync(CHAVE);
   },
-};
+});
 
 interface Ctx {
   api: ApiContabia;
@@ -36,8 +43,9 @@ interface Ctx {
 
 const Contexto = createContext<Ctx | null>(null);
 
-export function ProvedorSessao({ children, urlApi }: { children: ReactNode; urlApi: string }) {
+export function ProvedorSessao({ children, urlApi, chave = "contabia.sessao" }: { children: ReactNode; urlApi: string; chave?: string }) {
   const api = useMemo(() => new ApiContabia(urlApi), [urlApi]);
+  const guardar = useMemo(() => cofre(chave), [chave]);
   const [sessao, setSessao] = useState<Sessao | null>(null);
   const [pronto, setPronto] = useState(false);
   const [online, setOnline] = useState(false);
@@ -56,7 +64,7 @@ export function ProvedorSessao({ children, urlApi }: { children: ReactNode; urlA
       }
       setPronto(true);
     });
-  }, [api]);
+  }, [api, guardar]);
 
   useEffect(() => {
     if (!sessao) return;
@@ -71,14 +79,14 @@ export function ProvedorSessao({ children, urlApi }: { children: ReactNode; urlA
     empresas.current = s.papel === "empresa" ? [s.id] : [];
     await guardar.escrever(JSON.stringify(s));
     setSessao(s);
-  }, [api]);
+  }, [api, guardar]);
 
   const sair = useCallback(async () => {
     tr.current?.parar();
     api.token = null;
     await guardar.escrever(null);
     setSessao(null);
-  }, [api]);
+  }, [api, guardar]);
 
   const definirEmpresas = useCallback((ids: string[]) => {
     const novas = ids.filter((i) => !empresas.current.includes(i));

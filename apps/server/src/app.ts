@@ -1,6 +1,9 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
+import estatico from "@fastify/static";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { z, ZodError } from "zod";
 import {
   ajudaNIF, lerQR, limparNIF, normalizarUtilizador, proximasObrigacoes, qrConsistente, REGRAS_BASE, taxasEm, utilizadorValido, validarNIF,
@@ -21,6 +24,8 @@ export interface Config {
   tokenAdmin?: string;
   chaveIA?: string;
   agora?: () => Date;
+  /** Pasta com as builds web das apps (web/empresa e web/contabilista). */
+  pastaWeb?: string;
 }
 
 const HORAS_PEDIDO = 72;
@@ -577,6 +582,19 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
 
   app.get("/v1/saude", async () => ({ ok: true, versao: "0.1.0" }));
 
+  // ═════════════ Apps web (mesma origem que a API) ═════════════
+  const apps = ["empresa", "contabilista"].filter((n) => cfg.pastaWeb && existsSync(join(cfg.pastaWeb, n, "index.html")));
+  apps.forEach((nome, i) => {
+    app.register(estatico, { root: join(cfg.pastaWeb!, nome), prefix: `/${nome}/`, decorateReply: i === 0, wildcard: false });
+  });
+  app.setNotFoundHandler((req, reply) => {
+    const nome = apps.find((n) => req.url === `/${n}` || req.url.startsWith(`/${n}/`));
+    if (nome && req.method === "GET") return reply.type("text/html").sendFile("index.html", join(cfg.pastaWeb!, nome));
+    return reply.code(404).send({ codigo: "nao_encontrado", mensagem: "Endereço não encontrado." });
+  });
+  app.get("/", async (_req, reply) => reply.type("text/html; charset=utf-8").send(PAGINA_INICIAL));
+
+
   // ═════════════ Tempo real ═════════════
   app.get("/v1/tempo-real", { websocket: true }, async (socket, req) => {
     const a = (req as FastifyRequest & { ator?: Ator }).ator;
@@ -591,3 +609,11 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
 
   return { app, hub };
 }
+
+const PAGINA_INICIAL = `<!doctype html><html lang="pt-PT"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Contabia</title>
+<style>body{margin:0;font-family:system-ui,sans-serif;background:#12232E;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center}
+main{max-width:420px;padding:32px;display:flex;flex-direction:column;gap:18px;text-align:center}h1{font-size:40px;margin:8px 0 0;letter-spacing:-1px}p{color:#C9D6DC;margin:0 0 12px}
+a{display:block;padding:16px;border-radius:14px;font-weight:600;font-size:17px;text-decoration:none}.a{background:#3CC6A0;color:#0C1A22}.b{border:1px solid #4B6878;color:#fff}</style></head>
+<body><main><svg width="88" height="88" viewBox="0 0 64 64" style="margin:0 auto" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="#1F3B4A"/><path d="M43 19a16 16 0 1 0 0 26" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/><path d="M27 37q5-5 10 0t10 0t10 0" fill="none" stroke="#3CC6A0" stroke-width="4.5" stroke-linecap="round"/></svg>
+<h1>contabia</h1><p>A contabilidade da sua empresa, em dia.</p>
+<a class="a" href="/empresa/">App da empresa</a><a class="b" href="/contabilista/">App do Contabilista Certificado</a></main></body></html>`;

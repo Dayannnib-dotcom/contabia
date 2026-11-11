@@ -1,14 +1,15 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ProvedorSessao, cor } from "@contabia/ui";
 
-const URL_API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+const URL_API = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
 
 export default function Raiz() {
   return (
     <SafeAreaProvider>
-      <ProvedorSessao urlApi={URL_API}>
+      <ProvedorSessao urlApi={URL_API} chave="contabia.empresa">
         <StatusBar style="dark" />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: cor.fundo } }}>
           <Stack.Screen name="index" />

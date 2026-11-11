@@ -25,6 +25,6 @@
       ["expo-camera", { "cameraPermission": "A Contabia usa a câmara para ler o código QR das faturas." }],
       ["expo-local-authentication", { "faceIDPermission": "A Contabia usa o Face ID para confirmar ligações ao seu contabilista." }]
     ],
-    "experiments": { "typedRoutes": false }
+    "experiments": { "typedRoutes": false, "baseUrl": "/empresa" }
   }
 }
