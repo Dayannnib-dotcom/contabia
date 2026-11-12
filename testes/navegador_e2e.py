@@ -172,6 +172,22 @@ with sync_playwright() as p:
         emp.get_by_text("À espera de internet (1)").wait_for(state="detached", timeout=60000)
         emp.get_by_text("FT 2026/419", exact=False).first.wait_for(timeout=15000)
 
+        # ── Importar do e-Fatura (CSV exportado do portal, em Latin-1) ──
+        csv = ("Setor;Emitente;Nº Fatura / ATCUD;Tipo;Data Emissão;Total;IVA;Base Tributável;Situação\r\n"
+               "Outros;509999999 - Combustíveis do Funchal SA;FS A/77 / ABCD-77;Fatura simplificada;02/10/2026;61,00;11,00;50,00;Registado\r\n"
+               "Outros;500000000 - Papelaria Atlântico;FT 2026/419 / JFG3-419;Fatura;02/11/2026;61,00;11,00;50,00;Registado\r\n")
+        with open("/tmp/efatura.csv", "wb") as f: f.write(csv.encode("latin-1"))
+        emp.get_by_role("button", name="Importar do e-Fatura").click()
+        with emp.expect_file_chooser() as fc:
+            emp.get_by_role("button", name="Escolher ficheiro do e-Fatura").click()
+        fc.value.set_files("/tmp/efatura.csv")
+        emp.get_by_text("Combustíveis do Funchal SA").wait_for(timeout=15000)
+        shot(emp, "18e_efatura_previa")
+        emp.get_by_role("button", name="Importar 2 faturas").click()
+        emp.get_by_text("Importei 1 fatura", exact=False).wait_for(timeout=15000)
+        shot(emp, "18f_efatura_feito")
+        emp.get_by_role("button", name="Ver documentos").click()
+
         # ── Sentido inverso: uma 2.ª empresa convida o contabilista pelo n.º OCC ──
         emp2 = b.new_page(viewport=vp)
         emp2.on("pageerror", lambda e: erros.append(f"empresa2: {e}"))

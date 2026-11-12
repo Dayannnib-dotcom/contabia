@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { dataPT, euros, type Documento } from "@contabia/shared";
-import { Cartao, Chip, Ecra, Erro, Linha, Texto, Titulo, Vazio, cor, useDados, useSessao } from "@contabia/ui";
+import { Botao, Cartao, Chip, Ecra, Erro, Linha, Texto, Titulo, Vazio, cor, useDados, useSessao } from "@contabia/ui";
 
 const TIPOS: [Documento["tipo"], string][] = [["compra", "Compras"], ["venda", "Vendas"], ["banco", "Bancos"], ["pessoal", "Pessoal"]];
 const ESTADO: Record<Documento["estado"], [string, "erro" | "aviso" | "bom" | "neutro"]> = { validar: ["Validar", "erro"], sem_anexo: ["Sem anexo", "aviso"], validado: ["Validado", "bom"], anulacao_pedida: ["Anulação pedida", "aviso"], anulado: ["Anulado", "neutro"] };
@@ -19,6 +19,7 @@ export default function Documentos() {
     <Ecra>
       <Titulo sub={dados ? `${dados.length} documentos · ${dados.filter((d) => d.estado === "validado").length} validados` : undefined}>Documentos</Titulo>
       <FilaPendente />
+      <Botao titulo="Importar do e-Fatura" variante="secundario" onPress={() => router.push("/importar")} />
       <View accessibilityRole="tablist" style={{ flexDirection: "row", backgroundColor: "#E8ECE9", borderRadius: 12, padding: 4, gap: 4 }}>
         {TIPOS.map(([t, n]) => (
           <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected: t === tipo }} onPress={() => setTipo(t)}

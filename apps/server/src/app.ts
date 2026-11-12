@@ -301,6 +301,35 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     return rows.map(docDe);
   });
 
+  /** Regista um documento com todas as verificações (usado pelo QR, manual e importação do e-Fatura). */
+  async function registarDocumento(id: string, a: Ator, d: Omit<Documento, "id" | "empresaId" | "estado" | "contaSugerida" | "categoria" | "ivaDedutivel" | "criadoEm">, descricao = ""): Promise<Documento> {
+    // Erros "sem querer" mais comuns: data errada, período já fechado, a mesma fatura duas vezes.
+    const hoje = hojeISO();
+    if (d.data > hoje) throw new ErroApp("data_futura", `A data ${d.data.split("-").reverse().join("/")} ainda não chegou. Confirme a data da fatura.`);
+    if (d.data < "2000-01-01") throw new ErroApp("data_invalida", "A data do documento não parece correta.");
+    if (await periodoFechado(id, d.data.slice(0, 7)))
+      throw new ErroApp("periodo_fechado", `O mês ${d.data.slice(5, 7)}/${d.data.slice(0, 4)} já foi fechado pelo contabilista. Fale com ele antes de juntar documentos a esse mês.`, 409);
+    if (d.base < 0 || d.iva < 0) throw new ErroApp("valor_negativo", "Os valores não podem ser negativos. Para devoluções, registe a nota de crédito.");
+    if (d.origem === "manual" && d.taxa >= 0 && Math.abs(d.iva - (d.base * d.taxa) / 100) > Math.max(0.05, d.base * 0.005))
+      throw new ErroApp("iva_incoerente", `O IVA (${d.iva.toFixed(2)} €) não corresponde a ${d.taxa}% de ${d.base.toFixed(2)} €. Confirme os valores.`);
+    const [repetido] = await db.query<LinhaDoc>(
+      `SELECT * FROM documentos WHERE empresa_id = $1 AND terceiro_nif = $2 AND tipo = $3 AND upper(replace(numero, ' ', '')) = upper(replace($4, ' ', '')) AND estado <> 'anulado'`,
+      [id, d.terceiroNif, d.tipo, d.numero]);
+    if (repetido) throw new ErroApp("documento_duplicado", `Este documento já foi registado a ${repetido.criado_em.slice(0, 10).split("-").reverse().join("/")} (${repetido.numero}). Não é preciso enviá-lo outra vez.`, 409);
+    const cl = await classificar(db, id, d.tipo, d.terceiroNif, `${d.terceiroNome} ${descricao}`);
+    const novo: Documento = { ...d, id: novoId(), empresaId: id, estado: "validar", contaSugerida: cl.conta, categoria: cl.categoria, ivaDedutivel: cl.ivaDedutivel, criadoEm: agoraISO() };
+    await db.query(
+      `INSERT INTO documentos (id, empresa_id, tipo, terceiro_nif, terceiro_nome, numero, atcud, data, base, iva, total, taxa, espaco_fiscal, estado, conta_sugerida, categoria, iva_dedutivel, origem, criado_em)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+      [novo.id, id, novo.tipo, novo.terceiroNif, novo.terceiroNome, novo.numero, novo.atcud, novo.data, novo.base, novo.iva, novo.total, novo.taxa, novo.espacoFiscal, novo.estado, novo.contaSugerida, novo.categoria, novo.ivaDedutivel, novo.origem, novo.criadoEm],
+    ).catch((e) => {
+      if ((e as { code?: string }).code === "23505") throw new ErroApp("documento_duplicado", "Este documento já foi registado.", 409);
+      throw e;
+    });
+    await publicar(db, hub, id, "documento.criado", a.papel, { documentoId: novo.id, numero: novo.numero, total: novo.total });
+    return novo;
+  }
+
   app.post("/v1/empresas/:id/documentos", async (req, reply) => {
     const a = ator(req);
     const id = params(req).id;
@@ -334,31 +363,49 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
       if (m.terceiroNif && !validarNIF(m.terceiroNif)) throw new ErroApp("nif_invalido", "O NIF do fornecedor/cliente não é válido.");
       d = { ...m, atcud: m.atcud ?? "", total: Math.round((m.base + m.iva) * 100) / 100, espacoFiscal: empresa.regiao, origem: "manual" };
     }
-    // Erros "sem querer" mais comuns: data errada, período já fechado, a mesma fatura duas vezes.
-    const hoje = hojeISO();
-    if (d.data > hoje) throw new ErroApp("data_futura", `A data ${d.data.split("-").reverse().join("/")} ainda não chegou. Confirme a data da fatura.`);
-    if (d.data < "2000-01-01") throw new ErroApp("data_invalida", "A data do documento não parece correta.");
-    if (await periodoFechado(id, d.data.slice(0, 7)))
-      throw new ErroApp("periodo_fechado", `O mês ${d.data.slice(5, 7)}/${d.data.slice(0, 4)} já foi fechado pelo contabilista. Fale com ele antes de juntar documentos a esse mês.`, 409);
-    if (d.base < 0 || d.iva < 0) throw new ErroApp("valor_negativo", "Os valores não podem ser negativos. Para devoluções, registe a nota de crédito.");
-    if (d.origem === "manual" && d.taxa >= 0 && Math.abs(d.iva - (d.base * d.taxa) / 100) > Math.max(0.05, d.base * 0.005))
-      throw new ErroApp("iva_incoerente", `O IVA (${d.iva.toFixed(2)} €) não corresponde a ${d.taxa}% de ${d.base.toFixed(2)} €. Confirme os valores.`);
-    const [repetido] = await db.query<LinhaDoc>(
-      `SELECT * FROM documentos WHERE empresa_id = $1 AND terceiro_nif = $2 AND tipo = $3 AND upper(replace(numero, ' ', '')) = upper(replace($4, ' ', '')) AND estado <> 'anulado'`,
-      [id, d.terceiroNif, d.tipo, d.numero]);
-    if (repetido) throw new ErroApp("documento_duplicado", `Este documento já foi registado a ${repetido.criado_em.slice(0, 10).split("-").reverse().join("/")} (${repetido.numero}). Não é preciso enviá-lo outra vez.`, 409);
-    const cl = await classificar(db, id, d.tipo, d.terceiroNif, `${d.terceiroNome} ${String(corpo.descricao ?? "")}`);
-    const novo: Documento = { ...d, id: novoId(), empresaId: id, estado: "validar", contaSugerida: cl.conta, categoria: cl.categoria, ivaDedutivel: cl.ivaDedutivel, criadoEm: agoraISO() };
-    await db.query(
-      `INSERT INTO documentos (id, empresa_id, tipo, terceiro_nif, terceiro_nome, numero, atcud, data, base, iva, total, taxa, espaco_fiscal, estado, conta_sugerida, categoria, iva_dedutivel, origem, criado_em)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
-      [novo.id, id, novo.tipo, novo.terceiroNif, novo.terceiroNome, novo.numero, novo.atcud, novo.data, novo.base, novo.iva, novo.total, novo.taxa, novo.espacoFiscal, novo.estado, novo.contaSugerida, novo.categoria, novo.ivaDedutivel, novo.origem, novo.criadoEm],
-    ).catch((e) => {
-      if ((e as { code?: string }).code === "23505") throw new ErroApp("documento_duplicado", "Este documento já foi registado.", 409);
-      throw e;
-    });
-    await publicar(db, hub, id, "documento.criado", a.papel, { documentoId: novo.id, numero: novo.numero, total: novo.total });
+    const novo = await registarDocumento(id, a, d, String(corpo.descricao ?? ""));
     return reply.code(201).send(novo);
+  });
+
+
+  // Importação do e-Fatura: a app lê o CSV, mostra a pré-visualização e envia as linhas aqui.
+  app.post("/v1/empresas/:id/documentos/importar", async (req) => {
+    const a = ator(req);
+    const id = params(req).id;
+    await exigirAcesso(db, a, id);
+    const empresa = await empresaPorId(id);
+    const regras = await regrasAtuais();
+    const b = z.object({
+      tipo: z.enum(["compra", "venda"]).default("compra"),
+      linhas: z.array(z.object({
+        nif: z.string(), nome: z.string().min(1), numero: z.string().min(1), atcud: z.string().default(""),
+        data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), base: z.number(), iva: z.number(), total: z.number(),
+      })).min(1).max(500),
+    }).parse(req.body);
+    const resultados: { numero: string; estado: "importado" | "repetido" | "erro"; mensagem?: string; id?: string }[] = [];
+    for (const l of b.linhas) {
+      try {
+        if (!validarNIF(l.nif)) throw new ErroApp("nif_invalido", "NIF inválido.");
+        // taxa: a mais próxima das taxas da região naquela data
+        const t = taxasEm(regras, empresa.regiao, l.data);
+        const efetiva = l.base ? (l.iva / l.base) * 100 : 0;
+        const taxa = [0, t.reduzida, t.intermedia, t.normal].reduce((m, x) => (Math.abs(x - efetiva) < Math.abs(m - efetiva) ? x : m), 0);
+        const d = await registarDocumento(id, a, {
+          tipo: b.tipo, terceiroNif: l.nif, terceiroNome: l.nome, numero: l.numero, atcud: l.atcud, data: l.data,
+          base: l.base, iva: l.iva, total: l.total, taxa, espacoFiscal: empresa.regiao, origem: "efatura",
+        });
+        resultados.push({ numero: l.numero, estado: "importado", id: d.id });
+      } catch (e) {
+        if (e instanceof ErroApp && e.codigo === "documento_duplicado") resultados.push({ numero: l.numero, estado: "repetido" });
+        else resultados.push({ numero: l.numero, estado: "erro", mensagem: e instanceof ErroApp ? e.message : "Não foi possível importar." });
+      }
+    }
+    return {
+      importados: resultados.filter((r) => r.estado === "importado").length,
+      repetidos: resultados.filter((r) => r.estado === "repetido").length,
+      erros: resultados.filter((r) => r.estado === "erro").length,
+      resultados,
+    };
   });
 
   app.post("/v1/empresas/:id/documentos/:doc/validar", async (req) => {

@@ -55,3 +55,21 @@ test("Formatação", () => {
   assert.equal(nomePeriodo("2026T3"), "3.º trimestre de 2026");
   assert.equal(nomePeriodo("2026-10"), "outubro de 2026");
 });
+
+test("leitura do CSV exportado do e-Fatura", async () => {
+  const { lerCSVEfatura } = await import("./efatura.ts");
+  const csv = [
+    "Setor;Emitente;Nº Fatura / ATCUD;Tipo;Data Emissão;Total;IVA;Base Tributável;Situação",
+    "Outros;500000000 - Papelaria Atlântico, Lda.;FT 2026/418 / JFG3-418;Fatura;15/09/2026;146,40 €;26,40 €;120,00 €;Registado",
+    "Outros;509999999 - Combustíveis SA;FS A/77 / ABCD-77;Fatura simplificada;2026-10-02;1.230,00;230,00;1.000,00;Registado",
+    "Outros;123456788 - NIF errado;FT 1;Fatura;01/10/2026;10;0;10;Registado",
+    "Outros;500000000 - Papelaria;NC 2026/5;Nota de crédito;03/10/2026;12,30;2,30;10,00;Registado",
+    "Outros;500000000 - Papelaria;FT 2026/9;Fatura;03/10/2026;12,30;2,30;10,00;Anulado",
+  ].join("\r\n");
+  const r = lerCSVEfatura(csv);
+  assert.equal(r.linhas.length, 2);
+  assert.deepEqual(r.linhas[0], { nif: "500000000", nome: "Papelaria Atlântico, Lda.", numero: "FT 2026/418", atcud: "JFG3-418", data: "2026-09-15", base: 120, iva: 26.4, total: 146.4, tipoDoc: "Fatura", situacao: "Registado" });
+  assert.equal(r.linhas[1].base, 1000);
+  assert.equal(r.ignoradas.length, 3);
+  assert.match(lerCSVEfatura("a;b\n1;2").ignoradas[0].motivo, /Não reconheço/);
+});

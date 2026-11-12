@@ -10,6 +10,7 @@ import type {
   ResumoEmpresa, Sessao, Submissao, VerificacaoFecho, Contabilista,
 } from "./tipos.ts";
 import type { Regras, Regiao, RegimeIVA } from "./regras.ts";
+import type { LinhaEfatura } from "./efatura.ts";
 
 export class ErroApi extends Error {
   constructor(public codigo: string, mensagem: string, public status: number) {
@@ -126,6 +127,10 @@ export class ApiContabia {
   }
   criarDocumento(empresaId: string, d: Partial<Documento>) {
     return this.pedido<Documento>("POST", `/v1/empresas/${empresaId}/documentos`, d);
+  }
+  importarEfatura(empresaId: string, linhas: Omit<LinhaEfatura, "tipoDoc" | "situacao">[], tipo: "compra" | "venda" = "compra") {
+    return this.pedido<{ importados: number; repetidos: number; erros: number; resultados: { numero: string; estado: "importado" | "repetido" | "erro"; mensagem?: string }[] }>(
+      "POST", `/v1/empresas/${empresaId}/documentos/importar`, { tipo, linhas: linhas.map(({ nif, nome, numero, atcud, data, base, iva, total }) => ({ nif, nome, numero, atcud, data, base, iva, total })) });
   }
   anexos(empresaId: string, documentoId: string) {
     return this.pedido<Anexo[]>("GET", `/v1/empresas/${empresaId}/documentos/${documentoId}/anexos`);

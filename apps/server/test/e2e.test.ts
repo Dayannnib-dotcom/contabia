@@ -306,3 +306,24 @@ test("17. arquivo digital: foto/PDF de cada fatura guardado na nuvem", async () 
   const docs = (await chamar("GET", base, S.empC)).json;
   assert.equal(docs.find((x: { id: string }) => x.id === d.json.id).anexos, 1);
 });
+
+test("18. importação do e-Fatura: importa, salta repetidas e explica erros", async () => {
+  const url = `/v1/empresas/${S.empCId}/documentos/importar`;
+  const linhas = [
+    { nif: "500000000", nome: "Papelaria", numero: "FT 2026/700", atcud: "JFG3-700", data: "2026-10-15", base: 100, iva: 23, total: 123 },
+    { nif: "509999999", nome: "Restaurante", numero: "FS 9/1", atcud: "", data: "2026-10-16", base: 20, iva: 2.6, total: 22.6 },
+    { nif: "500000000", nome: "Papelaria", numero: "FT 2026/701", atcud: "", data: "2027-01-01", base: 10, iva: 2.3, total: 12.3 },
+  ];
+  const r = await chamar("POST", url, S.empC, { linhas });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.importados, 2);
+  assert.equal(r.json.erros, 1);
+  assert.match(r.json.resultados[2].mensagem, /ainda não chegou/);
+  // importar o mesmo ficheiro outra vez não duplica nada
+  const r2 = await chamar("POST", url, S.empC, { linhas: linhas.slice(0, 2) });
+  assert.equal(r2.json.repetidos, 2);
+  const docs = (await chamar("GET", `/v1/empresas/${S.empCId}/documentos`, S.empC)).json;
+  const rest = docs.find((d: { numero: string }) => d.numero === "FS 9/1");
+  assert.equal(rest.taxa, 13); // 2,60 / 20 = 13 % (taxa intermédia)
+  assert.equal(rest.origem, "efatura");
+});
