@@ -1,4 +1,5 @@
 import { Redirect, useRouter } from "expo-router";
+import { saudacao } from "@contabia/shared";
 import { EcraEntrada, useSessao } from "@contabia/ui";
 
 export default function Inicio() {
@@ -9,7 +10,8 @@ export default function Inicio() {
   return (
     <EcraEntrada
       papel="A contabilidade da sua empresa, em dia."
-      saudacao="Olá! Sou o Luís. Ajudo-o a ter tudo organizado para o seu contabilista."
+      saudacao={`${saudacao()}! Sou o Luís. Estou atento a todas as suas faturas e obrigações — trato de as organizar para o seu contabilista.`}
+      rotulo="o seu gestor virtual"
       onEntrar={() => router.push("/entrar")}
       onCriarConta={() => router.push("/registar")}
     />

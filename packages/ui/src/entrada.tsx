@@ -6,7 +6,7 @@ import { Logo, Luis } from "./marca";
 import { Botao } from "./componentes";
 
 /** Entrada animada: logótipo, nome, sinais de confiança e saudação do Luís. */
-export function EcraEntrada({ papel, saudacao, onEntrar, onCriarConta }: { papel: string; saudacao: string; onEntrar: () => void; onCriarConta: () => void }) {
+export function EcraEntrada({ papel, saudacao, onEntrar, onCriarConta, rotulo = "assistente virtual" }: { papel: string; saudacao: string; onEntrar: () => void; onCriarConta: () => void; rotulo?: string }) {
   const v = useRef(Array.from({ length: 7 }, () => new Animated.Value(0))).current;
   useEffect(() => {
     Animated.stagger(
@@ -43,7 +43,7 @@ export function EcraEntrada({ papel, saudacao, onEntrar, onCriarConta }: { papel
       <Animated.View style={[s.luis, sobe(5)]}>
         <Luis tamanho={52} id="entrada" />
         <View style={{ flex: 1, gap: 4 }}>
-          <Text style={{ fontSize: 13, fontWeight: "600", color: cor.texto }}>Luís <Text style={{ fontWeight: "400", color: cor.textoSec }}>· assistente virtual</Text></Text>
+          <Text style={{ fontSize: 13, fontWeight: "600", color: cor.texto }}>Luís <Text style={{ fontWeight: "400", color: cor.textoSec }}>· {rotulo}</Text></Text>
           <Text style={{ fontSize: 14, lineHeight: 20, color: cor.texto }}>{saudacao}</Text>
         </View>
       </Animated.View>

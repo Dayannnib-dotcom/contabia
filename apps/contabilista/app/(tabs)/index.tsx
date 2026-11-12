@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
-import { formatarNIF } from "@contabia/shared";
+import { formatarNIF, saudacao } from "@contabia/shared";
 import { Botao, Cartao, Chip, Ecra, Erro, Icone, MensagemLuis, Numero, Texto, Titulo, Vazio, cor, useDados, useSessao } from "@contabia/ui";
 
 const pl = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
@@ -15,19 +15,20 @@ export default function Carteira() {
   const rev = dados?.reduce((s, r) => s + r.lancamentosPorRever, 0) ?? 0;
   const ped = dados?.reduce((s, r) => s + r.pedidosPendentes, 0) ?? 0;
   const iva = dados?.filter((r) => !r.ivaSubmetido).length ?? 0;
+  const prioridade = dados?.slice().sort((a, b) => (b.lancamentosPorRever + b.pedidosPendentes + (b.ivaSubmetido ? 0 : 1)) - (a.lancamentosPorRever + a.pedidosPendentes + (a.ivaSubmetido ? 0 : 1))).find((r) => r.lancamentosPorRever + r.pedidosPendentes + (r.ivaSubmetido ? 0 : 1) > 0);
   const msg = !dados ? "A preparar o resumo do dia…"
     : dados.length === 0 ? "Ainda não tem empresas. Use «Ligar empresa» com o utilizador e o NIF que a empresa lhe der."
-    : rev + ped + iva === 0 ? `Está tudo em dia nas suas ${dados.length} empresas. Bom trabalho!`
-    : `Tem ${pl(rev, "lançamento", "lançamentos")} para rever e ${pl(ped, "pedido", "pedidos")} à espera das empresas.${iva ? ` ${pl(iva, "declaração de IVA", "declarações de IVA")} por submeter.` : ""}`;
+    : rev + ped + iva === 0 ? `Está tudo revisto e submetido nas suas ${dados.length} empresas. Bom trabalho!`
+    : `Hoje temos muito trabalho por ver e submeter: ${pl(rev, "lançamento", "lançamentos")} para rever, ${pl(ped, "pedido", "pedidos")} à espera das empresas e ${pl(iva, "declaração de IVA", "declarações de IVA")} por submeter.${prioridade ? ` Sugiro começar pela ${prioridade.empresa.nome.replace(/\.$/, "")}.` : ""}`;
   const primeira = dados?.find((r) => r.lancamentosPorRever > 0);
 
   return (
     <Ecra>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <Titulo sub={online ? "Sincronizado em tempo real" : "A ligar…"}>Bom dia, {sessao!.nome.split(" ")[0]}</Titulo>
+        <Titulo sub={online ? "Sincronizado em tempo real" : "A ligar…"}>{saudacao()}, {sessao!.nome.split(" ")[0]}</Titulo>
         <Pressable accessibilityRole="button" accessibilityLabel="Terminar sessão" onPress={sair} style={{ padding: 10 }}><Icone nome="sair" cor={cor.textoSec} /></Pressable>
       </View>
-      <MensagemLuis escuro texto={msg} acao={primeira ? <Botao titulo="Começar revisão" variante="menta" onPress={() => router.push({ pathname: "/empresa/[id]", params: { id: primeira.empresa.id, sec: "revisao" } })} estilo={{ alignSelf: "flex-start", minHeight: 40, marginTop: 6 }} /> : undefined} />
+      <MensagemLuis escuro rotulo="Luís · assistente do seu gabinete" texto={msg} acao={primeira ? <Botao titulo="Começar revisão" variante="menta" onPress={() => router.push({ pathname: "/empresa/[id]", params: { id: primeira.empresa.id, sec: "revisao" } })} estilo={{ alignSelf: "flex-start", minHeight: 40, marginTop: 6 }} /> : undefined} />
       <Erro texto={erro} />
       <View style={{ flexDirection: "row", gap: 10 }}>
         {[["Por rever", rev], ["Pedidos", ped], ["IVA por submeter", iva]].map(([t, n]) => (

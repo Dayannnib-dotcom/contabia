@@ -96,7 +96,7 @@ export function Linha({ esquerda, direita, sub, onPress }: { esquerda: ReactNode
 }
 
 /** Mensagem do Luís, que entra a subir suavemente. */
-export function MensagemLuis({ texto, escuro, acao }: { texto: string; escuro?: boolean; acao?: ReactNode }) {
+export function MensagemLuis({ texto, escuro, acao, rotulo = "Luís · assistente virtual" }: { texto: string; escuro?: boolean; acao?: ReactNode; rotulo?: string }) {
   const y = useRef(new Animated.Value(16)).current;
   const o = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -109,7 +109,7 @@ export function MensagemLuis({ texto, escuro, acao }: { texto: string; escuro?: 
     <Animated.View style={[s.luis, escuro && { backgroundColor: cor.tinta, borderColor: cor.tinta }, { opacity: o, transform: [{ translateY: y }] }]}>
       <Luis tamanho={44} id="msg" />
       <View style={{ flex: 1, gap: 4 }}>
-        <Text style={{ fontSize: 13, fontWeight: "600", color: escuro ? "#9FE3CF" : cor.verdeEscuro }}>Luís · assistente virtual</Text>
+        <Text style={{ fontSize: 13, fontWeight: "600", color: escuro ? "#9FE3CF" : cor.verdeEscuro }}>{rotulo}</Text>
         <Text style={{ fontSize: 14, lineHeight: 20, color: escuro ? "#FFFFFF" : cor.texto }}>{texto}</Text>
         {acao}
       </View>

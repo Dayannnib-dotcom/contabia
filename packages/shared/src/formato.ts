@@ -26,3 +26,9 @@ export function nomePeriodo(p: string): string {
 export function arred(v: number): number {
   return Math.round(v * 100) / 100;
 }
+
+/** «Bom dia» até às 12h, «Boa tarde» até às 20h, depois «Boa noite». */
+export function saudacao(d: Date = new Date()): string {
+  const h = d.getHours();
+  return h < 12 ? "Bom dia" : h < 20 ? "Boa tarde" : "Boa noite";
+}

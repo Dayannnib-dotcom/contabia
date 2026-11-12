@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { dataPT, diasAte, nomePeriodo } from "@contabia/shared";
+import { dataPT, diasAte, nomePeriodo, saudacao } from "@contabia/shared";
 import { Cartao, Chip, Ecra, Erro, Icone, Linha, MensagemLuis, Numero, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
 
 const MESES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
@@ -18,8 +18,8 @@ export default function Painel() {
   const prox = dados?.prazos.find((p) => !p.submetida);
   const faltas = (dados?.resumo.documentosPorValidar ?? 0) + (dados?.pedidos.length ?? 0) + (dados?.ligPendente ? 1 : 0);
   const msg = !dados ? "A preparar o seu resumo…"
-    : faltas === 0 ? "Está tudo em dia. Bom trabalho!"
-    : `Tem ${faltas} ${faltas === 1 ? "coisa" : "coisas"} para tratar.${prox ? ` O próximo prazo é a ${dataPT(prox.prazo)}.` : ""}`;
+    : faltas === 0 ? `${saudacao()}! Estou atento a todas as suas faturas e obrigações. Por agora está tudo em dia — pode ficar descansado.`
+    : `${saudacao()}! Estou atento às suas faturas e obrigações. Tem ${faltas} ${faltas === 1 ? "coisa" : "coisas"} para tratar${prox ? `; o próximo prazo é a ${dataPT(prox.prazo)}` : ""}.`;
 
   return (
     <Ecra>
@@ -29,7 +29,7 @@ export default function Painel() {
           <Icone nome="sair" cor={cor.textoSec} />
         </Pressable>
       </View>
-      <MensagemLuis texto={msg} escuro />
+      <MensagemLuis texto={msg} escuro rotulo="Luís · o seu gestor virtual" />
       <Erro texto={erro} />
 
       {prox ? (
