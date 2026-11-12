@@ -12,6 +12,7 @@ let url = "";
 const S: Record<string, string> = {};
 const enviados: MensagemPush[] = [];
 const naoRegistados = new Set<string>();
+const emails: { para: string; assunto: string; texto: string }[] = [];
 const enviarFalso = async (m: MensagemPush[]) => { enviados.push(...m); return m.map((x) => (naoRegistados.has(x.to) ? { status: "error" as const, details: { error: "DeviceNotRegistered" } } : { status: "ok" as const })); };
 
 async function chamar(metodo: string, caminho: string, token?: string, corpo?: unknown, extra: Record<string, string> = {}) {
@@ -26,7 +27,7 @@ async function chamar(metodo: string, caminho: string, token?: string, corpo?: u
 
 before(async () => {
   db = await abrirDb(process.env.TEST_DATABASE_URL);
-  ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => new Date("2026-11-11T10:00:00Z"), enviarPush: enviarFalso }));
+  ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => new Date("2026-11-11T10:00:00Z"), enviarPush: enviarFalso, enviarEmail: async (e) => { emails.push(e); return true; }, urlPublico: "https://contabia-eu.onrender.com" }));
   url = await app.listen({ port: 0, host: "127.0.0.1" });
 });
 after(async () => {
@@ -459,4 +460,41 @@ test("22. avisos push: eventos para o outro lado e prazos sem repetir", async ()
   // rota de administração (para um cron externo)
   assert.equal((await chamar("POST", "/v1/admin/avisos-prazos", S.empC, {})).status, 403);
   assert.equal((await chamar("POST", "/v1/admin/avisos-prazos", undefined, {}, { "x-admin-token": "admin" })).status, 200);
+});
+
+test("23. segurança da entrada: limite de tentativas e recuperar a senha por e-mail", async () => {
+  // empresa nova com e-mail
+  const e = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "empresa.g", nif: "509999956", nome: "Empresa G", senha: "segredo123", regiao: "PT", regimeIVA: "mensal", email: "Gestor@EmpresaG.pt" });
+  assert.equal(e.status, 201, JSON.stringify(e.json));
+  const sessaoAntiga = e.json.token;
+  // 5 senhas erradas → bloqueio temporário, mesmo com a senha certa
+  for (let i = 0; i < 5; i++) assert.equal((await chamar("POST", "/v1/auth/sessoes", undefined, { papel: "empresa", identificador: "empresa.g", senha: "errada123" })).json.codigo, "credenciais");
+  const bloq = await chamar("POST", "/v1/auth/sessoes", undefined, { papel: "empresa", identificador: "empresa.g", senha: "segredo123" });
+  assert.equal(bloq.status, 429);
+  assert.match(bloq.json.mensagem, /tente de novo dentro de 15 minutos/);
+  // recuperar: a resposta é igual exista ou não a conta (não revela quem está registado)
+  emails.length = 0;
+  const nada = await chamar("POST", "/v1/auth/recuperar", undefined, { papel: "empresa", identificador: "nao.existe" });
+  const sim = await chamar("POST", "/v1/auth/recuperar", undefined, { papel: "empresa", identificador: "empresa.g" });
+  assert.equal(nada.json.mensagem, sim.json.mensagem);
+  assert.equal(emails.length, 1);
+  assert.equal(emails[0].para, "gestor@empresag.pt");
+  const token = emails[0].texto.match(/redefinir\?token=([\w-]+)/)![1];
+  assert.ok(emails[0].texto.includes("https://contabia-eu.onrender.com/empresa/redefinir?token="));
+  // senha curta recusada; depois a nova senha fica guardada
+  assert.equal((await chamar("POST", "/v1/auth/redefinir", undefined, { token, senha: "curta" })).status, 400);
+  await new Promise((r) => setTimeout(r, 1100));
+  assert.equal((await chamar("POST", "/v1/auth/redefinir", undefined, { token, senha: "novaSenha123" })).json.ok, true);
+  // a ligação só serve uma vez
+  assert.equal((await chamar("POST", "/v1/auth/redefinir", undefined, { token, senha: "outraSenha1" })).json.codigo, "ligacao_invalida");
+  // as sessões antigas terminam, e a nova senha entra logo (o bloqueio é levantado)
+  assert.equal((await chamar("GET", "/v1/auth/eu", sessaoAntiga)).status, 401);
+  assert.ok((await chamar("POST", "/v1/auth/sessoes", undefined, { papel: "empresa", identificador: "empresa.g", senha: "novaSenha123" })).json.token);
+  // o colaborador também recupera pelo próprio e-mail
+  emails.length = 0;
+  await chamar("POST", "/v1/auth/recuperar", undefined, { papel: "empresa", identificador: "rui@gabinete.pt" });
+  assert.equal(emails.length, 0); // é contabilista, não empresa
+  await chamar("POST", "/v1/auth/recuperar", undefined, { papel: "contabilista", identificador: "rui@gabinete.pt" });
+  assert.equal(emails.length, 1);
+  assert.ok(emails[0].texto.includes("/contabilista/redefinir?token="));
 });

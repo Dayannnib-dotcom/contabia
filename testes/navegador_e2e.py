@@ -31,6 +31,7 @@ with sync_playwright() as p:
         emp.get_by_text("NIF inválido").wait_for()
         emp.get_by_label("NIF da empresa").fill("509999999")
         emp.get_by_text("✓ NIF válido").wait_for()
+        emp.get_by_label("E-mail do gestor").fill("gestor@atlantico.pt")
         emp.get_by_label("Senha").fill("segredo123")
         shot(emp, "02_registo")
         emp.get_by_role("button", name="Criar conta").click()
@@ -268,6 +269,7 @@ with sync_playwright() as p:
         emp2.get_by_label("Nome da empresa").fill("Funchal Digital, Lda.")
         emp2.get_by_label("Utilizador da empresa").fill("funchal.digital")
         emp2.get_by_label("NIF da empresa").fill("510100007")
+        emp2.get_by_label("E-mail do gestor").fill("gestor@funchaldigital.pt")
         emp2.get_by_label("Senha").fill("segredo123")
         emp2.get_by_role("button", name="Criar conta").click()
         emp2.get_by_text("Precisa da sua atenção").wait_for(timeout=15000)
@@ -304,6 +306,17 @@ with sync_playwright() as p:
         emp2.get_by_role("button", name="Sim, sair").click()
         emp2.get_by_role("button", name="Entrar").wait_for(timeout=20000)
         shot(emp2, "25_saiu")
+
+        # ── Esqueci-me da senha ──
+        emp2.get_by_role("button", name="Entrar").click()
+        emp2.get_by_role("button", name="Esqueci-me da senha").click()
+        emp2.get_by_label("Utilizador ou e-mail da conta a recuperar").fill("funchal.digital")
+        emp2.get_by_role("button", name="Enviar ligação").click()
+        emp2.get_by_text("enviámos uma ligação", exact=False).wait_for(timeout=15000)
+        shot(emp2, "26_recuperar")
+        emp2.goto(BASE + "/empresa/redefinir")
+        emp2.get_by_text("Ligação incompleta", exact=False).wait_for(timeout=20000)
+
 
 
     except Exception:

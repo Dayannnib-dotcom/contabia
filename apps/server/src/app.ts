@@ -21,6 +21,8 @@ import {
 import { perguntar } from "./assistente.ts";
 import { sugerir, type DocConc } from "./conciliacao.ts";
 import { criarPush, enviarExpo, type EnviarPush } from "./push.ts";
+import { criarEnvioEmail, emailRecuperacao, type EnviarEmail } from "./email.ts";
+import { randomBytes } from "node:crypto";
 
 export interface Config {
   segredoJWT: string;
@@ -31,6 +33,10 @@ export interface Config {
   pastaWeb?: string;
   /** Envio de avisos push (por omissão, o serviço da Expo; nos testes, um falso). */
   enviarPush?: EnviarPush;
+  /** Envio de e-mails (por omissão, Brevo com BREVO_API_KEY; nos testes, um falso). */
+  enviarEmail?: EnviarEmail;
+  /** Endereço público do site, para as ligações nos e-mails. */
+  urlPublico?: string;
   /** Verificar os prazos e enviar avisos todos os dias às 9h de Lisboa. */
   agendarAvisosPrazos?: boolean;
 }
@@ -39,7 +45,7 @@ const HORAS_PEDIDO = 72;
 const MAX_PEDIDOS_HORA = 5;
 
 export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInstance; hub: Hub }> {
-  const app = Fastify({ logger: false });
+  const app = Fastify({ logger: false, trustProxy: true });
   const hub = new Hub();
   const tokens = criarTokens(cfg.segredoJWT);
   const push = criarPush(db, cfg.enviarPush ?? enviarExpo);
@@ -58,11 +64,14 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const token = h?.startsWith("Bearer ") ? h.slice(7) : q;
     if (!token) return;
     const a = await tokens.verificar(token);
-    const [existe] = await db.query(a.papel === "empresa" ? `SELECT 1 FROM empresas WHERE id = $1` : `SELECT 1 FROM contabilistas WHERE id = $1`, [a.id]);
+    const [existe] = await db.query<{ senha_mudada_em: string | null }>(a.papel === "empresa" ? `SELECT senha_mudada_em FROM empresas WHERE id = $1` : `SELECT senha_mudada_em FROM contabilistas WHERE id = $1`, [a.id]);
     if (!existe) throw new ErroApp("sessao_invalida", "A sua sessão terminou. Entre novamente.", 401);
     // um colaborador desativado pelo gestor sai logo, em todos os dispositivos
-    if (a.colaboradorId && !(await db.query(`SELECT 1 FROM colaboradores WHERE id = $1 AND empresa_id = $2 AND ativo`, [a.colaboradorId, a.id])).length)
-      throw new ErroApp("sessao_invalida", "O seu acesso a esta empresa foi desativado pelo gestor.", 401);
+    const [colab] = a.colaboradorId ? await db.query<{ senha_mudada_em: string | null }>(`SELECT senha_mudada_em FROM colaboradores WHERE id = $1 AND empresa_id = $2 AND ativo`, [a.colaboradorId, a.id]) : [];
+    if (a.colaboradorId && !colab) throw new ErroApp("sessao_invalida", "O seu acesso a esta empresa foi desativado pelo gestor.", 401);
+    // senha mudada (ex.: recuperada por e-mail): as sessões antigas terminam em todos os aparelhos
+    const mudada = a.colaboradorId ? colab?.senha_mudada_em : existe.senha_mudada_em;
+    if (mudada && a.emitidoEm * 1000 < Date.parse(mudada) - 1000) throw new ErroApp("sessao_invalida", "A senha foi alterada. Entre novamente com a nova senha.", 401);
     const { emitidoEm, ...semData } = a;
     (req as FastifyRequest & { ator?: Ator }).ator = semData;
     // Sessão deslizante: quem usa a app pelo menos uma vez por mês nunca é posto fora.
@@ -101,10 +110,10 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
 
   // ── auxiliares ──
   const empresaPorId = async (id: string): Promise<Empresa> => {
-    const [e] = await db.query<{ id: string; utilizador: string; nif: string; nome: string; regiao: string; regime_iva: string }>(
-      `SELECT id, utilizador, nif, nome, regiao, regime_iva FROM empresas WHERE id = $1`, [id]);
+    const [e] = await db.query<{ id: string; utilizador: string; nif: string; nome: string; regiao: string; regime_iva: string; email: string | null }>(
+      `SELECT id, utilizador, nif, nome, regiao, regime_iva, email FROM empresas WHERE id = $1`, [id]);
     if (!e) throw new ErroApp("nao_encontrada", "Empresa não encontrada.", 404);
-    return { id: e.id, utilizador: e.utilizador, nif: e.nif, nome: e.nome, regiao: e.regiao as Empresa["regiao"], regimeIVA: e.regime_iva as Empresa["regimeIVA"] };
+    return { id: e.id, utilizador: e.utilizador, nif: e.nif, nome: e.nome, regiao: e.regiao as Empresa["regiao"], regimeIVA: e.regime_iva as Empresa["regimeIVA"], email: e.email };
   };
   const regrasAtuais = async (): Promise<Regras> => {
     const [r] = await db.query<{ regras: Regras }>(`SELECT regras FROM regras_versoes ORDER BY publicada_em DESC LIMIT 1`);
@@ -121,6 +130,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const b = z.object({
       utilizador: z.string(), nif: z.string(), nome: z.string().min(2), senha: z.string().min(8),
       regiao: z.enum(["PT", "PT-MA", "PT-AC"]), regimeIVA: z.enum(["mensal", "trimestral"]),
+      email: z.string().trim().toLowerCase().email("O e-mail não parece válido.").optional(),
     }).parse(req.body);
     const utilizador = normalizarUtilizador(b.utilizador);
     if (!utilizadorValido(utilizador)) throw new ErroApp("utilizador_invalido", "O utilizador deve ter 3 a 40 letras, números, pontos ou hífenes.");
@@ -131,8 +141,8 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const [nifUsado] = await db.query(`SELECT 1 FROM empresas WHERE nif = $1`, [nif]);
     if (nifUsado) throw new ErroApp("nif_existe", "Já existe uma conta Contabia com este NIF. Use «Entrar» com o utilizador dessa conta.", 409);
     const id = novoId();
-    await db.query(`INSERT INTO empresas (id, utilizador, nif, nome, regiao, regime_iva, senha_hash, criada_em) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, utilizador, nif, b.nome, b.regiao, b.regimeIVA, await hashSenha(b.senha), agoraISO()]);
+    await db.query(`INSERT INTO empresas (id, utilizador, nif, nome, regiao, regime_iva, senha_hash, criada_em, email) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [id, utilizador, nif, b.nome, b.regiao, b.regimeIVA, await hashSenha(b.senha), agoraISO(), b.email ?? null]);
     return reply.code(201).send(await sessao({ papel: "empresa", id, nome: b.nome }));
   });
 
@@ -149,8 +159,34 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     return reply.code(201).send(await sessao({ papel: "contabilista", id, nome: b.nome }));
   });
 
+  // ── Proteção contra adivinhar senhas: 5 erros por conta em 15 min, 20 por endereço IP ──
+  const falhas = new Map<string, number[]>();
+  const JANELA = 15 * 60 * 1000;
+  const recentes = (k: string) => (falhas.get(k) ?? []).filter((t) => Date.now() - t < JANELA);
+  function verificarTentativas(chaves: [string, number][]) {
+    for (const [k, max] of chaves) {
+      const r = recentes(k);
+      if (r.length >= max) {
+        const min = Math.max(1, Math.ceil((JANELA - (Date.now() - r[0])) / 60000));
+        throw new ErroApp("demasiadas_tentativas", `Demasiadas tentativas erradas. Por segurança, tente de novo dentro de ${min} ${min === 1 ? "minuto" : "minutos"} ou recupere a senha.`, 429);
+      }
+    }
+  }
+  const registarFalha = (...ks: string[]) => { for (const k of ks) falhas.set(k, [...recentes(k), Date.now()]); };
+
   app.post("/v1/auth/sessoes", async (req) => {
     const b = z.object({ papel: z.enum(["empresa", "contabilista"]), identificador: z.string(), senha: z.string() }).parse(req.body);
+    const kConta = `conta:${b.papel}:${b.identificador.trim().toLowerCase()}`;
+    const kIP = `ip:${req.ip}`;
+    verificarTentativas([[kConta, 5], [kIP, 20]]);
+    try {
+      return await entrarCom(b);
+    } catch (e) {
+      if (e instanceof ErroApp && e.codigo === "credenciais") registarFalha(kConta, kIP);
+      throw e;
+    }
+  });
+  async function entrarCom(b: { papel: "empresa" | "contabilista"; identificador: string; senha: string }): Promise<Sessao> {
     if (b.papel === "empresa" && b.identificador.includes("@")) {
       // colaborador: entra com o próprio e-mail
       const [c] = await db.query<{ id: string; nome: string; senha_hash: string; ativo: boolean; empresa_id: string; e_nome: string }>(
@@ -166,6 +202,73 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const [u] = await db.query<{ id: string; nome: string; senha_hash: string }>(sql, [ident]);
     if (!u || !(await verificarSenha(b.senha, u.senha_hash))) throw new ErroApp("credenciais", "Utilizador ou senha incorretos.", 401);
     return sessao({ papel: b.papel, id: u.id, nome: u.nome });
+  }
+
+
+  // ── Recuperar a senha por e-mail ──
+  const enviarEmail = cfg.enviarEmail ?? criarEnvioEmail();
+  const urlPublico = (cfg.urlPublico ?? process.env.URL_PUBLICO ?? "http://localhost:3000").replace(/\/$/, "");
+  const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
+  const MENSAGEM_RECUPERAR = "Se existir uma conta com esses dados e um e-mail associado, enviámos uma ligação para criar uma nova senha. Veja também a pasta de spam.";
+
+  app.post("/v1/auth/recuperar", async (req) => {
+    const b = z.object({ papel: z.enum(["empresa", "contabilista"]), identificador: z.string().trim().min(1) }).parse(req.body);
+    const ident = b.identificador.toLowerCase();
+    verificarTentativas([[`recuperar:${ident}`, 3], [`ip:${req.ip}`, 20]]);
+    registarFalha(`recuperar:${ident}`); // conta como tentativa para limitar abusos
+    let alvo: { conta: string; colab: string | null; email: string; nome: string } | null = null;
+    if (b.papel === "contabilista") {
+      const [c] = await db.query<{ id: string; email: string; nome: string }>(`SELECT id, email, nome FROM contabilistas WHERE email = $1`, [ident]);
+      if (c) alvo = { conta: c.id, colab: null, email: c.email, nome: c.nome };
+    } else {
+      const [c] = await db.query<{ id: string; empresa_id: string; email: string; nome: string }>(`SELECT id, empresa_id, email, nome FROM colaboradores WHERE email = $1 AND ativo`, [ident]);
+      if (c) alvo = { conta: c.empresa_id, colab: c.id, email: c.email, nome: c.nome };
+      else {
+        const [e] = await db.query<{ id: string; email: string | null; nome: string }>(`SELECT id, email, nome FROM empresas WHERE utilizador = $1 OR email = $2`, [normalizarUtilizador(ident), ident]);
+        if (e?.email) alvo = { conta: e.id, colab: null, email: e.email, nome: e.nome };
+      }
+    }
+    if (alvo) {
+      const token = randomBytes(32).toString("base64url");
+      await db.query(`INSERT INTO recuperacoes (hash, papel, conta_id, colaborador_id, expira_em) VALUES ($1,$2,$3,$4,$5)`,
+        [hashToken(token), b.papel, alvo.conta, alvo.colab, new Date(Date.now() + 60 * 60 * 1000).toISOString()]);
+      const ligacao = `${urlPublico}/${b.papel === "empresa" ? "empresa" : "contabilista"}/redefinir?token=${token}`;
+      await enviarEmail({ para: alvo.email, nome: alvo.nome, ...emailRecuperacao(alvo.nome, ligacao) });
+    }
+    // a mesma resposta exista ou não a conta: não se revela quem está registado
+    return { ok: true, mensagem: MENSAGEM_RECUPERAR };
+  });
+
+  app.post("/v1/auth/redefinir", async (req) => {
+    const b = z.object({ token: z.string().min(20), senha: z.string().min(8, "A senha deve ter pelo menos 8 caracteres.") }).parse(req.body);
+    const [r] = await db.query<{ hash: string; papel: string; conta_id: string; colaborador_id: string | null; expira_em: string; usada: boolean }>(
+      `SELECT * FROM recuperacoes WHERE hash = $1`, [hashToken(b.token)]);
+    if (!r || r.usada || Date.parse(r.expira_em) < Date.now())
+      throw new ErroApp("ligacao_invalida", "Esta ligação já foi usada ou expirou. Peça uma nova em «Esqueci-me da senha».", 400);
+    const hash = await hashSenha(b.senha);
+    const agoraTxt = new Date().toISOString();
+    if (r.colaborador_id) await db.query(`UPDATE colaboradores SET senha_hash = $1, senha_mudada_em = $2 WHERE id = $3`, [hash, agoraTxt, r.colaborador_id]);
+    else if (r.papel === "empresa") await db.query(`UPDATE empresas SET senha_hash = $1, senha_mudada_em = $2 WHERE id = $3`, [hash, agoraTxt, r.conta_id]);
+    else await db.query(`UPDATE contabilistas SET senha_hash = $1, senha_mudada_em = $2 WHERE id = $3`, [hash, agoraTxt, r.conta_id]);
+    await db.query(`UPDATE recuperacoes SET usada = true WHERE hash = $1`, [r.hash]);
+    // quem acabou de provar que é dono do e-mail pode entrar já, sem esperar pelo desbloqueio
+    const idents = r.colaborador_id
+      ? await db.query<{ i: string }>(`SELECT email AS i FROM colaboradores WHERE id = $1`, [r.colaborador_id])
+      : r.papel === "empresa"
+        ? await db.query<{ i: string }>(`SELECT utilizador AS i FROM empresas WHERE id = $1 UNION SELECT email FROM empresas WHERE id = $1 AND email IS NOT NULL`, [r.conta_id])
+        : await db.query<{ i: string }>(`SELECT email AS i FROM contabilistas WHERE id = $1`, [r.conta_id]);
+    for (const { i } of idents) falhas.delete(`conta:${r.papel}:${i.toLowerCase()}`);
+    return { ok: true, mensagem: "Nova senha guardada. Já pode entrar." };
+  });
+
+  /** O gestor da empresa define ou muda o e-mail de recuperação. */
+  app.put("/v1/auth/email", async (req) => {
+    const a = ator(req);
+    if (a.papel !== "empresa") throw new ErroApp("sem_acesso", "Só para empresas.", 403);
+    exigirGestor(a);
+    const b = z.object({ email: z.string().trim().toLowerCase().email("O e-mail não parece válido.") }).parse(req.body);
+    await db.query(`UPDATE empresas SET email = $1 WHERE id = $2`, [b.email, a.id]);
+    return empresaPorId(a.id);
   });
 
   app.get("/v1/auth/eu", async (req) => {

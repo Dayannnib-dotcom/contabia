@@ -235,6 +235,19 @@ const MIGRACOES: string[] = [
      em text NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS atividade_empresa ON atividade(empresa_id, seq)`,
+  // E-mail da empresa (recuperar senha) e invalidação de sessões quando a senha muda.
+  `ALTER TABLE empresas ADD COLUMN IF NOT EXISTS email text`,
+  `ALTER TABLE empresas ADD COLUMN IF NOT EXISTS senha_mudada_em text`,
+  `ALTER TABLE contabilistas ADD COLUMN IF NOT EXISTS senha_mudada_em text`,
+  `ALTER TABLE colaboradores ADD COLUMN IF NOT EXISTS senha_mudada_em text`,
+  `CREATE TABLE IF NOT EXISTS recuperacoes (
+     hash text PRIMARY KEY,
+     papel text NOT NULL,
+     conta_id text NOT NULL,
+     colaborador_id text,
+     expira_em text NOT NULL,
+     usada boolean NOT NULL DEFAULT false
+   )`,
   // Telemóveis que recebem avisos push (Expo). Um token por aparelho.
   `CREATE TABLE IF NOT EXISTS dispositivos (
      token text PRIMARY KEY,

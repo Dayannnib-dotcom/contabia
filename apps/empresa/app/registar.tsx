@@ -30,19 +30,20 @@ export default function Registar() {
   const [utilizador, setUtilizador] = useState("");
   const [nif, setNif] = useState("");
   const [senha, setSenha] = useState("");
+  const [email, setEmail] = useState("");
   const [regiao, setRegiao] = useState<Regiao>("PT-MA");
   const [regime, setRegime] = useState<RegimeIVA>("trimestral");
   const [erro, setErro] = useState<string | null>(null);
   const [aEnviar, setAEnviar] = useState(false);
   const ajuda = ajudaNIF(nif);
   const userOk = utilizadorValido(utilizador);
-  const valido = nome.length >= 2 && userOk && ajuda.estado === "valido" && senha.length >= 8;
+  const valido = nome.length >= 2 && userOk && ajuda.estado === "valido" && senha.length >= 8 && /^\S+@\S+\.\S+$/.test(email.trim());
 
   async function enviar() {
     setAEnviar(true);
     setErro(null);
     try {
-      await entrar(await api.registarEmpresa({ nome, utilizador, nif, senha, regiao, regimeIVA: regime }));
+      await entrar(await api.registarEmpresa({ nome, utilizador, nif, senha, regiao, regimeIVA: regime, email: email.trim() }));
       router.replace("/(tabs)");
     } catch (e) {
       setErro((e as Error).message);
@@ -62,6 +63,7 @@ export default function Registar() {
         ajuda={ajuda.estado === "valido" ? "✓ NIF válido" : ajuda.mensagem} erro={ajuda.estado === "invalido"} />
       <Opcoes rotulo="Região fiscal" valor={regiao} mudar={setRegiao} opcoes={[["PT", "Continente"], ["PT-MA", "Madeira"], ["PT-AC", "Açores"]]} />
       <Opcoes rotulo="Regime de IVA" valor={regime} mudar={setRegime} opcoes={[["mensal", "Mensal"], ["trimestral", "Trimestral"]]} />
+      <Campo rotulo="E-mail do gestor" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" ajuda="Para recuperar a senha se a esquecer. Não o partilhamos." />
       <Campo rotulo="Senha" value={senha} onChangeText={setSenha} secureTextEntry ajuda="Mínimo de 8 caracteres." />
       <Texto sec tamanho={12}>A Contabia nunca pede a senha do Portal das Finanças. As submissões são feitas pelo seu contabilista.</Texto>
       <Erro texto={erro} />

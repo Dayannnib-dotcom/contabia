@@ -13,3 +13,4 @@ export * from "./ficheiros";
 export * from "./banco";
 export * from "./atividade";
 export * from "./grafico";
+export * from "./recuperar";

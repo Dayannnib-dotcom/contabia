@@ -9,6 +9,8 @@ export interface Empresa {
   nome: string;
   regiao: Regiao;
   regimeIVA: RegimeIVA;
+  /** E-mail para recuperar a senha (empresas antigas podem não ter). */
+  email?: string | null;
 }
 
 export interface Contabilista {

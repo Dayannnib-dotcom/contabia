@@ -76,7 +76,7 @@ export class ApiContabia {
   }
 
   // ── Autenticação ──
-  registarEmpresa(d: { utilizador: string; nif: string; nome: string; senha: string; regiao: Regiao; regimeIVA: RegimeIVA }) {
+  registarEmpresa(d: { utilizador: string; nif: string; nome: string; senha: string; regiao: Regiao; regimeIVA: RegimeIVA; email?: string }) {
     return this.pedido<Sessao>("POST", "/v1/auth/empresas", d);
   }
   registarContabilista(d: { email: string; nome: string; numeroOCC: string; senha: string }) {
@@ -84,6 +84,15 @@ export class ApiContabia {
   }
   entrar(d: { papel: "empresa" | "contabilista"; identificador: string; senha: string }) {
     return this.pedido<Sessao>("POST", "/v1/auth/sessoes", d);
+  }
+  recuperarSenha(papel: "empresa" | "contabilista", identificador: string) {
+    return this.pedido<{ ok: true; mensagem: string }>("POST", "/v1/auth/recuperar", { papel, identificador }, 2);
+  }
+  redefinirSenha(token: string, senha: string) {
+    return this.pedido<{ ok: true; mensagem: string }>("POST", "/v1/auth/redefinir", { token, senha }, 2);
+  }
+  definirEmail(email: string) {
+    return this.pedido<Empresa>("PUT", "/v1/auth/email", { email });
   }
   eu() {
     return this.pedido<{ sessao: Sessao; empresa?: Empresa; contabilista?: Contabilista }>("GET", "/v1/auth/eu");
