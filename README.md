@@ -14,25 +14,20 @@ Duas apps móveis (iOS e Android) e um servidor partilhado:
 
 ## Experimentar já (online)
 
-- **App da empresa** (abra no telemóvel): https://contabia.onrender.com/empresa/
-- **App do Contabilista Certificado**: https://contabia.onrender.com/contabilista/
+- **App da empresa** (abra no telemóvel): https://contabia-eu.onrender.com/empresa/
+- **App do Contabilista Certificado**: https://contabia-eu.onrender.com/contabilista/
 
 Plano gratuito do Render: o servidor adormece após 15 minutos sem uso (o primeiro acesso demora cerca de 1 minuto). Os dados ficam numa base de dados PostgreSQL (`contabia-db`) e já não se perdem quando o serviço reinicia ou é atualizado. A base de dados gratuita do Render expira 30 dias após ser criada; antes disso, passe-a para um plano pago (Basic) no painel do Render.
 
-### Antes do primeiro cliente real: dados na UE (RGPD)
+### Alojamento na UE (RGPD)
 
-Na fase de testes (só dados fictícios) o servidor fica em Oregon (EUA). Antes de qualquer cliente real:
-1. No GitHub, apague `render.yaml` e mude o nome de `render.eu.yaml` para `render.yaml`.
-2. No Render, crie um Blueprint novo a partir do repositório (servidor `contabia-eu` e base de dados `contabia-db-eu`, em Frankfurt).
-3. Preencha `BREVO_API_KEY` e `EMAIL_REMETENTE`, confirme que funciona e apague os serviços antigos de Oregon.
-
-O Render não permite mudar a região de um serviço já criado; por isso é uma migração e não uma definição.
+O servidor (`contabia-eu`) e a base de dados (`contabia-db-eu`) estão em Frankfurt. O Render não permite mudar a região de um serviço já criado: para mudar de região é preciso criar serviços novos.
 
 ### Avisos no telemóvel
 
 - **Avisos de prazos locais** (7 dias, 2 dias e no próprio dia, às 9h): funcionam já, mesmo com a app fechada e sem internet.
 - **Avisos enviados pelo servidor** (pedidos do contabilista, convites, anulações, prazos): ficam ativos quando a app for publicada com EAS Build (`npx eas init` cria o ID do projeto, que vai para `extra.eas.projectId` no `app.json`). O Expo Go no Android não recebe este tipo de aviso.
-- **Plano gratuito do Render**: o servidor adormece. Para os avisos de prazos saírem todos os dias, crie em cron-job.org um pedido diário às 9h00 (Lisboa) para `POST https://contabia.onrender.com/v1/admin/avisos-prazos` com o cabeçalho `x-admin-token` igual ao `ADMIN_TOKEN` do Render.
+- **Plano gratuito do Render**: o servidor adormece. Para os avisos de prazos saírem todos os dias, crie em cron-job.org um pedido diário às 9h00 (Lisboa) para `POST https://contabia-eu.onrender.com/v1/admin/avisos-prazos` com o cabeçalho `x-admin-token` igual ao `ADMIN_TOKEN` do Render.
 
 ### Ligação empresa ⇄ contabilista (dois sentidos)
 
