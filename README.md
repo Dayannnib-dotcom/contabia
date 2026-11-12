@@ -12,6 +12,13 @@ Duas apps móveis (iOS e Android) e um servidor partilhado:
 | `packages/ui` | Tema, logótipo, Luís, componentes e sessão partilhados pelas duas apps |
 | `testes/` | Teste de ponta a ponta no navegador (Playwright) |
 
+## Experimentar já (online)
+
+- **App da empresa** (abra no telemóvel): https://contabia.onrender.com/empresa/
+- **App do Contabilista Certificado**: https://contabia.onrender.com/contabilista/
+
+Versão de demonstração no plano gratuito do Render: adormece após 15 minutos sem uso (o primeiro acesso demora cerca de 1 minuto) e os dados apagam-se quando o serviço reinicia.
+
 ## Começar em 5 minutos
 
 Requisitos: Node.js 20 ou mais recente, e a app **Expo Go** no telemóvel.
