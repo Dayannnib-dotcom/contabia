@@ -147,6 +147,14 @@ export class ApiContabia {
     return this.pedido<Atividade[]>("GET", `/v1/empresas/${empresaId}/atividade`);
   }
 
+  // ── Avisos push ──
+  registarDispositivo(token: string, plataforma: "ios" | "android" | "web") {
+    return this.pedido<{ ok: true }>("POST", "/v1/dispositivos", { token, plataforma }, 2);
+  }
+  removerDispositivo(token: string) {
+    return this.pedido<{ ok: true }>("POST", "/v1/dispositivos/remover", { token }, 1);
+  }
+
   // ── Regras por fornecedor ──
   regrasFornecedor(empresaId: string) {
     return this.pedido<RegraFornecedor[]>("GET", `/v1/empresas/${empresaId}/regras-fornecedor`);

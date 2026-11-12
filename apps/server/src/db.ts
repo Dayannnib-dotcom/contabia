@@ -235,6 +235,17 @@ const MIGRACOES: string[] = [
      em text NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS atividade_empresa ON atividade(empresa_id, seq)`,
+  // Telemóveis que recebem avisos push (Expo). Um token por aparelho.
+  `CREATE TABLE IF NOT EXISTS dispositivos (
+     token text PRIMARY KEY,
+     papel text NOT NULL,
+     conta_id text NOT NULL,
+     colaborador_id text,
+     plataforma text NOT NULL,
+     atualizado_em text NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS dispositivos_conta ON dispositivos(papel, conta_id)`,
+  `CREATE TABLE IF NOT EXISTS avisos_enviados (chave text PRIMARY KEY, em text NOT NULL)`,
   // Regras do contabilista por fornecedor: conta, IVA e se lança sozinho.
   `CREATE TABLE IF NOT EXISTS regras_fornecedor (
      empresa_id text NOT NULL REFERENCES empresas(id),

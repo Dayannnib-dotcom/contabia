@@ -20,6 +20,7 @@ import {
 } from "./contabilidade.ts";
 import { perguntar } from "./assistente.ts";
 import { sugerir, type DocConc } from "./conciliacao.ts";
+import { criarPush, enviarExpo, type EnviarPush } from "./push.ts";
 
 export interface Config {
   segredoJWT: string;
@@ -28,6 +29,10 @@ export interface Config {
   agora?: () => Date;
   /** Pasta com as builds web das apps (web/empresa e web/contabilista). */
   pastaWeb?: string;
+  /** Envio de avisos push (por omissão, o serviço da Expo; nos testes, um falso). */
+  enviarPush?: EnviarPush;
+  /** Verificar os prazos e enviar avisos todos os dias às 9h de Lisboa. */
+  agendarAvisosPrazos?: boolean;
 }
 
 const HORAS_PEDIDO = 72;
@@ -37,6 +42,8 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   const app = Fastify({ logger: false });
   const hub = new Hub();
   const tokens = criarTokens(cfg.segredoJWT);
+  const push = criarPush(db, cfg.enviarPush ?? enviarExpo);
+  hub.aoPublicar = (e, cc) => { void push.aoEvento(e, cc).catch(() => undefined); };
   const agora = cfg.agora ?? (() => new Date());
   const hojeISO = () => agora().toISOString().slice(0, 10);
   const tentativasLigacao = new Map<string, number[]>();
@@ -820,6 +827,37 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     await db.query(`DELETE FROM regras_fornecedor WHERE empresa_id = $1 AND nif = $2`, [id, nif]);
     return { ok: true };
   });
+
+  // ═════════════ Avisos push ═════════════
+  app.post("/v1/dispositivos", async (req) => {
+    const a = ator(req);
+    const b = z.object({ token: z.string().regex(/^Expo(nent)?PushToken\[.+\]$/), plataforma: z.enum(["ios", "android", "web"]) }).parse(req.body);
+    await db.query(
+      `INSERT INTO dispositivos (token, papel, conta_id, colaborador_id, plataforma, atualizado_em) VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (token) DO UPDATE SET papel = $2, conta_id = $3, colaborador_id = $4, plataforma = $5, atualizado_em = $6`,
+      [b.token, a.papel, a.id, a.colaboradorId ?? null, b.plataforma, agoraISO()]);
+    return { ok: true };
+  });
+  app.post("/v1/dispositivos/remover", async (req) => {
+    const a = ator(req);
+    const b = z.object({ token: z.string() }).parse(req.body);
+    await db.query(`DELETE FROM dispositivos WHERE token = $1 AND conta_id = $2`, [b.token, a.id]);
+    return { ok: true };
+  });
+  /** Para um serviço externo (ex.: cron-job.org) acordar o servidor às 9h e enviar os avisos de prazos. */
+  app.post("/v1/admin/avisos-prazos", async (req) => {
+    if (!cfg.tokenAdmin || req.headers["x-admin-token"] !== cfg.tokenAdmin) throw new ErroApp("sem_permissao", "Acesso reservado.", 403);
+    return { enviados: await push.avisarPrazos(hojeISO(), await regrasAtuais()) };
+  });
+  if (cfg.agendarAvisosPrazos) {
+    const verificar = async () => {
+      const hora = Number(new Intl.DateTimeFormat("pt-PT", { timeZone: "Europe/Lisbon", hour: "numeric", hourCycle: "h23" }).format(agora()));
+      if (hora >= 9) await push.avisarPrazos(hojeISO(), await regrasAtuais()).catch(() => 0);
+    };
+    const t = setInterval(() => void verificar(), 30 * 60 * 1000);
+    app.addHook("onClose", async () => clearInterval(t));
+    void verificar();
+  }
 
   // ═════════════ Lançamentos ═════════════
   type LinhaLanc = Parameters<typeof lancamentoDeLinha>[0];

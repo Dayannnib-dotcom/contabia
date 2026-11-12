@@ -9,6 +9,7 @@ if (!segredo && process.env.NODE_ENV === "production") throw new Error("Defina J
 
 const db = await abrirDb(process.env.DATABASE_URL, process.env.DATABASE_URL ? undefined : (process.env.PASTA_DADOS ?? "./data"));
 const { app } = await criarApp(db, {
+  agendarAvisosPrazos: true,
   segredoJWT: segredo ?? "desenvolvimento-apenas-mude-isto",
   tokenAdmin: process.env.ADMIN_TOKEN,
   chaveIA: process.env.ANTHROPIC_API_KEY,

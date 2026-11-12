@@ -51,7 +51,11 @@ export class Hub {
     for (const s of this.porContabilista.get(contabilistaId) ?? []) daEmpresa.delete(s);
   }
 
+  /** Chamado em cada evento publicado (usado para os avisos push). */
+  aoPublicar: ((e: Evento, contabilistaId?: string) => void) | null = null;
+
   emitir(e: Evento, tambemContabilista?: string) {
+    try { this.aoPublicar?.(e, tambemContabilista); } catch { /* o aviso nunca impede o evento */ }
     const alvo = new Set(this.porEmpresa.get(e.empresaId) ?? []);
     if (tambemContabilista) for (const s of this.porContabilista.get(tambemContabilista) ?? []) alvo.add(s);
     const txt = JSON.stringify(e);

@@ -3,12 +3,16 @@ import { test, before, after } from "node:test";
 import WebSocket from "ws";
 import { abrirDb, type Db } from "../src/db.ts";
 import { criarApp } from "../src/app.ts";
+import { criarPush, type MensagemPush } from "../src/push.ts";
 import { REGRAS_BASE } from "@contabia/shared";
 
 let db: Db;
 let app: Awaited<ReturnType<typeof criarApp>>["app"];
 let url = "";
 const S: Record<string, string> = {};
+const enviados: MensagemPush[] = [];
+const naoRegistados = new Set<string>();
+const enviarFalso = async (m: MensagemPush[]) => { enviados.push(...m); return m.map((x) => (naoRegistados.has(x.to) ? { status: "error" as const, details: { error: "DeviceNotRegistered" } } : { status: "ok" as const })); };
 
 async function chamar(metodo: string, caminho: string, token?: string, corpo?: unknown, extra: Record<string, string> = {}) {
   const r = await app.inject({
@@ -22,7 +26,7 @@ async function chamar(metodo: string, caminho: string, token?: string, corpo?: u
 
 before(async () => {
   db = await abrirDb(process.env.TEST_DATABASE_URL);
-  ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => new Date("2026-11-11T10:00:00Z") }));
+  ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => new Date("2026-11-11T10:00:00Z"), enviarPush: enviarFalso }));
   url = await app.listen({ port: 0, host: "127.0.0.1" });
 });
 after(async () => {
@@ -416,4 +420,43 @@ test("21. regras por fornecedor: o contabilista define; a conta vem certa e pode
   assert.ok(l, "devia estar lançado");
   assert.equal(l.linhas[0].conta, "62421");
   assert.equal((await chamar("GET", `/v1/empresas/${id}/regras-fornecedor`, S.empC)).json[0].autoLancar, true);
+});
+
+test("22. avisos push: eventos para o outro lado e prazos sem repetir", async () => {
+  const id = S.empCId;
+  const tEmp = "ExponentPushToken[empresa-c]";
+  const tCC = "ExponentPushToken[rui-cc]";
+  assert.equal((await chamar("POST", "/v1/dispositivos", S.empC, { token: "lixo", plataforma: "ios" })).status, 400);
+  await chamar("POST", "/v1/dispositivos", S.empC, { token: tEmp, plataforma: "android" });
+  await chamar("POST", "/v1/dispositivos", S.ccC, { token: tCC, plataforma: "ios" });
+  enviados.length = 0;
+  // o contabilista pede um documento → aviso no telemóvel da empresa
+  await chamar("POST", `/v1/empresas/${id}/pedidos`, S.ccC, { tipo: "Extrato bancário", detalhe: "novembro" });
+  await new Promise((r) => setTimeout(r, 50));
+  assert.ok(enviados.some((m) => m.to === tEmp && m.title === "O seu contabilista pede um documento" && m.body.includes("novembro")), JSON.stringify(enviados));
+  assert.ok(!enviados.some((m) => m.to === tCC));
+  // a empresa pede uma anulação → aviso no telemóvel do contabilista
+  enviados.length = 0;
+  const d = await chamar("POST", `/v1/empresas/${id}/documentos`, S.empC, { tipo: "compra", terceiroNif: "500000000", terceiroNome: "Papelaria", numero: "FT 2026/900", data: "2026-11-08", base: 10, iva: 2.3, taxa: 23 });
+  await chamar("POST", `/v1/empresas/${id}/documentos/${d.json.id}/anulacao`, S.empC, { motivo: "duplicado" });
+  await new Promise((r) => setTimeout(r, 50));
+  assert.ok(enviados.some((m) => m.to === tCC && m.title === "Pedido de anulação"));
+  // prazos: a 7 dias do dia 20 avisa a empresa e o contabilista, uma só vez
+  const push = criarPush(db, enviarFalso);
+  enviados.length = 0;
+  await push.avisarPrazos("2026-11-13", REGRAS_BASE);
+  assert.ok(enviados.some((m) => m.to === tEmp && m.title.startsWith("Faltam 7 dias")), JSON.stringify(enviados.map((m) => m.title)));
+  assert.ok(enviados.some((m) => m.to === tCC && m.body.startsWith("Empresa C:")));
+  enviados.length = 0;
+  await push.avisarPrazos("2026-11-13", REGRAS_BASE);
+  assert.equal(enviados.filter((m) => m.to === tEmp).length, 0, "não repete");
+  // aparelho que já não existe deixa de receber
+  naoRegistados.add(tEmp);
+  await push.avisar({ empresaId: id }, "teste", "x");
+  enviados.length = 0;
+  await push.avisar({ empresaId: id }, "teste", "x");
+  assert.equal(enviados.filter((m) => m.to === tEmp).length, 0);
+  // rota de administração (para um cron externo)
+  assert.equal((await chamar("POST", "/v1/admin/avisos-prazos", S.empC, {})).status, 403);
+  assert.equal((await chamar("POST", "/v1/admin/avisos-prazos", undefined, {}, { "x-admin-token": "admin" })).status, 200);
 });
