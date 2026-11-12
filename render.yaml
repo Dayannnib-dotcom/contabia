@@ -1,23 +1,21 @@
-# Render Blueprint — servidor + base de dados PostgreSQL permanente, ambos na UE (Frankfurt),
-# para cumprir o RGPD. A região não pode ser mudada depois de criada.
+# Render Blueprint — FASE DE TESTES (só dados fictícios). Servidor + PostgreSQL permanente.
+# Antes do primeiro cliente real, migrar para a UE com render.eu.yaml (ver README).
 databases:
-  - name: contabia-db-eu
-    region: frankfurt
+  - name: contabia-db
     plan: free
     databaseName: contabia
     user: contabia
 
 services:
   - type: web
-    name: contabia-eu
-    region: frankfurt
+    name: contabia
     runtime: docker
     plan: free
     healthCheckPath: /v1/saude
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: contabia-db-eu
+          name: contabia-db
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
@@ -28,5 +26,3 @@ services:
         sync: false
       - key: EMAIL_REMETENTE
         sync: false
-      - key: URL_PUBLICO
-        value: https://contabia-eu.onrender.com

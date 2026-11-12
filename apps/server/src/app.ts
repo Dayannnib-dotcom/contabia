@@ -207,7 +207,8 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
 
   // ── Recuperar a senha por e-mail ──
   const enviarEmail = cfg.enviarEmail ?? criarEnvioEmail();
-  const urlPublico = (cfg.urlPublico ?? process.env.URL_PUBLICO ?? "http://localhost:3000").replace(/\/$/, "");
+  // endereço das ligações nos e-mails: o configurado, ou o próprio endereço por onde o pedido chegou
+  const urlPublicoDe = (req: FastifyRequest) => (cfg.urlPublico ?? process.env.URL_PUBLICO ?? `${req.protocol}://${req.host}`).replace(/\/$/, "");
   const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
   const MENSAGEM_RECUPERAR = "Se existir uma conta com esses dados e um e-mail associado, enviámos uma ligação para criar uma nova senha. Veja também a pasta de spam.";
 
@@ -232,7 +233,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
       const token = randomBytes(32).toString("base64url");
       await db.query(`INSERT INTO recuperacoes (hash, papel, conta_id, colaborador_id, expira_em) VALUES ($1,$2,$3,$4,$5)`,
         [hashToken(token), b.papel, alvo.conta, alvo.colab, new Date(Date.now() + 60 * 60 * 1000).toISOString()]);
-      const ligacao = `${urlPublico}/${b.papel === "empresa" ? "empresa" : "contabilista"}/redefinir?token=${token}`;
+      const ligacao = `${urlPublicoDe(req)}/${b.papel === "empresa" ? "empresa" : "contabilista"}/redefinir?token=${token}`;
       await enviarEmail({ para: alvo.email, nome: alvo.nome, ...emailRecuperacao(alvo.nome, ligacao) });
     }
     // a mesma resposta exista ou não a conta: não se revela quem está registado
@@ -1250,4 +1251,5 @@ main{max-width:420px;padding:32px;display:flex;flex-direction:column;gap:18px;te
 a{display:block;padding:16px;border-radius:14px;font-weight:600;font-size:17px;text-decoration:none}.a{background:#3CC6A0;color:#0C1A22}.b{border:1px solid #4B6878;color:#fff}</style></head>
 <body><main><svg width="88" height="88" viewBox="0 0 64 64" style="margin:0 auto" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="#1F3B4A"/><path d="M43 19a16 16 0 1 0 0 26" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/><path d="M27 37q5-5 10 0t10 0t10 0" fill="none" stroke="#3CC6A0" stroke-width="4.5" stroke-linecap="round"/></svg>
 <h1>contabia</h1><p>A contabilidade da sua empresa, em dia.</p>
-<a class="a" href="/empresa/">App da empresa</a><a class="b" href="/contabilista/">App do Contabilista Certificado</a></main></body></html>`;
+<a class="a" href="/empresa/">App da empresa</a><a class="b" href="/contabilista/">App do Contabilista Certificado</a>
+<p style="margin-top:22px;padding:10px 14px;border-radius:10px;background:#FBEEDC;color:#7A3B05;font-size:13px">Versão de testes: use apenas dados fictícios. Não introduza dados reais de empresas.</p></main></body></html>`;
