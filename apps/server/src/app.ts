@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { z, ZodError } from "zod";
 import {
   ajudaNIF, lerQR, limparNIF, normalizarUtilizador, proximasObrigacoes, qrConsistente, REGRAS_BASE, taxasEm, utilizadorValido, validarNIF,
-  type Anexo, type Atividade, type Colaborador, type Documento, type MovimentoBancario, type Empresa, type Ligacao, type Pedido, type Regras, type ResumoEmpresa, type Sessao, type VerificacaoFecho,
+  type Anexo, type Atividade, type RegraFornecedor, type Colaborador, type Documento, type MovimentoBancario, type Empresa, type Ligacao, type Pedido, type Regras, type ResumoEmpresa, type Sessao, type VerificacaoFecho,
 } from "@contabia/shared";
 import type { Db } from "./db.ts";
 import {
@@ -16,7 +16,7 @@ import {
 } from "./comum.ts";
 import { Hub, eventosDesde, publicar } from "./tempo-real.ts";
 import {
-  apurarIVA, aprender, classificar, diarioDe, equilibrado, gerarSAFT, lancamentoDeLinha, mesesDoPeriodo, periodoIVADoMes, proporLinhas, xmlDP,
+  apurarIVA, aprender, classificar, diarioDe, equilibrado, gerarSAFT, lancamentoDeLinha, mesesDoPeriodo, periodoIVADoMes, PLANO_SNC, proporLinhas, xmlDP,
 } from "./contabilidade.ts";
 import { perguntar } from "./assistente.ts";
 import { sugerir, type DocConc } from "./conciliacao.ts";
@@ -435,19 +435,31 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const [d0] = await db.query<LinhaDoc>(`SELECT * FROM documentos WHERE id = $1 AND empresa_id = $2`, [doc, id]);
     if (!d0) throw new ErroApp("nao_encontrado", "Documento não encontrado.", 404);
     if (d0.estado === "anulado" || d0.estado === "anulacao_pedida") throw new ErroApp("documento_anulado", "Este documento está anulado ou com anulação pedida.", 409);
+    // a regra do contabilista para este fornecedor manda sobre a escolha da empresa
+    const [regra] = d0.tipo === "venda" ? [] : await db.query<{ conta: string; iva_dedutivel: boolean; auto_lancar: boolean }>(
+      `SELECT conta, iva_dedutivel, auto_lancar FROM regras_fornecedor WHERE empresa_id = $1 AND nif = $2`, [id, d0.terceiro_nif]);
     const [d1] = await db.query<LinhaDoc>(
       `UPDATE documentos SET estado = 'validado', conta_sugerida = COALESCE($1, conta_sugerida), iva_dedutivel = COALESCE($2, iva_dedutivel), terceiro_nome = COALESCE($3, terceiro_nome) WHERE id = $4 RETURNING *`,
-      [b.contaSugerida ?? null, b.ivaDedutivel ?? null, b.terceiroNome ?? null, doc]);
+      [regra?.conta ?? b.contaSugerida ?? null, regra?.iva_dedutivel ?? b.ivaDedutivel ?? null, b.terceiroNome ?? null, doc]);
     const d = docDe(d1);
-    if (d.tipo !== "venda") await aprender(db, id, d.terceiroNif, d.contaSugerida);
+    if (d.tipo !== "venda" && !regra) await aprender(db, id, d.terceiroNif, d.contaSugerida);
     const [ja] = await db.query(`SELECT 1 FROM lancamentos WHERE documento_id = $1 AND estado IN ('proposto','lancado')`, [doc]);
     if (!ja) {
-      const cl = b.contaSugerida ? { confianca: "alta" as const } : await classificar(db, id, d.tipo, d.terceiroNif, d.terceiroNome);
+      const cl = regra || b.contaSugerida ? { confianca: "alta" as const } : await classificar(db, id, d.tipo, d.terceiroNif, d.terceiroNome);
       const linhas = proporLinhas(d);
+      const lid = novoId();
       await db.query(
         `INSERT INTO lancamentos (id, empresa_id, documento_id, diario, data, periodo, descricao, linhas, estado, confianca, versao, criado_em) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,'proposto',$9,1,$10)`,
-        [novoId(), id, doc, diarioDe(d.tipo), d.data, d.data.slice(0, 7), `${d.numero} · ${d.terceiroNome}`, JSON.stringify(linhas), cl.confianca, agoraISO()]);
+        [lid, id, doc, diarioDe(d.tipo), d.data, d.data.slice(0, 7), `${d.numero} · ${d.terceiroNome}`, JSON.stringify(linhas), cl.confianca, agoraISO()]);
       await publicar(db, hub, id, "lancamento.proposto", "sistema", { documentoId: doc });
+      if (regra?.auto_lancar) {
+        // o contabilista disse que este fornecedor se lança sozinho; se o período estiver fechado, fica para revisão
+        const [l] = await db.query<LinhaLanc>(`SELECT * FROM lancamentos WHERE id = $1`, [lid]);
+        try {
+          await aprovar(id, l, 1);
+          await publicar(db, hub, id, "lancamento.lancado", "sistema", { lancamentoId: lid, regra: true });
+        } catch { /* fica proposto */ }
+      }
     }
     await publicar(db, hub, id, "documento.validado", a.papel, { documentoId: doc });
     return d;
@@ -758,6 +770,8 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     "POST /v1/empresas/:id/periodos/:periodo/fechar": "fechou um período",
     "POST /v1/empresas/:id/saft/:ano": "gerou o ficheiro SAF-T",
     "POST /v1/empresas/:id/colaboradores": "adicionou um utilizador",
+    "PUT /v1/empresas/:id/regras-fornecedor/:nif": "definiu uma regra para um fornecedor",
+    "DELETE /v1/empresas/:id/regras-fornecedor/:nif": "removeu uma regra de fornecedor",
     "POST /v1/empresas/:id/colaboradores/:cid/desativar": "desativou um utilizador",
     "POST /v1/empresas/:id/colaboradores/:cid/ativar": "reativou um utilizador",
   };
@@ -770,6 +784,41 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const quem = a.papel === "contabilista" ? `${a.nome} (contabilista)` : a.quem ?? `${a.nome} (gestor)`;
     await db.query(`INSERT INTO atividade (empresa_id, quem, papel, acao, em) VALUES ($1,$2,$3,$4,$5)`,
       [empresaId, quem, a.papel, typeof acao === "function" ? acao(a) : acao, agoraISO()]).catch(() => undefined);
+  });
+
+  // ═════════════ Regras por fornecedor (do contabilista) ═════════════
+  type LinhaRegra = { nif: string; nome: string; conta: string; iva_dedutivel: boolean; auto_lancar: boolean; criada_em: string };
+  const regraDe = (r: LinhaRegra): RegraFornecedor => ({ nif: r.nif, nome: r.nome, conta: r.conta, categoria: PLANO_SNC[r.conta] ?? "Conta " + r.conta, ivaDedutivel: r.iva_dedutivel, autoLancar: r.auto_lancar, criadaEm: r.criada_em });
+  app.get("/v1/empresas/:id/regras-fornecedor", async (req) => {
+    const id = params(req).id;
+    await exigirAcesso(db, ator(req), id);
+    return (await db.query<LinhaRegra>(`SELECT * FROM regras_fornecedor WHERE empresa_id = $1 ORDER BY nome`, [id])).map(regraDe);
+  });
+  app.put("/v1/empresas/:id/regras-fornecedor/:nif", async (req) => {
+    const a = ator(req);
+    const { id, nif } = params(req);
+    exigirPapel(a, "contabilista");
+    await exigirAcesso(db, a, id, "lancamentos.escrever");
+    if (!validarNIF(nif)) throw new ErroApp("nif_invalido", "NIF do fornecedor inválido.");
+    const b = z.object({ nome: z.string().trim().min(1), conta: z.string().regex(/^\d{2,8}$/), ivaDedutivel: z.boolean(), autoLancar: z.boolean().default(false) }).parse(req.body);
+    if (!/^6|^2|^3|^4/.test(b.conta)) throw new ErroApp("conta_invalida", "Use uma conta de gastos (6x), de ativo (4x/3x) ou de terceiros (2x).");
+    const [r] = await db.query<LinhaRegra>(
+      `INSERT INTO regras_fornecedor (empresa_id, nif, nome, conta, iva_dedutivel, auto_lancar, criada_em) VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (empresa_id, nif) DO UPDATE SET nome = $3, conta = $4, iva_dedutivel = $5, auto_lancar = $6 RETURNING *`,
+      [id, nif, b.nome, b.conta, b.ivaDedutivel, b.autoLancar, agoraISO()]);
+    // aplica já aos documentos deste fornecedor que ainda estão por validar
+    await db.query(`UPDATE documentos SET conta_sugerida = $1, categoria = $2, iva_dedutivel = $3 WHERE empresa_id = $4 AND terceiro_nif = $5 AND estado IN ('validar','sem_anexo') AND tipo <> 'venda'`,
+      [b.conta, PLANO_SNC[b.conta] ?? "Regra do contabilista", b.ivaDedutivel, id, nif]);
+    await publicar(db, hub, id, "regra.atualizada", "contabilista", { nif });
+    return regraDe(r);
+  });
+  app.delete("/v1/empresas/:id/regras-fornecedor/:nif", async (req) => {
+    const a = ator(req);
+    const { id, nif } = params(req);
+    exigirPapel(a, "contabilista");
+    await exigirAcesso(db, a, id, "lancamentos.escrever");
+    await db.query(`DELETE FROM regras_fornecedor WHERE empresa_id = $1 AND nif = $2`, [id, nif]);
+    return { ok: true };
   });
 
   // ═════════════ Lançamentos ═════════════

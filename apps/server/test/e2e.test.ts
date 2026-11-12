@@ -394,3 +394,26 @@ test("20. vários utilizadores: o gestor adiciona e desativa; o colaborador faz 
   assert.equal((await chamar("GET", `/v1/empresas/${id}/documentos`, marta)).status, 401);
   assert.equal((await chamar("POST", "/v1/auth/sessoes", undefined, { papel: "empresa", identificador: "marta@empresac.pt", senha: "segredo123" })).json.codigo, "desativado");
 });
+
+test("21. regras por fornecedor: o contabilista define; a conta vem certa e pode lançar sozinho", async () => {
+  const id = S.empCId;
+  const url = `/v1/empresas/${id}/regras-fornecedor/509999999`;
+  // só o contabilista define regras
+  assert.equal((await chamar("PUT", url, S.empC, { nome: "Combustíveis SA", conta: "62421", ivaDedutivel: false, autoLancar: true })).status, 403);
+  assert.equal((await chamar("PUT", url, S.ccC, { nome: "Combustíveis SA", conta: "72", ivaDedutivel: false })).json.codigo, "conta_invalida");
+  const r = await chamar("PUT", url, S.ccC, { nome: "Combustíveis SA", conta: "62421", ivaDedutivel: false, autoLancar: true });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  // a empresa regista e valida uma fatura deste fornecedor, mesmo escolhendo outra conta
+  const d = await chamar("POST", `/v1/empresas/${id}/documentos`, S.empC, { tipo: "compra", terceiroNif: "509999999", terceiroNome: "Combustíveis SA", numero: "FT G/55", data: "2026-11-07", base: 40, iva: 9.2, taxa: 23 });
+  assert.equal(d.json.contaSugerida, "62421");
+  assert.equal(d.json.confianca ?? "alta", "alta");
+  const v = await chamar("POST", `/v1/empresas/${id}/documentos/${d.json.id}/validar`, S.empC, { contaSugerida: "6268" });
+  assert.equal(v.json.contaSugerida, "62421"); // a regra manda
+  assert.equal(v.json.ivaDedutivel, false);
+  // lançado sozinho, sem passar pela revisão
+  const lancados = (await chamar("GET", `/v1/empresas/${id}/lancamentos?estado=lancado`, S.ccC)).json;
+  const l = lancados.find((x: { documentoId: string }) => x.documentoId === d.json.id);
+  assert.ok(l, "devia estar lançado");
+  assert.equal(l.linhas[0].conta, "62421");
+  assert.equal((await chamar("GET", `/v1/empresas/${id}/regras-fornecedor`, S.empC)).json[0].autoLancar, true);
+});

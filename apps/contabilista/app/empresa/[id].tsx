@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { Regras } from "../../components/Regras";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { euros, motivoLegivel, nomePeriodo, type Lancamento } from "@contabia/shared";
 import { Banco, Botao, RegistoAtividade, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, VerOriginal, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
 
-type Sec = "revisao" | "banco" | "iva" | "pedidos" | "saft" | "fecho" | "atividade";
-const SECS: [Sec, string][] = [["revisao", "Revisão"], ["banco", "Banco"], ["iva", "IVA"], ["pedidos", "Pedidos"], ["saft", "SAF-T"], ["fecho", "Fecho"], ["atividade", "Atividade"]];
+type Sec = "revisao" | "banco" | "regras" | "iva" | "pedidos" | "saft" | "fecho" | "atividade";
+const SECS: [Sec, string][] = [["revisao", "Revisão"], ["banco", "Banco"], ["regras", "Regras"], ["iva", "IVA"], ["pedidos", "Pedidos"], ["saft", "SAF-T"], ["fecho", "Fecho"], ["atividade", "Atividade"]];
 
 function mesAnterior(): string {
   const d = new Date();
@@ -42,6 +43,7 @@ export default function EmpresaDetalhe() {
         })}
       </ScrollView>
       {sec === "revisao" ? <Revisao id={id} irPara={setSec} /> : null}
+      {sec === "regras" ? <Regras empresaId={id} /> : null}
       {sec === "banco" ? <Banco empresaId={id} papel="contabilista" /> : null}
       {sec === "iva" ? <Iva id={id} irPara={setSec} /> : null}
       {sec === "pedidos" ? <Pedidos id={id} /> : null}

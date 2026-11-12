@@ -201,3 +201,5 @@ export interface MovimentoBancario {
   documento?: { numero: string; terceiroNome: string; total: number; data: string } | null;
   sugestao?: { documentoId: string; numero: string; terceiroNome: string; total: number; data: string; motivo: string; confianca: "alta" | "media" } | null;
 }
+
+export interface RegraFornecedor { nif: string; nome: string; conta: string; categoria: string; ivaDedutivel: boolean; autoLancar: boolean; criadaEm: string }

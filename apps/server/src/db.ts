@@ -235,6 +235,17 @@ const MIGRACOES: string[] = [
      em text NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS atividade_empresa ON atividade(empresa_id, seq)`,
+  // Regras do contabilista por fornecedor: conta, IVA e se lança sozinho.
+  `CREATE TABLE IF NOT EXISTS regras_fornecedor (
+     empresa_id text NOT NULL REFERENCES empresas(id),
+     nif text NOT NULL,
+     nome text NOT NULL,
+     conta text NOT NULL,
+     iva_dedutivel boolean NOT NULL,
+     auto_lancar boolean NOT NULL DEFAULT false,
+     criada_em text NOT NULL,
+     PRIMARY KEY (empresa_id, nif)
+   )`,
   `CREATE TABLE IF NOT EXISTS regras_versoes (
      versao text PRIMARY KEY,
      regras jsonb NOT NULL,

@@ -237,6 +237,16 @@ with sync_playwright() as p:
         col.close()
         emp.go_back()
 
+        # ── Regras por fornecedor: o contabilista define a conta de um fornecedor frequente ──
+        cc.get_by_role("tab", name="Regras").click()
+        cc.get_by_text("Fornecedores frequentes sem regra").wait_for(timeout=15000)
+        cc.get_by_role("button", name="Criar regra para Papelaria Atlântico").first.click()
+        cc.get_by_label("Conta SNC").fill("6233")
+        cc.get_by_role("switch", name="Lançar automaticamente").click()
+        cc.get_by_role("button", name="Guardar regra").click()
+        cc.get_by_text("Lança sozinho").wait_for(timeout=15000)
+        shot(cc, "18k_cc_regras")
+
         # ── Sentido inverso: uma 2.ª empresa convida o contabilista pelo n.º OCC ──
         emp2 = b.new_page(viewport=vp)
         emp2.on("pageerror", lambda e: erros.append(f"empresa2: {e}"))

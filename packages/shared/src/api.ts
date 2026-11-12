@@ -5,7 +5,7 @@
  * - Tempo real por WebSocket com recuperação por cursor ao reconectar.
  */
 import type {
-  MotivoAnulacao, Anexo, MovimentoBancario, Colaborador, Atividade,
+  MotivoAnulacao, Anexo, MovimentoBancario, Colaborador, Atividade, RegraFornecedor,
   ApuramentoIVA, Documento, Empresa, Evento, Lancamento, Ligacao, Pedido, RespostaAssistente,
   ResumoEmpresa, Sessao, Submissao, VerificacaoFecho, Contabilista,
 } from "./tipos.ts";
@@ -145,6 +145,17 @@ export class ApiContabia {
   }
   atividade(empresaId: string) {
     return this.pedido<Atividade[]>("GET", `/v1/empresas/${empresaId}/atividade`);
+  }
+
+  // ── Regras por fornecedor ──
+  regrasFornecedor(empresaId: string) {
+    return this.pedido<RegraFornecedor[]>("GET", `/v1/empresas/${empresaId}/regras-fornecedor`);
+  }
+  guardarRegraFornecedor(empresaId: string, nif: string, r: { nome: string; conta: string; ivaDedutivel: boolean; autoLancar: boolean }) {
+    return this.pedido<RegraFornecedor>("PUT", `/v1/empresas/${empresaId}/regras-fornecedor/${nif}`, r);
+  }
+  removerRegraFornecedor(empresaId: string, nif: string) {
+    return this.pedido<{ ok: true }>("DELETE", `/v1/empresas/${empresaId}/regras-fornecedor/${nif}`);
   }
 
   // ── Banco ──
