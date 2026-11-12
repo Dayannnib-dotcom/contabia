@@ -19,6 +19,20 @@ with sync_playwright() as p:
         pg.on("pageerror", lambda e, n=n: erros.append(f"{n}: {e}"))
 
     try:
+        # ── Site público: a promessa e os botões levam às apps ──
+        site = b.new_page(viewport={"width": 1280, "height": 900})
+        site.on("pageerror", lambda e: erros.append(f"site: {e}"))
+        site.goto(BASE + "/")
+        site.get_by_role("heading", name="O seu contabilista, à mão.").wait_for(timeout=20000)
+        site.get_by_role("img", name="O Painel da app Contabia", exact=False).wait_for()
+        assert site.evaluate("document.documentElement.scrollWidth") <= 1280
+        site.get_by_role("link", name="Criar conta grátis").first.click()
+        site.get_by_text("Configurar a empresa").wait_for(timeout=20000)
+        site.goto(BASE + "/")
+        site.get_by_role("link", name="Experimentar no meu gabinete").click()
+        site.get_by_label("N.º de Contabilista Certificado (OCC)").wait_for(timeout=20000)
+        site.close()
+
         # ── Empresa cria conta ──
         emp.goto(BASE + "/empresa/")
         emp.get_by_text("Criar conta").first.wait_for(timeout=20000)

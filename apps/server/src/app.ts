@@ -1222,12 +1222,17 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   apps.forEach((nome, i) => {
     app.register(estatico, { root: join(cfg.pastaWeb!, nome), prefix: `/${nome}/`, decorateReply: i === 0, wildcard: false });
   });
+  // Site público (página inicial de marketing) em /, com os seus ficheiros em /site/
+  const temSite = !!cfg.pastaWeb && existsSync(join(cfg.pastaWeb, "site", "index.html"));
+  if (temSite) app.register(estatico, { root: join(cfg.pastaWeb!, "site"), prefix: "/site/", decorateReply: apps.length === 0, wildcard: false, maxAge: "1d" });
   app.setNotFoundHandler((req, reply) => {
     const nome = apps.find((n) => req.url === `/${n}` || req.url.startsWith(`/${n}/`));
     if (nome && req.method === "GET") return reply.type("text/html").sendFile("index.html", join(cfg.pastaWeb!, nome));
     return reply.code(404).send({ codigo: "nao_encontrado", mensagem: "Endereço não encontrado." });
   });
-  app.get("/", async (_req, reply) => reply.type("text/html; charset=utf-8").send(PAGINA_INICIAL));
+  app.get("/", async (_req, reply) =>
+    temSite ? reply.type("text/html; charset=utf-8").header("cache-control", "no-cache").sendFile("index.html", join(cfg.pastaWeb!, "site"))
+      : reply.type("text/html; charset=utf-8").send(PAGINA_INICIAL));
 
 
   // ═════════════ Tempo real ═════════════

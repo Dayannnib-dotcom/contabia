@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contabia — O seu contabilista, à mão</title>
+<meta name="description" content="Fotografe as faturas, acompanhe os prazos e fale com o seu Contabilista Certificado — tudo numa app, em tempo real. Dados alojados na UE.">
+<meta name="theme-color" content="#12232E">
+<meta property="og:title" content="Contabia — O seu contabilista, à mão">
+<meta property="og:description" content="Faturas, prazos e IVA num só sítio, ligado ao seu Contabilista Certificado em tempo real.">
+<meta property="og:locale" content="pt_PT">
+<link rel="icon" href="/site/img/contabia-simbolo.svg" type="image/svg+xml">
+<link rel="preload" href="/site/fonts/SpaceGrotesk-Bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/site/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face{font-family:"Space Grotesk";src:url(/site/fonts/SpaceGrotesk-Bold.woff2) format("woff2");font-weight:700;font-display:swap}
+@font-face{font-family:"IBM Plex Sans";src:url(/site/fonts/IBMPlexSans-Regular.woff2) format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"IBM Plex Sans";src:url(/site/fonts/IBMPlexSans-SemiBold.woff2) format("woff2");font-weight:600;font-display:swap}
+@font-face{font-family:"IBM Plex Mono";src:url(/site/fonts/IBMPlexMono-Medium.woff2) format("woff2");font-weight:500;font-display:swap}
+:root{
+  --surface:#F6F7F5;--surface-raised:#FFFFFF;--surface-ink:#12232E;--surface-ocean:#1F3B4A;
+  --ink:#12232E;--ink-muted:#4B5A63;--on-ink:#FFFFFF;--on-ink-muted:#B9C7CE;
+  --primary:#0B6E5B;--primary-strong:#084F41;--on-primary:#FFFFFF;--mint:#3CC6A0;--on-mint:#0B1820;
+  --mint-tint:#E3F1EC;--on-mint-tint:#084F41;--luis-sage:#CFE9DF;--amber-tint:#FBEEDC;--amber-ink:#7A3B05;--danger:#A61B1B;
+  --border:#DDE2DF;--border-strong:#5E7079;--line:#EEF1EF;--focus:#0B6E5B;
+  --space-4:16px;--space-6:24px;--space-8:32px;--space-12:48px;--space-16:64px;--space-24:96px;--space-32:128px;
+  --radius-s:10px;--radius-m:14px;--radius-l:18px;--radius-xl:22px;--radius-device:40px;--radius-pill:999px;
+  --shadow-card:0 1px 2px rgba(18,35,46,.06),0 8px 24px rgba(18,35,46,.06);--shadow-device:0 24px 60px rgba(18,35,46,.22);
+  --font-display:"Space Grotesk","IBM Plex Sans",system-ui,sans-serif;--font-sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;font:400 16px/26px var(--font-sans);color:var(--ink);background:var(--surface)}
+img{max-width:100%;display:block}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+.escuro :focus-visible{outline-color:var(--mint)}
+.contentor{max-width:1200px;margin:0 auto;padding:0 24px}
+@media(min-width:900px){.contentor{padding:0 48px}}
+.saltar{position:absolute;left:-999px;top:8px;background:var(--surface-raised);padding:8px 14px;border-radius:var(--radius-s);z-index:100}.saltar:focus{left:8px}
+
+/* tipografia */
+.eyebrow{font:500 12px/16px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-muted);margin:0 0 14px}
+.escuro .eyebrow{color:var(--on-ink-muted)}
+h1,h2,h3{font-family:var(--font-display);font-weight:700;margin:0;text-wrap:balance}
+.display-hero{font-size:44px;line-height:48px;letter-spacing:-.02em}
+@media(min-width:640px){.display-hero{font-size:64px;line-height:68px}}
+.h1{font-size:36px;line-height:42px;letter-spacing:-.015em}@media(min-width:640px){.h1{font-size:44px;line-height:50px}}
+.h2{font-size:28px;line-height:34px;letter-spacing:-.01em}@media(min-width:640px){.h2{font-size:32px;line-height:38px}}
+.h3{font-family:var(--font-display);font-weight:700;font-size:21px;line-height:27px}
+.lead{font-size:19px;line-height:30px;color:var(--ink-muted);margin:16px 0 0;max-width:34em}
+.escuro .lead{color:var(--on-ink-muted)}
+.mono{font-family:var(--font-mono);font-weight:500;font-variant-numeric:tabular-nums}
+
+/* a onda: sublinha a palavra-chave e desenha-se ao entrar */
+.onda{position:relative;white-space:nowrap;display:inline-block}
+@media(max-width:640px){.onda{white-space:normal;display:inline}}
+.onda svg{position:absolute;left:0;bottom:-.2em;width:100%;height:12px;overflow:visible}
+.onda path{fill:none;stroke:var(--mint);stroke-width:4.5;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .7s cubic-bezier(.2,.7,.2,1) .25s}
+.visivel .onda path,.onda.visivel path{stroke-dashoffset:0}
+
+/* botões */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:0 24px;border-radius:var(--radius-m);font:600 16px/1 var(--font-sans);text-decoration:none;border:2px solid transparent;transition:background .15s,transform .15s}
+.btn:active{transform:translateY(1px)}
+.btn-primario{background:var(--primary);color:var(--on-primary)}.btn-primario:hover{background:var(--primary-strong)}
+.btn-menta{background:var(--mint);color:var(--on-mint)}.btn-menta:hover{background:#6AD8B8}
+.btn-secundario{background:var(--surface-raised);color:var(--ink);border-color:var(--border-strong)}.btn-secundario:hover{background:var(--line)}
+.btn-escuro{color:var(--on-ink);border-color:var(--on-ink-muted)}.btn-escuro:hover{border-color:var(--on-ink)}
+.acoes{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}
+
+/* aviso de testes + cabeçalho */
+.aviso-testes{background:var(--amber-tint);color:var(--amber-ink);font:500 14px/20px var(--font-sans);text-align:center;padding:8px 16px}
+header.topo{position:sticky;top:0;z-index:50;background:rgba(246,247,245,.92);backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--border)}
+.topo .contentor{display:flex;align-items:center;justify-content:space-between;height:68px;gap:16px}
+.marca{display:flex;align-items:center;gap:10px;text-decoration:none;font:700 23px/1 var(--font-display);letter-spacing:-.02em;color:var(--ink)}
+.marca svg{width:36px;height:36px}
+nav.menu{display:none;gap:28px;align-items:center}
+nav.menu a{text-decoration:none;font-weight:600;font-size:15px;color:var(--ink-muted)}nav.menu a:hover{color:var(--ink)}
+.topo .acoes-topo{display:flex;gap:10px;align-items:center}
+.topo .btn{min-height:42px;padding:0 16px;font-size:15px}
+.topo .entrar{display:none}
+@media(min-width:980px){nav.menu{display:flex}.topo .entrar{display:inline-flex}}
+
+/* secções */
+section{padding:var(--space-16) 0}
+@media(min-width:900px){section{padding:var(--space-24) 0}}
+.escuro{background:var(--surface-ink);color:var(--on-ink)}
+.cabeca-seccao{max-width:720px;margin-bottom:var(--space-12)}
+
+/* hero */
+.hero{padding:var(--space-16) 0 var(--space-16);overflow:hidden;position:relative}
+.hero .contentor{display:grid;gap:48px;align-items:center}
+@media(min-width:960px){.hero{padding:var(--space-24) 0 var(--space-32)}.hero .contentor{grid-template-columns:1.1fr .9fr}}
+.provas{display:flex;flex-wrap:wrap;gap:8px 18px;margin:28px 0 0;padding:0;list-style:none;font-size:14px;color:var(--on-ink-muted)}
+.provas li{display:flex;align-items:center;gap:7px}
+.provas svg{width:16px;height:16px;stroke:var(--mint);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
+/* telemóvel com ecrã real */
+.palco{position:relative;justify-self:center;width:min(300px,78vw)}
+.tel{position:relative;border-radius:var(--radius-device);background:#0B1820;padding:10px;box-shadow:var(--shadow-device)}
+.tel img{border-radius:30px;width:100%;height:auto;aspect-ratio:390/844;object-fit:cover;object-position:top;background:var(--surface)}
+.palco.rodado .tel{transform:rotate(-4deg)}
+.hero .tel{box-shadow:0 30px 80px rgba(0,0,0,.45)}
+.flutua{position:absolute;box-shadow:var(--shadow-card);opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease}
+.visivel .flutua{opacity:1;transform:none}
+.chip-prazo{display:flex;align-items:center;gap:12px;background:var(--amber-tint);color:var(--amber-ink);border-radius:var(--radius-m);padding:10px 16px 10px 10px;font:600 14px/18px var(--font-sans)}
+.chip-prazo small{display:block;font-weight:400;font-size:12px;line-height:16px}
+.cal{background:var(--surface-raised);border-radius:10px;width:48px;text-align:center;padding:5px 0;flex:none}
+.cal i{display:block;font:500 10px/13px var(--font-mono);letter-spacing:.14em;color:var(--danger);font-style:normal}
+.cal b{display:block;font:500 22px/26px var(--font-mono);color:var(--ink)}
+.hero .chip-prazo{left:-56px;bottom:84px;transition-delay:.5s}
+.hero .balao{right:-48px;top:-84px;transition-delay:.8s;max-width:240px}
+@media(max-width:520px){.hero .chip-prazo{left:-8px}.hero .balao{right:-8px;top:-44px}}
+
+/* balão do Luís */
+.balao{display:flex;gap:10px;align-items:flex-end}
+.balao .av{width:40px;height:40px;border-radius:50%;flex:none;background:var(--luis-sage)}
+.balao .b{background:var(--surface-raised);color:var(--ink);border:1px solid var(--border);border-radius:var(--radius-xl);border-bottom-left-radius:6px;padding:10px 14px;font-size:14px;line-height:20px}
+.balao .b small{display:block;font:600 11px/14px var(--font-sans);color:var(--primary);margin-bottom:2px}
+.balao.oceano .b{background:var(--surface-ocean);color:var(--on-ink);border-color:var(--surface-ocean)}.balao.oceano .b small{color:var(--mint)}
+
+/* dor */
+.dores{display:grid;gap:16px}
+@media(min-width:800px){.dores{grid-template-columns:repeat(3,1fr)}}
+.dor{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-l);padding:28px 24px;font:700 21px/28px var(--font-display);letter-spacing:-.01em;position:relative}
+.dor::before{content:"«";display:block;font:700 44px/1 var(--font-display);color:var(--mint);margin-bottom:6px}
+.fecho{margin-top:40px;font:700 24px/30px var(--font-display);color:var(--ink)}
+
+/* como funciona */
+.passos{display:grid;gap:20px;counter-reset:passo}
+@media(min-width:900px){.passos{grid-template-columns:repeat(3,1fr)}}
+.passo{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-l);padding:24px;display:flex;flex-direction:column;gap:12px}
+.passo .num{font:500 13px/16px var(--font-mono);letter-spacing:.14em;color:var(--primary)}
+.passo p{margin:0;color:var(--ink-muted)}
+.cena{height:200px;border-radius:var(--radius-m);background:var(--surface);position:relative;overflow:hidden;margin-bottom:8px;display:grid;place-items:center}
+/* recibo → dado */
+.recibo{position:absolute;width:132px;background:#fff;padding:14px 12px 18px;font:500 9px/13px var(--font-mono);color:#5b6670;box-shadow:0 6px 18px rgba(18,35,46,.12);transform:rotate(-5deg);transition:opacity .5s ease .9s,transform .9s ease .2s;clip-path:polygon(0 0,100% 0,100% 94%,92% 100%,84% 94%,76% 100%,68% 94%,60% 100%,52% 94%,44% 100%,36% 94%,28% 100%,20% 94%,12% 100%,4% 94%,0 100%)}
+.recibo b{display:block;font-size:10px;color:#2c3a42;margin-bottom:6px}.recibo .qr{width:34px;height:34px;margin:8px auto 0;background:repeating-conic-gradient(#2c3a42 0 25%,#fff 0 50%) 0 0/8px 8px}
+.cartao-doc{position:absolute;width:250px;background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-m);padding:12px 14px;box-shadow:var(--shadow-card);opacity:0;transform:scale(.92);transition:opacity .5s ease 1.2s,transform .5s ease 1.2s}
+.cartao-doc .l1{display:flex;justify-content:space-between;gap:10px;font-weight:600;font-size:14px;white-space:nowrap}
+.cartao-doc .l2{display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:12px;color:var(--ink-muted)}
+.pill{display:inline-block;border-radius:var(--radius-pill);padding:2px 10px;font:600 12px/18px var(--font-sans)}
+.pill.ok{background:var(--mint-tint);color:var(--on-mint-tint)}
+.visivel .recibo{transform:rotate(-5deg) scale(.6) translateY(-20px);opacity:0}
+.visivel .cartao-doc{opacity:1;transform:none}
+.cena .balao{position:absolute;max-width:240px}
+.cena-carteira{background:var(--surface-ink)}
+.cena-carteira img{position:absolute;inset:14px 14px auto 14px;width:calc(100% - 28px);border-radius:10px;object-fit:cover;object-position:top left;height:172px}
+
+/* funcionalidades */
+.grelha{display:grid;gap:20px}
+@media(min-width:700px){.grelha{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1060px){.grelha{grid-template-columns:repeat(3,1fr)}}
+.cartao{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-l);padding:24px}
+.cartao .ic{width:44px;height:44px;border-radius:12px;background:var(--mint-tint);display:grid;place-items:center;margin-bottom:16px}
+.cartao .ic svg{width:24px;height:24px;stroke:var(--primary);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.cartao p{margin:8px 0 0;color:var(--ink-muted)}
+.cartao .prova{margin-top:14px;font:500 13px/18px var(--font-mono);color:var(--primary)}
+.destaque{display:grid;gap:40px;align-items:center;margin-top:var(--space-12)}
+@media(min-width:900px){.destaque{grid-template-columns:1fr 1fr}}
+.numero{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-l);padding:28px}
+.numero .valor{font:500 44px/50px var(--font-mono);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+@media(min-width:640px){.numero .valor{font-size:56px;line-height:60px}}
+.dupla{height:10px;margin-top:8px;border-top:2.5px solid var(--ink);border-bottom:2.5px solid var(--ink);transform-origin:left;transform:scaleX(0);transition:transform .5s ease .7s}
+.visivel .dupla{transform:none}
+.numero .leg{margin:12px 0 0;font-weight:600;color:var(--primary);font-size:15px}
+
+/* Luís */
+.luis-grid{display:grid;gap:48px;align-items:center}
+@media(min-width:960px){.luis-grid{grid-template-columns:.9fr 1.1fr}}
+.conversa{display:flex;flex-direction:column;gap:14px;margin-top:32px;max-width:520px}
+.pergunta{align-self:flex-end;background:var(--surface-raised);color:var(--ink);border-radius:var(--radius-xl);border-bottom-right-radius:6px;padding:12px 16px;max-width:80%}
+.conversa .balao .b{font-size:15px;line-height:22px}
+.fonte{display:block;margin-top:6px;font:500 12px/16px var(--font-mono);color:var(--mint)}
+.retrato{width:120px;height:120px;border-radius:50%;background:var(--luis-sage);margin-bottom:24px}
+
+/* contabilistas */
+.cc-grid{display:grid;gap:48px;align-items:center}
+@media(min-width:960px){.cc-grid{grid-template-columns:1fr 1.15fr}}
+.lista-cc{list-style:none;padding:0;margin:28px 0 0;display:grid;gap:14px}
+.lista-cc li{display:flex;gap:14px;align-items:baseline}
+.lista-cc .mono{color:var(--primary);font-size:14px;flex:none;width:28px}
+.janela{border-radius:14px;overflow:hidden;box-shadow:var(--shadow-device);border:1px solid var(--border);background:var(--surface-raised)}
+.janela .barra{height:30px;background:var(--line);display:flex;align-items:center;gap:6px;padding:0 12px}
+.janela .barra i{width:10px;height:10px;border-radius:50%;background:var(--border)}
+.janela img{width:100%;height:auto}
+
+/* segurança */
+.selos{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 40px;padding:0;list-style:none}
+.selo{display:inline-flex;align-items:center;gap:8px;border-radius:var(--radius-pill);padding:9px 16px;background:var(--mint-tint);color:var(--on-mint-tint);font:600 14px/18px var(--font-sans)}
+.selo svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.pontos{display:grid;gap:20px}
+@media(min-width:800px){.pontos{grid-template-columns:repeat(3,1fr)}}
+.pontos div{border-top:2.5px solid var(--ink);padding-top:16px}
+.pontos p{margin:6px 0 0;color:var(--ink-muted)}
+
+/* perguntas */
+.faq{max-width:820px}
+.faq details{border-bottom:1px solid var(--border);padding:4px 0}
+.faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 0;font:700 19px/26px var(--font-display)}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"";width:12px;height:12px;border-right:2.5px solid var(--primary);border-bottom:2.5px solid var(--primary);transform:rotate(45deg);transition:transform .2s;flex:none;margin-right:6px}
+.faq details[open] summary::after{transform:rotate(-135deg)}
+.faq p{margin:0 0 20px;color:var(--ink-muted);max-width:42em}
+
+/* CTA final + rodapé */
+.final{text-align:center;padding:var(--space-24) 0}
+@media(min-width:900px){.final{padding:var(--space-32) 0}}
+.final .acoes{justify-content:center}
+.final .nota{margin-top:16px;font-size:14px;color:var(--on-ink-muted)}
+footer{background:var(--surface-ink);color:var(--on-ink-muted);border-top:1px solid #24394A;padding:40px 0;font-size:14px}
+footer .contentor{display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between;align-items:center}
+footer .marca{color:var(--on-ink)}
+footer nav{display:flex;flex-wrap:wrap;gap:20px}footer nav a{text-decoration:none}footer nav a:hover{color:var(--on-ink)}
+
+/* entrada suave das secções */
+.revela{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s ease}
+.revela.visivel{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}.revela,.flutua{opacity:1;transform:none}.onda path{stroke-dashoffset:0}.dupla{transform:none}.recibo{display:none}.cartao-doc{opacity:1;transform:none}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<a class="saltar" href="#conteudo">Saltar para o conteúdo</a>
+<div class="aviso-testes" role="note">Versão de testes: use apenas dados fictícios. Não introduza dados reais de empresas.</div>
+
+<header class="topo">
+  <div class="contentor">
+    <a class="marca" href="/" aria-label="Contabia, página inicial">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="#12232E"/><path d="M43 19a16 16 0 1 0 0 26" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/><path d="M27 37q5-5 10 0t10 0t10 0" fill="none" stroke="#3CC6A0" stroke-width="4.5" stroke-linecap="round"/></svg>contabia</a>
+    <nav class="menu" aria-label="Principal">
+      <a href="#como-funciona">Como funciona</a>
+      <a href="#contabilistas">Para contabilistas</a>
+      <a href="#seguranca">Segurança</a>
+      <a href="#perguntas">Perguntas</a>
+    </nav>
+    <div class="acoes-topo">
+      <a class="btn btn-secundario entrar" href="/empresa/entrar">Entrar</a>
+      <a class="btn btn-primario" href="/empresa/registar">Criar conta grátis</a>
+    </div>
+  </div>
+</header>
+
+<main id="conteudo">
+<!-- 1. Hero -->
+<section class="hero escuro">
+  <div class="contentor">
+    <div class="revela">
+      <p class="eyebrow">Contabilidade para empresas em Portugal</p>
+      <h1 class="display-hero">O seu contabilista, <span class="onda">à mão.<svg viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" vector-effect="non-scaling-stroke" d="M2 6q7.5-7 15 0t15 0t15 0t15 0t15 0t15 0t15 0t13 0"/></svg></span></h1>
+      <p class="lead">Fotografe as faturas, acompanhe os prazos e fale com o seu Contabilista Certificado — tudo numa app, em tempo real.</p>
+      <div class="acoes">
+        <a class="btn btn-menta" href="/empresa/registar">Criar conta grátis <span aria-hidden="true">→</span></a>
+        <a class="btn btn-escuro" href="#como-funciona">Ver como funciona</a>
+      </div>
+      <ul class="provas">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Dados alojados na UE</li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>RGPD</li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Funciona sem internet</li>
+      </ul>
+    </div>
+    <div class="palco rodado revela">
+      <div class="tel"><img src="/site/img/app-painel.webp" width="390" height="844" alt="O Painel da app Contabia: mensagem do Luís, o próximo prazo do IVA a 20 de novembro, o gráfico de vendas e compras e o IVA estimado do trimestre."></div>
+      <div class="flutua chip-prazo" aria-hidden="true"><div class="cal"><i>NOV</i><b>20</b></div><div>IVA trimestral<small>faltam 8 dias</small></div></div>
+      <div class="flutua balao" aria-hidden="true"><img class="av" src="/site/img/luis.svg" alt=""><div class="b"><small>Luís · assistente virtual</small>Estou atento a todas as suas faturas.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. A dor -->
+<section aria-labelledby="t-dor">
+  <div class="contentor">
+    <div class="cabeca-seccao revela"><h2 class="h2" id="t-dor">Faturas na carteira. E-mails sem resposta. Prazos na cabeça.</h2></div>
+    <div class="dores">
+      <p class="dor revela">Onde está a fatura do gasóleo de setembro?</p>
+      <p class="dor revela">O contabilista pediu o extrato outra vez.</p>
+      <p class="dor revela">Quando é que termina o IVA?</p>
+    </div>
+    <p class="fecho revela">A contabilidade não tem de ser assim.</p>
+  </div>
+</section>
+
+<!-- 3. Como funciona -->
+<section id="como-funciona" aria-labelledby="t-como" style="padding-top:0">
+  <div class="contentor">
+    <div class="cabeca-seccao revela">
+      <p class="eyebrow">Como funciona</p>
+      <h2 class="h1" id="t-como">Três gestos. <span class="onda">Nenhum papel.<svg viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" vector-effect="non-scaling-stroke" d="M2 6q7.5-7 15 0t15 0t15 0t15 0t15 0t15 0t15 0t13 0"/></svg></span></h2>
+    </div>
+    <div class="passos">
+      <article class="passo revela">
+        <div class="cena" aria-hidden="true">
+          <div class="recibo"><b>PAPELARIA ATLÂNTICO</b>FT 2026/418<br>03/11/2026<br>Material escritório<br>TOTAL ........ 146,40<div class="qr"></div></div>
+          <div class="cartao-doc"><div class="l1"><span>Papelaria Atlântico</span><span class="mono">146,40 €</span></div><div class="l2"><span>FT 2026/418 · original na nuvem</span><span class="pill ok">Lida</span></div></div>
+        </div>
+        <span class="num">01</span>
+        <h3 class="h3">Fotografe</h3>
+        <p>A app lê o código QR da fatura e guarda o original na nuvem durante 10 anos, como a lei exige.</p>
+      </article>
+      <article class="passo revela">
+        <div class="cena" aria-hidden="true">
+          <div class="balao"><img class="av" src="/site/img/luis.svg" alt=""><div class="b"><small>Luís · assistente virtual</small>Classifiquei como material de escritório. Faltam 2 documentos para fechar outubro.</div></div>
+        </div>
+        <span class="num">02</span>
+        <h3 class="h3">O Luís organiza</h3>
+        <p>Classifica cada despesa, diz-lhe o que falta e lembra os prazos 7 e 2 dias antes.</p>
+      </article>
+      <article class="passo revela">
+        <div class="cena cena-carteira" aria-hidden="true"><img src="/site/img/app-carteira.webp" alt="" loading="lazy"></div>
+        <span class="num">03</span>
+        <h3 class="h3">O seu contabilista submete</h3>
+        <p>Recebe tudo ao segundo, revê, apura o IVA e submete. Vocês falam na mesma app.</p>
+      </article>
+    </div>
+    <p class="fecho revela">Está tudo em dia.</p>
+  </div>
+</section>
+
+<!-- 4. O que muda -->
+<section aria-labelledby="t-muda" style="padding-top:0">
+  <div class="contentor">
+    <div class="cabeca-seccao revela">
+      <p class="eyebrow">O que muda na sua empresa</p>
+      <h2 class="h2" id="t-muda">Nenhum papel perdido. Nenhum prazo esquecido.</h2>
+    </div>
+    <div class="grelha">
+      <article class="cartao revela"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></div><h3 class="h3">Prazos que avisam</h3><p>Notificação 7 dias, 2 dias e no próprio dia. Nunca mais um prazo por surpresa.</p><p class="prova">7 d · 2 d · hoje</p></article>
+      <article class="cartao revela"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M7 16V9M12 16V5M17 16v-4"/></svg></div><h3 class="h3">IVA à vista</h3><p>Veja quanto vai pagar ou recuperar este trimestre, com o que já registou.</p><p class="prova">atualizado a cada fatura</p></article>
+      <article class="cartao revela"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v10H8l-4 4z"/><path d="M8 10h8M8 13h5"/></svg></div><h3 class="h3">Pedidos sem e-mails</h3><p>O contabilista pede; recebe no telemóvel; responde com uma fotografia.</p><p class="prova">«Já enviei» num toque</p></article>
+      <article class="cartao revela"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 20h18"/></svg></div><h3 class="h3">Banco ligado às faturas</h3><p>Importe o extrato; cada pagamento encontra a sua fatura, com a explicação.</p><p class="prova">qualquer banco · CSV</p></article>
+      <article class="cartao revela"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/><path d="M3 3l18 18"/></svg></div><h3 class="h3">Funciona sem internet</h3><p>Registe na obra ou no armazém. A app envia sozinha quando houver rede.</p><p class="prova">sem duplicados</p></article>
+      <article class="cartao revela"><div class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2 .8 3 3 3 6"/></svg></div><h3 class="h3">A sua equipa também</h3><p>Colaboradores com acesso próprio. Fica registado quem fez o quê.</p><p class="prova">registo de atividade</p></article>
+    </div>
+    <div class="destaque">
+      <div class="revela">
+        <h3 class="h2">Saiba hoje o que vai pagar no fim do trimestre.</h3>
+        <p class="lead" style="color:var(--ink-muted)">Cada fatura que regista atualiza o IVA estimado. Sem surpresas no dia 20 — e com tempo para falar com o seu contabilista.</p>
+      </div>
+      <div class="numero revela" aria-label="Exemplo: IVA estimado do 4.º trimestre, 444,40 euros a pagar">
+        <p class="eyebrow" style="margin:0 0 6px">IVA estimado · 4.º trimestre · exemplo</p>
+        <div class="valor" data-conta="444.40" aria-hidden="true">444,40 €</div>
+        <div class="dupla" aria-hidden="true"></div>
+        <p class="leg" aria-hidden="true">a pagar · com o que já registou</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. O Luís -->
+<section class="escuro" aria-labelledby="t-luis">
+  <div class="contentor luis-grid">
+    <div class="palco revela" style="width:min(280px,72vw)">
+      <div class="tel"><img src="/site/img/app-assistente.webp" width="390" height="844" loading="lazy" alt="O assistente Luís na app: responde à pergunta sobre o IVA de um almoço com um cliente, citando o artigo 21.º do Código do IVA."></div>
+    </div>
+    <div class="revela">
+      <img class="retrato" src="/site/img/luis.svg" width="120" height="120" alt="Luís, assistente virtual da Contabia">
+      <p class="eyebrow">Conheça o Luís</p>
+      <h2 class="h1" id="t-luis">Dúvidas simples, <span class="onda">respostas imediatas.<svg viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" vector-effect="non-scaling-stroke" d="M2 6q7.5-7 15 0t15 0t15 0t15 0t15 0t15 0t15 0t13 0"/></svg></span></h2>
+      <p class="lead">O Luís responde com a fonte legal. Quando a questão pede uma decisão, passa-a ao seu Contabilista Certificado.</p>
+      <div class="conversa">
+        <div class="pergunta">Posso deduzir o IVA de um almoço com um cliente?</div>
+        <div class="balao oceano"><img class="av" src="/site/img/luis.svg" alt=""><div class="b"><small>Luís · assistente virtual</small>Em regra, não: o IVA de refeições não é dedutível. Quer que pergunte ao seu contabilista?<span class="fonte">CIVA, art. 21.º</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Contabilistas -->
+<section id="contabilistas" aria-labelledby="t-cc">
+  <div class="contentor cc-grid">
+    <div class="revela">
+      <p class="eyebrow">Para Contabilistas Certificados</p>
+      <h2 class="h1" id="t-cc">Menos pedidos, <span class="onda">mais contabilidade.<svg viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" vector-effect="non-scaling-stroke" d="M2 6q7.5-7 15 0t15 0t15 0t15 0t15 0t15 0t15 0t13 0"/></svg></span></h2>
+      <p class="lead">Os documentos chegam já lidos, classificados e com o original. Você revê, decide e submete.</p>
+      <ul class="lista-cc">
+        <li><span class="mono">01</span><span><strong>Carteira com prioridades</strong> — o Luís diz por onde começar hoje.</span></li>
+        <li><span class="mono">02</span><span><strong>Revisão com confiança da IA</strong> — aprove de uma vez os lançamentos certos.</span></li>
+        <li><span class="mono">03</span><span><strong>Regras por fornecedor</strong> — conta, IVA e lançamento automático, definidos por si.</span></li>
+        <li><span class="mono">04</span><span><strong>Conciliação bancária explicada</strong> — e o pedido da fatura em falta num toque.</span></li>
+        <li><span class="mono">05</span><span><strong>DP IVA, SAF-T (PT) e fecho de período</strong> — com validações antes de submeter.</span></li>
+      </ul>
+      <div class="acoes"><a class="btn btn-primario" href="/contabilista/registar">Experimentar no meu gabinete <span aria-hidden="true">→</span></a></div>
+    </div>
+    <div class="janela revela"><div class="barra" aria-hidden="true"><i></i><i></i><i></i></div><img src="/site/img/app-carteira.webp" width="2048" height="1400" loading="lazy" alt="A app do Contabilista Certificado: carteira de empresas com os lançamentos por rever, pedidos e declarações de IVA por submeter."></div>
+  </div>
+</section>
+
+<!-- 7. Segurança -->
+<section id="seguranca" aria-labelledby="t-seg" style="padding-top:0">
+  <div class="contentor">
+    <div class="cabeca-seccao revela">
+      <p class="eyebrow">Segurança</p>
+      <h2 class="h2" id="t-seg">Os seus dados, na Europa. E nunca se apagam por engano.</h2>
+    </div>
+    <ul class="selos revela">
+      <li class="selo"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>Alojado na UE</li>
+      <li class="selo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>RGPD</li>
+      <li class="selo"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Conservação 10 anos</li>
+      <li class="selo"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Sessões protegidas</li>
+    </ul>
+    <div class="pontos">
+      <div class="revela"><h3 class="h3">Nada se apaga sem o contabilista</h3><p>Um erro pede-se para anular; o seu contabilista confirma. O documento fica no histórico.</p></div>
+      <div class="revela"><h3 class="h3">O original de cada fatura</h3><p>A fotografia ou o PDF ficam guardados na nuvem. Pode deitar fora o papel.</p></div>
+      <div class="revela"><h3 class="h3">Cada pessoa com o seu acesso</h3><p>Colaboradores com conta própria; desative um acesso e ele termina em todos os aparelhos.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 8. Perguntas -->
+<section id="perguntas" aria-labelledby="t-faq" style="padding-top:0">
+  <div class="contentor">
+    <div class="cabeca-seccao revela"><p class="eyebrow">Perguntas frequentes</p><h2 class="h2" id="t-faq">O que costumam perguntar-nos</h2></div>
+    <div class="faq revela">
+      <details><summary>Preciso de deixar o meu contabilista?</summary><p>Não. A Contabia liga a sua empresa ao seu Contabilista Certificado. Ele continua a decidir e a submeter; a diferença é que deixa de lhe pedir papéis por e-mail.</p></details>
+      <details><summary>E se o meu contabilista ainda não usa a Contabia?</summary><p>Convide-o na app com o e-mail ou o n.º OCC dele. Quando aceitar, a ligação fica ativa e ele passa a receber os seus documentos ao segundo.</p></details>
+      <details><summary>Os meus dados estão seguros?</summary><p>Os dados ficam alojados na União Europeia (Frankfurt), com sessões protegidas e limite de tentativas de entrada. Nenhum documento se apaga: só pode ser anulado, e apenas com a confirmação do seu contabilista.</p></details>
+      <details><summary>Funciona na Madeira e nos Açores?</summary><p>Sim. A app usa as taxas de IVA de cada região (Continente, Madeira e Açores) e o calendário fiscal correspondente.</p></details>
+      <details><summary>Preciso de internet?</summary><p>Não para registar. Sem rede, a fatura e a fotografia ficam guardadas no telemóvel e são enviadas sozinhas quando a ligação voltar.</p></details>
+      <details><summary>Quanto custa?</summary><p>Estamos em fase de testes e criar conta é gratuito. Antes de lançarmos para clientes reais, publicaremos os preços aqui.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- 9. CTA final -->
+<section class="final escuro" aria-labelledby="t-final">
+  <div class="contentor revela">
+    <h2 class="h1" id="t-final">Comece hoje. Amanhã já está <span class="onda">tudo em dia.<svg viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" vector-effect="non-scaling-stroke" d="M2 6q7.5-7 15 0t15 0t15 0t15 0t15 0t15 0t15 0t13 0"/></svg></span></h2>
+    <div class="acoes">
+      <a class="btn btn-menta" href="/empresa/registar">Criar conta grátis <span aria-hidden="true">→</span></a>
+      <a class="btn btn-escuro" href="/contabilista/registar">Sou contabilista</a>
+    </div>
+    <p class="nota">Leva 2 minutos. Sem cartão.</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="contentor">
+    <a class="marca" href="/"><svg viewBox="0 0 64 64" aria-hidden="true" style="width:30px;height:30px"><circle cx="32" cy="32" r="32" fill="#1F3B4A"/><path d="M43 19a16 16 0 1 0 0 26" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/><path d="M27 37q5-5 10 0t10 0t10 0" fill="none" stroke="#3CC6A0" stroke-width="4.5" stroke-linecap="round"/></svg>contabia</a>
+    <nav aria-label="Rodapé"><a href="/empresa/">App da empresa</a><a href="/contabilista/">App do contabilista</a><a href="#seguranca">Segurança</a><a href="#perguntas">Perguntas</a></nav>
+    <p style="margin:0">Feito na Madeira, para empresas de todo o Portugal.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var reduzir = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var els = document.querySelectorAll(".revela, .hero .contentor, .passo, .onda");
+  if (!("IntersectionObserver" in window) || reduzir) { els.forEach(function (e) { e.classList.add("visivel"); }); }
+  else {
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("visivel"); io.unobserve(e.target); } });
+    }, { threshold: 0.2, rootMargin: "0px 0px -40px 0px" });
+    els.forEach(function (e) { io.observe(e); });
+  }
+  // a onda: desenhada à medida da palavra (ondas de 30px), para nunca se esticar nem partir
+  function desenharOndas() {
+    document.querySelectorAll(".onda").forEach(function (o) {
+      var svg = o.querySelector("svg"), path = svg && svg.querySelector("path");
+      if (!path) return;
+      // frase partida em duas linhas (ecrãs estreitos): sem onda, para não sair do ecrã
+      if (o.getClientRects().length > 1) { svg.style.display = "none"; return; }
+      svg.style.display = "";
+      var w = Math.max(30, o.getBoundingClientRect().width), n = Math.max(2, Math.round((w - 4) / 30)), p = (w - 4) / n;
+      var d = "M2 6"; for (var i = 0; i < n; i++) d += " q" + (p / 4).toFixed(2) + " -6 " + (p / 2).toFixed(2) + " 0 t" + (p / 2).toFixed(2) + " 0";
+      svg.setAttribute("viewBox", "0 0 " + w.toFixed(1) + " 12");
+      svg.removeAttribute("preserveAspectRatio");
+      path.removeAttribute("vector-effect");
+      path.setAttribute("d", d);
+    });
+  }
+  desenharOndas();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(desenharOndas);
+  var tr; window.addEventListener("resize", function () { clearTimeout(tr); tr = setTimeout(desenharOndas, 150); });
+  // números que contam até ao valor
+  var fmt = function (v) { return v.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " €"; };
+  document.querySelectorAll("[data-conta]").forEach(function (el) {
+    var alvo = parseFloat(el.getAttribute("data-conta"));
+    if (reduzir || !("IntersectionObserver" in window)) { el.textContent = fmt(alvo); return; }
+    el.textContent = fmt(0);
+    var o = new IntersectionObserver(function (es) {
+      if (!es[0].isIntersecting) return; o.disconnect();
+      var t0 = performance.now();
+      (function passo(t) { var p = Math.min(1, (t - t0) / 600), e = 1 - Math.pow(1 - p, 3); el.textContent = fmt(alvo * e); if (p < 1) requestAnimationFrame(passo); })(t0);
+    }, { threshold: 0.5 });
+    o.observe(el);
+  });
+})();
+</script>
+</body>
+</html>
