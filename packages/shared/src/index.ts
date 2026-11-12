@@ -6,3 +6,4 @@ export * from "./api.ts";
 export * from "./formato.ts";
 export * from "./efatura.ts";
 export * from "./extrato.ts";
+export * from "./apoios.ts";

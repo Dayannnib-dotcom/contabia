@@ -81,3 +81,24 @@ test("leitura do extrato bancário (montante único ou débito/crédito, com lin
   const b = lerCSVExtrato("Data;Descritivo;Débito;Crédito\n2026-10-01;DD EDP;45,30;\n2026-10-03;TRF;;100,00\n");
   assert.deepEqual(b.movimentos.map((m) => m.valor), [-45.3, 100]);
 });
+
+test("CAE Rev. 4 e apoios compatíveis", async () => {
+  const { erroCAE, apoiosCompativeis, CATALOGO_BASE, SECCOES_CAE } = await import("./apoios.ts");
+  assert.equal(SECCOES_CAE.flatMap((s) => s.divisoes).length, 87, "a NACE Rev. 2.1 tem 87 divisões");
+  assert.equal(erroCAE("56111"), null);
+  assert.equal(erroCAE("56.111"), null);
+  assert.match(erroCAE("45200")!, /Rev\. 4/);
+  assert.match(erroCAE("04000")!, /não existe/);
+  assert.match(erroCAE("5611")!, /5 algarismos/);
+  const madeira = apoiosCompativeis({ cae: "56111", caesSecundarios: [], dimensao: "micro", regiao: "PT-MA" }, CATALOGO_BASE, "2026-11-11T10:00:00Z");
+  assert.ok(madeira.every((a) => a.apoio.regioes.includes("PT-MA")));
+  // prazo passado: desaparece
+  const tarde = apoiosCompativeis({ cae: "56111", caesSecundarios: [], dimensao: "micro", regiao: "PT-MA" }, CATALOGO_BASE, "2026-11-21T10:00:00Z");
+  assert.ok(!tarde.some((a) => a.apoio.id === "m2030-2026-35"));
+  // grande empresa não vê avisos só para PME
+  const grande = apoiosCompativeis({ cae: "25110", caesSecundarios: [], dimensao: "grande", regiao: "PT" }, CATALOGO_BASE, "2026-11-11T10:00:00Z");
+  assert.ok(!grande.some((a) => a.apoio.id === "mpr-2026-6"));
+  // um CAE secundário elegível chega
+  const sec = apoiosCompativeis({ cae: "64190", caesSecundarios: ["62010"], dimensao: "pequena", regiao: "PT" }, CATALOGO_BASE, "2026-11-11T10:00:00Z");
+  assert.ok(sec.some((a) => a.apoio.id === "mpr-2026-6"));
+});

@@ -12,8 +12,8 @@ export default function Painel() {
   const id = sessao!.id;
   const gestor = sessao!.perfil !== "colaborador";
   const { dados, erro, recarregar } = useDados(async () => {
-    const [resumo, prazos, pedidos, ligacoes, docs] = await Promise.all([api.resumo(id), api.prazos(id), api.pedidos(id), api.ligacoes(), api.documentos(id)]);
-    return { resumo, docs, prazos, pedidos: pedidos.filter((p) => p.estado === "pendente"), ligPendente: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "contabilista"), conviteEnviado: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "empresa"), ligAtiva: ligacoes.find((l) => l.estado === "ativa") };
+    const [resumo, prazos, pedidos, ligacoes, docs, apoios] = await Promise.all([api.resumo(id), api.prazos(id), api.pedidos(id), api.ligacoes(), api.documentos(id), api.apoios(id).catch(() => null)]);
+    return { resumo, docs, apoios, prazos, pedidos: pedidos.filter((p) => p.estado === "pendente"), ligPendente: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "contabilista"), conviteEnviado: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "empresa"), ligAtiva: ligacoes.find((l) => l.estado === "ativa") };
   }, [id]);
 
   // Avisos no telemóvel 7 dias, 2 dias e no dia de cada prazo por submeter (funcionam com a app fechada).
@@ -72,6 +72,27 @@ export default function Painel() {
           })()}
         </Cartao>
       ) : null}
+
+      {dados?.apoios ? (() => {
+        const abertos = dados.apoios.apoios.filter((a) => a.apoio.estado === "aberto");
+        const prox = abertos.find((a) => a.diasParaFim !== null);
+        return (
+          <Cartao onPress={() => router.push("/apoios")} estilo={{ backgroundColor: cor.tinta, borderColor: cor.tinta, gap: 6 }}>
+            <Texto tamanho={11} forte cor={cor.menta}>APOIOS EUROPEUS</Texto>
+            <Texto forte tamanho={17} cor="#FFFFFF">
+              {!dados.apoios.perfil.cae ? "Há fundos europeus para a sua atividade?"
+                : abertos.length ? `${abertos.length === 1 ? "1 aviso aberto pode" : `${abertos.length} avisos abertos podem`} servir à sua empresa`
+                : "Sem avisos abertos para a sua atividade agora"}
+            </Texto>
+            <Texto tamanho={13} cor="#C9D6DC">
+              {!dados.apoios.perfil.cae ? "Indique o CAE e eu procuro os apoios a que se pode candidatar."
+                : prox ? `O próximo a fechar: ${prox.apoio.nome}, ${prox.diasParaFim! <= 0 ? "hoje" : `daqui a ${prox.diasParaFim} ${prox.diasParaFim === 1 ? "dia" : "dias"}`}.`
+                : "Veja os avisos previstos e peça um estudo de viabilidade."}
+            </Texto>
+            <Texto forte tamanho={14} cor={cor.menta}>{dados.apoios.perfil.cae ? "Ver apoios e pedir estudo ›" : "Indicar o CAE ›"}</Texto>
+          </Cartao>
+        );
+      })() : null}
 
       <Cartao>
         <Texto forte tamanho={15}>Precisa da sua atenção</Texto>

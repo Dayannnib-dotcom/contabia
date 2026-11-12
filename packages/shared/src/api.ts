@@ -12,6 +12,7 @@ import type {
 import type { Regras, Regiao, RegimeIVA } from "./regras.ts";
 import type { LinhaEfatura } from "./efatura.ts";
 import type { LinhaExtrato } from "./extrato.ts";
+import type { ApoioCompativel, Dimensao, PedidoEstudo, PerfilApoios } from "./apoios.ts";
 
 export class ErroApi extends Error {
   constructor(public codigo: string, mensagem: string, public status: number) {
@@ -162,6 +163,20 @@ export class ApiContabia {
   }
   removerDispositivo(token: string) {
     return this.pedido<{ ok: true }>("POST", "/v1/dispositivos/remover", { token }, 1);
+  }
+
+  // ── Apoios europeus e estudos de viabilidade ──
+  apoios(empresaId: string) {
+    return this.pedido<{ perfil: PerfilApoios; apoios: ApoioCompativel[]; verificadoEm: string }>("GET", `/v1/empresas/${empresaId}/apoios`);
+  }
+  definirPerfilApoios(empresaId: string, p: { cae: string; caesSecundarios?: string[]; dimensao: Dimensao | null }) {
+    return this.pedido<PerfilApoios>("PUT", `/v1/empresas/${empresaId}/perfil-apoios`, p);
+  }
+  pedirEstudo(empresaId: string, p: { apoioId: string | null; nome: string; email: string; telefone?: string; mensagem?: string; autorizoContacto: true }) {
+    return this.pedido<PedidoEstudo>("POST", `/v1/empresas/${empresaId}/estudos`, p);
+  }
+  estudos(empresaId: string) {
+    return this.pedido<PedidoEstudo[]>("GET", `/v1/empresas/${empresaId}/estudos`);
   }
 
   // ── Regras por fornecedor ──

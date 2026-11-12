@@ -331,6 +331,47 @@ with sync_playwright() as p:
         emp2.goto(BASE + "/empresa/redefinir")
         emp2.get_by_text("Ligação incompleta", exact=False).wait_for(timeout=20000)
 
+        # ── Apoios europeus pelo CAE e pedido de estudo de viabilidade ──
+        emp.goto(BASE + "/empresa/")
+        emp.get_by_text("APOIOS EUROPEUS").wait_for(timeout=20000)
+        emp.get_by_text("Há fundos europeus para a sua atividade?").wait_for()
+        shot(emp, "27_painel_apoios")
+        emp.get_by_text("Indicar o CAE ›").click()
+        emp.get_by_label("CAE principal").fill("45110")
+        emp.get_by_role("button", name="Procurar apoios").click()
+        emp.get_by_text("deixou de existir na CAE Rev. 4", exact=False).wait_for()
+        emp.get_by_label("CAE principal").fill("56111")
+        emp.get_by_role("radio", name="Micro", exact=False).click()
+        emp.get_by_role("button", name="Procurar apoios").click()
+        emp.get_by_text("CAE 56111 · Alojamento e restauração").wait_for(timeout=15000)
+        emp.get_by_text("Informação indicativa, verificada", exact=False).wait_for()
+        shot(emp, "28_apoios_lista")
+        if emp.get_by_role("button", name="Pedir estudo de viabilidade").count():
+            emp.get_by_role("button", name="Pedir estudo de viabilidade").first.click()
+            emp.get_by_text("Pedir estudo para este aviso").wait_for()
+            emp.get_by_role("button", name="Cancelar").last.click()
+        emp.get_by_role("button", name="Pedir um estudo").click()
+        emp.get_by_label("Nome para contacto").fill("Rita Gomes")
+        emp.get_by_label("E-mail para contacto").fill("rita@atlantico.pt")
+        emp.get_by_label("O que quer fazer? (opcional)").fill("Abrir uma esplanada")
+        emp.get_by_role("button", name="Enviar pedido").click()
+        emp.get_by_text("Para lhe ligarmos, autorize o contacto.").wait_for()
+        emp.get_by_role("checkbox").click()
+        shot(emp, "29_pedido_estudo")
+        emp.get_by_role("button", name="Enviar pedido").click()
+        emp.get_by_text("Pedido recebido", exact=False).wait_for(timeout=15000)
+        emp.get_by_text("Os seus pedidos de estudo").wait_for()
+        shot(emp, "30_estudo_pedido")
+
+        # o contabilista vê o CAE, os apoios e o pedido da empresa
+        cc.goto(BASE + "/contabilista/")
+        cc.get_by_text("Atlântico Serviços, Lda.", exact=True).first.click()
+        cc.get_by_role("tab", name="Apoios UE").click()
+        cc.get_by_text("CAE 56111 · Alojamento e restauração").wait_for(timeout=15000)
+        cc.get_by_text("Estudos pedidos pela empresa").wait_for()
+        assert cc.get_by_role("button", name="Pedir estudo de viabilidade").count() == 0
+        shot(cc, "31_cc_apoios")
+
 
 
     except Exception:

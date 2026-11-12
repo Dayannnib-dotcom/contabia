@@ -7,6 +7,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { z, ZodError } from "zod";
 import {
+  apoiosCompativeis, CATALOGO_BASE, erroCAE, normalizarCAE, validarCatalogo, type Catalogo, type Dimensao, type PedidoEstudo, type PerfilApoios,
   ajudaNIF, lerQR, limparNIF, normalizarUtilizador, proximasObrigacoes, qrConsistente, REGRAS_BASE, taxasEm, utilizadorValido, validarNIF,
   type Anexo, type Atividade, type RegraFornecedor, type Colaborador, type Documento, type MovimentoBancario, type Empresa, type Ligacao, type Pedido, type Regras, type ResumoEmpresa, type Sessao, type VerificacaoFecho,
 } from "@contabia/shared";
@@ -21,7 +22,7 @@ import {
 import { perguntar } from "./assistente.ts";
 import { sugerir, type DocConc } from "./conciliacao.ts";
 import { criarPush, enviarExpo, type EnviarPush } from "./push.ts";
-import { criarEnvioEmail, emailRecuperacao, type EnviarEmail } from "./email.ts";
+import { criarEnvioEmail, emailPedidoEstudo, emailRecuperacao, type EnviarEmail } from "./email.ts";
 import { randomBytes } from "node:crypto";
 
 export interface Config {
@@ -37,6 +38,8 @@ export interface Config {
   enviarEmail?: EnviarEmail;
   /** Endereço público do site, para as ligações nos e-mails. */
   urlPublico?: string;
+  /** Caixa da equipa que recebe os pedidos de estudo de viabilidade económica. */
+  emailEstudos?: string;
   /** Verificar os prazos e enviar avisos todos os dias às 9h de Lisboa. */
   agendarAvisosPrazos?: boolean;
 }
@@ -110,10 +113,11 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
 
   // ── auxiliares ──
   const empresaPorId = async (id: string): Promise<Empresa> => {
-    const [e] = await db.query<{ id: string; utilizador: string; nif: string; nome: string; regiao: string; regime_iva: string; email: string | null }>(
-      `SELECT id, utilizador, nif, nome, regiao, regime_iva, email FROM empresas WHERE id = $1`, [id]);
+    const [e] = await db.query<{ id: string; utilizador: string; nif: string; nome: string; regiao: string; regime_iva: string; email: string | null; cae: string | null; caes_secundarios: string[] | null; dimensao: string | null }>(
+      `SELECT id, utilizador, nif, nome, regiao, regime_iva, email, cae, caes_secundarios, dimensao FROM empresas WHERE id = $1`, [id]);
     if (!e) throw new ErroApp("nao_encontrada", "Empresa não encontrada.", 404);
-    return { id: e.id, utilizador: e.utilizador, nif: e.nif, nome: e.nome, regiao: e.regiao as Empresa["regiao"], regimeIVA: e.regime_iva as Empresa["regimeIVA"], email: e.email };
+    return { id: e.id, utilizador: e.utilizador, nif: e.nif, nome: e.nome, regiao: e.regiao as Empresa["regiao"], regimeIVA: e.regime_iva as Empresa["regimeIVA"], email: e.email,
+      cae: e.cae, caesSecundarios: e.caes_secundarios ?? [], dimensao: (e.dimensao as Dimensao | null) ?? null };
   };
   const regrasAtuais = async (): Promise<Regras> => {
     const [r] = await db.query<{ regras: Regras }>(`SELECT regras FROM regras_versoes ORDER BY publicada_em DESC LIMIT 1`);
@@ -885,6 +889,8 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     "DELETE /v1/empresas/:id/regras-fornecedor/:nif": "removeu uma regra de fornecedor",
     "POST /v1/empresas/:id/colaboradores/:cid/desativar": "desativou um utilizador",
     "POST /v1/empresas/:id/colaboradores/:cid/ativar": "reativou um utilizador",
+    "PUT /v1/empresas/:id/perfil-apoios": "atualizou o CAE e a dimensão da empresa",
+    "POST /v1/empresas/:id/estudos": "pediu um estudo de viabilidade económica",
   };
   app.addHook("onResponse", async (req, reply) => {
     if (req.method === "GET" || reply.statusCode >= 400 || (req as FastifyRequest & { repetido?: boolean }).repetido) return;
@@ -930,6 +936,100 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     await exigirAcesso(db, a, id, "lancamentos.escrever");
     await db.query(`DELETE FROM regras_fornecedor WHERE empresa_id = $1 AND nif = $2`, [id, nif]);
     return { ok: true };
+  });
+
+  // ═════════════ Apoios europeus e estudos de viabilidade ═════════════
+  const catalogoAtual = async (): Promise<Catalogo> => {
+    const [r] = await db.query<{ catalogo: Catalogo }>(`SELECT catalogo FROM apoios_versoes ORDER BY publicada_em DESC LIMIT 1`);
+    return r?.catalogo ?? CATALOGO_BASE;
+  };
+  const perfilDe = (e: Empresa): PerfilApoios => ({ cae: e.cae ?? null, caesSecundarios: e.caesSecundarios ?? [], dimensao: e.dimensao ?? null, regiao: e.regiao });
+  const zCAE = z.string().transform(normalizarCAE).superRefine((v, ctx) => {
+    const erro = erroCAE(v);
+    if (erro) ctx.addIssue({ code: "custom", message: erro });
+  });
+  app.get("/v1/empresas/:id/apoios", async (req) => {
+    const id = params(req).id;
+    await exigirAcesso(db, ator(req), id);
+    const perfil = perfilDe(await empresaPorId(id));
+    const cat = await catalogoAtual();
+    return { perfil, apoios: apoiosCompativeis(perfil, cat, agora().toISOString()), verificadoEm: cat.verificadoEm };
+  });
+  app.put("/v1/empresas/:id/perfil-apoios", async (req) => {
+    const a = ator(req);
+    const id = params(req).id;
+    await exigirAcesso(db, a, id);
+    exigirGestor(a);
+    const b = z.object({
+      cae: zCAE,
+      caesSecundarios: z.array(zCAE).max(20).default([]),
+      dimensao: z.enum(["micro", "pequena", "media", "grande"]).nullable().default(null),
+    }).parse(req.body);
+    const sec = [...new Set(b.caesSecundarios.filter((c) => c !== b.cae))];
+    await db.query(`UPDATE empresas SET cae = $1, caes_secundarios = $2::jsonb, dimensao = $3 WHERE id = $4`, [b.cae, JSON.stringify(sec), b.dimensao, id]);
+    await publicar(db, hub, id, "empresa.atualizada", a.papel, { campo: "perfil-apoios" });
+    return perfilDe(await empresaPorId(id));
+  });
+
+  type LinhaEstudo = { id: string; apoio_id: string | null; apoio_nome: string | null; nome: string; email: string; telefone: string | null; mensagem: string | null; estado: string; criado_em: string };
+  const estudoDe = (r: LinhaEstudo): PedidoEstudo => ({ id: r.id, apoioId: r.apoio_id, apoioNome: r.apoio_nome, nome: r.nome, email: r.email, telefone: r.telefone, mensagem: r.mensagem, estado: r.estado as PedidoEstudo["estado"], criadoEm: r.criado_em });
+  app.post("/v1/empresas/:id/estudos", async (req, reply) => {
+    const a = ator(req);
+    const id = params(req).id;
+    exigirPapel(a, "empresa");
+    await exigirAcesso(db, a, id);
+    const b = z.object({
+      apoioId: z.string().max(80).nullable().default(null),
+      nome: z.string().trim().min(2, "Indique o nome de quem devemos contactar.").max(120),
+      email: z.string().trim().toLowerCase().email("O e-mail não parece válido."),
+      telefone: z.string().trim().max(30).regex(/^[+\d\s()-]*$/, "O telefone só pode ter algarismos, espaços e +.").optional(),
+      mensagem: z.string().trim().max(1500).optional(),
+      autorizoContacto: z.literal(true, { errorMap: () => ({ message: "Para lhe ligarmos, autorize o contacto." }) }),
+    }).parse(req.body);
+    const desde = new Date(agora().getTime() - 86_400_000).toISOString();
+    const [{ n }] = await db.query<{ n: string }>(`SELECT count(*) AS n FROM pedidos_estudo WHERE empresa_id = $1 AND criado_em > $2`, [id, desde]);
+    if (Number(n) >= 3) throw new ErroApp("demasiados_pedidos", "Já recebemos 3 pedidos hoje. Vamos contactá-lo em breve.", 429);
+    const apoio = b.apoioId ? (await catalogoAtual()).linhas.find((l) => l.id === b.apoioId) : undefined;
+    if (b.apoioId && !apoio) throw new ErroApp("apoio_desconhecido", "Este aviso já não está no catálogo. Atualize a lista.", 404);
+    const [r] = await db.query<LinhaEstudo>(
+      `INSERT INTO pedidos_estudo (id, empresa_id, apoio_id, apoio_nome, nome, email, telefone, mensagem, criado_em) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [novoId(), id, apoio?.id ?? null, apoio ? `${apoio.codigo} · ${apoio.nome}` : null, b.nome, b.email, b.telefone || null, b.mensagem || null, agoraISO()]);
+    const empresa = await empresaPorId(id);
+    const destino = cfg.emailEstudos ?? process.env.EMAIL_ESTUDOS;
+    if (destino) void enviarEmail({ para: destino, ...emailPedidoEstudo(empresa, estudoDe(r)) }).catch(() => false);
+    else console.warn(`[estudos] EMAIL_ESTUDOS em falta — pedido ${r.id} guardado, sem e-mail para a equipa.`);
+    await publicar(db, hub, id, "estudo.pedido", "empresa", { estudoId: r.id });
+    return reply.code(201).send(estudoDe(r));
+  });
+  app.get("/v1/empresas/:id/estudos", async (req) => {
+    const id = params(req).id;
+    await exigirAcesso(db, ator(req), id);
+    return (await db.query<LinhaEstudo>(`SELECT * FROM pedidos_estudo WHERE empresa_id = $1 ORDER BY criado_em DESC`, [id])).map(estudoDe);
+  });
+  const exigirAdmin = (req: FastifyRequest) => {
+    if (!cfg.tokenAdmin || req.headers["x-admin-token"] !== cfg.tokenAdmin) throw new ErroApp("sem_permissao", "Acesso reservado.", 403);
+  };
+  /** Lista de pedidos para a equipa que faz os estudos. */
+  app.get("/v1/admin/estudos", async (req) => {
+    exigirAdmin(req);
+    const rs = await db.query<LinhaEstudo & { empresa_id: string; empresa_nome: string; empresa_nif: string }>(
+      `SELECT p.*, e.nome AS empresa_nome, e.nif AS empresa_nif FROM pedidos_estudo p JOIN empresas e ON e.id = p.empresa_id ORDER BY p.criado_em DESC LIMIT 500`);
+    return rs.map((r) => ({ ...estudoDe(r), empresa: { id: r.empresa_id, nome: r.empresa_nome, nif: r.empresa_nif } }));
+  });
+  app.post("/v1/admin/estudos/:eid/estado", async (req) => {
+    exigirAdmin(req);
+    const b = z.object({ estado: z.enum(["recebido", "em_contacto", "concluido"]) }).parse(req.body);
+    const [r] = await db.query<LinhaEstudo>(`UPDATE pedidos_estudo SET estado = $1 WHERE id = $2 RETURNING *`, [b.estado, params(req).eid]);
+    if (!r) throw new ErroApp("nao_encontrado", "Pedido não encontrado.", 404);
+    return estudoDe(r);
+  });
+  /** Publica uma versão nova do catálogo de avisos (atualizar prazos, abrir/fechar avisos). */
+  app.post("/v1/admin/apoios", async (req, reply) => {
+    exigirAdmin(req);
+    if (!validarCatalogo(req.body)) throw new ErroApp("dados_invalidos", "Catálogo incompleto: precisa de versao, verificadoEm e linhas válidas (ligações https).");
+    await db.query(`INSERT INTO apoios_versoes (versao, catalogo, publicada_em) VALUES ($1, $2::jsonb, $3) ON CONFLICT (versao) DO UPDATE SET catalogo = $2::jsonb, publicada_em = $3`,
+      [req.body.versao, JSON.stringify(req.body), agoraISO()]);
+    return reply.code(201).send({ versao: req.body.versao, linhas: req.body.linhas.length });
   });
 
   // ═════════════ Avisos push ═════════════

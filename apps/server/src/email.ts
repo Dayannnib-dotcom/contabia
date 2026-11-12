@@ -37,3 +37,28 @@ export function emailRecuperacao(nome: string, ligacao: string): Pick<Email, "as
 <p style="color:#4B5A63;font-size:13px">A ligação é válida durante 60 minutos. Se não foi você, ignore este e-mail: a sua senha continua igual.</p></div>`;
   return { assunto: "Contabia — criar nova senha", texto, html };
 }
+
+/** Aviso à equipa: uma empresa pediu um estudo de viabilidade económica. */
+export function emailPedidoEstudo(
+  empresa: { nome: string; nif: string; regiao: string; cae?: string | null; dimensao?: string | null },
+  p: { id: string; apoioNome: string | null; nome: string; email: string; telefone: string | null; mensagem: string | null },
+): Pick<Email, "assunto" | "texto" | "html"> {
+  const linhas: [string, string][] = [
+    ["Empresa", `${empresa.nome} (NIF ${empresa.nif})`],
+    ["Região", empresa.regiao],
+    ["CAE", empresa.cae ?? "não indicado"],
+    ["Dimensão", empresa.dimensao ?? "não indicada"],
+    ["Aviso", p.apoioNome ?? "Estudo geral (sem aviso escolhido)"],
+    ["Contacto", p.nome],
+    ["E-mail", p.email],
+    ["Telefone", p.telefone ?? "—"],
+    ["Mensagem", p.mensagem ?? "—"],
+    ["Pedido", p.id],
+  ];
+  const texto = `Novo pedido de estudo de viabilidade económica\n\n${linhas.map(([k, v]) => `${k}: ${v}`).join("\n")}\n\nO cliente autorizou o contacto.`;
+  const html = `<div style="font-family:system-ui,Segoe UI,Roboto,sans-serif;max-width:560px;margin:auto;color:#12232E">
+<h2 style="color:#0B6E5B;margin:0 0 12px">Novo pedido de estudo de viabilidade</h2>
+<table style="border-collapse:collapse;width:100%;font-size:14px">${linhas.map(([k, v]) => `<tr><td style="padding:6px 10px 6px 0;color:#4B5A63;vertical-align:top;white-space:nowrap">${esc(k)}</td><td style="padding:6px 0">${esc(v).replace(/\n/g, "<br>")}</td></tr>`).join("")}</table>
+<p style="color:#4B5A63;font-size:13px">O cliente autorizou o contacto.</p></div>`;
+  return { assunto: `Contabia — pedido de estudo: ${empresa.nome}`, texto, html };
+}

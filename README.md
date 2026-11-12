@@ -100,6 +100,15 @@ Builds para as lojas: `npx eas build -p ios` / `-p android` em cada app (precisa
 - **Regras fiscais automáticas**: taxas, prazos e prorrogações são dados versionados; uma nova versão publicada chega a todas as apps e aplica-se na data legal, sem atualizar a app.
 - **Contabilidade**: a IA sugere a conta SNC (histórico do fornecedor + palavras-chave), propõe o lançamento em partidas dobradas, e só o contabilista lança. Apuramento de IVA por campos da declaração periódica (Continente, Madeira, Açores). Estornos em vez de alterações. Períodos fechados ficam bloqueados.
 
+## Apoios europeus e estudos de viabilidade
+
+- **Onde:** na app da empresa, Painel → «Apoios europeus»; na app do contabilista, separador «Apoios UE» de cada empresa.
+- **CAE:** a empresa (gestor) ou o contabilista indica o CAE (Rev. 4, 5 algarismos), os secundários e a dimensão. Não há API pública gratuita que dê o CAE pelo NIF; o ecrã aponta para o SICAE. Ligar um fornecedor pago (ex.: nif.pt com chave) permitiria preencher sozinho.
+- **Catálogo de avisos:** vem com os avisos verificados a 12/11/2026 e atualiza-se sem nova versão da app:
+  `curl -X POST https://contabia-eu.onrender.com/v1/admin/apoios -H "x-admin-token: $ADMIN_TOKEN" -H "content-type: application/json" -d @catalogo.json`
+  (o formato é o de `CATALOGO_BASE` em `packages/shared/src/apoios.ts`). Avisos com o prazo passado deixam de aparecer sozinhos.
+- **Pedidos de estudo:** ficam guardados; a equipa recebe um e-mail em `EMAIL_ESTUDOS` (precisa do Brevo configurado). Lista: `GET /v1/admin/estudos`; estado: `POST /v1/admin/estudos/<id>/estado` com `{"estado":"em_contacto"}` ou `"concluido"`.
+
 ## Antes de entrar em produção (não se resolve só com código)
 
 - [ ] **Certificação da AT** do módulo de faturação (Portaria n.º 363/2010): a emissão de faturas certificadas (assinatura/hash, ATCUD) ainda não está incluída — as apps registam faturas recebidas e emitidas por outros programas.

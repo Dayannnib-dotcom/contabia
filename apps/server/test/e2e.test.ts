@@ -27,7 +27,7 @@ async function chamar(metodo: string, caminho: string, token?: string, corpo?: u
 
 before(async () => {
   db = await abrirDb(process.env.TEST_DATABASE_URL);
-  ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => new Date("2026-11-11T10:00:00Z"), enviarPush: enviarFalso, enviarEmail: async (e) => { emails.push(e); return true; }, urlPublico: "https://contabia-eu.onrender.com" }));
+  ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => new Date("2026-11-11T10:00:00Z"), enviarPush: enviarFalso, enviarEmail: async (e) => { emails.push(e); return true; }, urlPublico: "https://contabia-eu.onrender.com", emailEstudos: "estudos@contabia.test" }));
   url = await app.listen({ port: 0, host: "127.0.0.1" });
 });
 after(async () => {
@@ -497,4 +497,84 @@ test("23. segurança da entrada: limite de tentativas e recuperar a senha por e-
   await chamar("POST", "/v1/auth/recuperar", undefined, { papel: "contabilista", identificador: "rui@gabinete.pt" });
   assert.equal(emails.length, 1);
   assert.ok(emails[0].texto.includes("/contabilista/redefinir?token="));
+});
+
+test("24. apoios europeus pelo CAE e pedido de estudo de viabilidade", async () => {
+  const id = S.empId; // Empresa A, na Madeira, ligada à Ana CC
+  // sem CAE: mostra os avisos da região, mas pede o CAE e a dimensão para confirmar
+  const sem = await chamar("GET", `/v1/empresas/${id}/apoios`, S.emp);
+  assert.equal(sem.status, 200);
+  assert.equal(sem.json.perfil.cae, null);
+  const codigos = sem.json.apoios.map((x: { apoio: { codigo: string } }) => x.apoio.codigo);
+  assert.ok(codigos.includes("M2030-2026-38") && codigos.includes("M2030-2026-35"), codigos.join());
+  assert.ok(!codigos.includes("MPR-2026-6"), "avisos do Continente não aparecem a uma empresa da Madeira");
+  assert.ok(sem.json.apoios.every((x: { compatibilidade: string }) => x.compatibilidade === "verificar"));
+  // CAE inválido ou da Rev. 3 é recusado com explicação
+  assert.equal((await chamar("PUT", `/v1/empresas/${id}/perfil-apoios`, S.emp, { cae: "1234" })).status, 400);
+  const rev3 = await chamar("PUT", `/v1/empresas/${id}/perfil-apoios`, S.emp, { cae: "45110" });
+  assert.equal(rev3.status, 400);
+  assert.match(JSON.stringify(rev3.json), /Rev\. 4/);
+  // CAE e dimensão certos → compatibilidade provável, com o motivo
+  const p = await chamar("PUT", `/v1/empresas/${id}/perfil-apoios`, S.emp, { cae: "56 111", caesSecundarios: ["56111", "47250"], dimensao: "micro" });
+  assert.equal(p.status, 200, JSON.stringify(p.json));
+  assert.equal(p.json.cae, "56111");
+  assert.deepEqual(p.json.caesSecundarios, ["47250"]);
+  const com = await chamar("GET", `/v1/empresas/${id}/apoios`, S.emp);
+  const transp = com.json.apoios.find((x: { apoio: { id: string } }) => x.apoio.id === "m2030-2026-35");
+  assert.equal(transp.compatibilidade, "provavel");
+  assert.equal(transp.diasParaFim, 9);
+  assert.equal(com.json.apoios[0].apoio.id, "m2030-2026-35", "o prazo mais próximo aparece primeiro");
+  // o contabilista ligado vê o mesmo e também pode corrigir o CAE (a ligação do teste 10 foi revogada: liga-se de novo)
+  assert.equal((await chamar("GET", `/v1/empresas/${id}/apoios`, S.cc)).status, 403);
+  const conv = await chamar("POST", "/v1/ligacoes", S.cc, { utilizador: "empresa.a", nif: "509999999" });
+  assert.equal(conv.status, 201, JSON.stringify(conv.json));
+  assert.equal((await chamar("POST", `/v1/ligacoes/${conv.json.id}/aceitar`, S.emp, { versao: conv.json.versao })).json.estado, "ativa");
+  assert.equal((await chamar("GET", `/v1/empresas/${id}/apoios`, S.cc)).json.perfil.cae, "56111");
+  assert.equal((await chamar("PUT", `/v1/empresas/${id}/perfil-apoios`, S.cc, { cae: "56111", caesSecundarios: ["47250"], dimensao: "micro" })).status, 200);
+  // atividade financeira no Continente: a Inovação Produtiva exclui as divisões 64–66
+  const h = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "empresa.h", nif: "509999905", nome: "Empresa H", senha: "segredo123", regiao: "PT", regimeIVA: "mensal" });
+  assert.equal(h.status, 201, JSON.stringify(h.json));
+  await chamar("PUT", `/v1/empresas/${h.json.id}/perfil-apoios`, h.json.token, { cae: "64190", dimensao: "pequena" });
+  const fin = (await chamar("GET", `/v1/empresas/${h.json.id}/apoios`, h.json.token)).json.apoios.map((x: { apoio: { id: string } }) => x.apoio.id);
+  assert.ok(!fin.includes("mpr-2026-6") && fin.includes("mpr-2026-7"), fin.join());
+  await chamar("PUT", `/v1/empresas/${h.json.id}/perfil-apoios`, h.json.token, { cae: "25110", dimensao: "pequena" });
+  const ind = (await chamar("GET", `/v1/empresas/${h.json.id}/apoios`, h.json.token)).json.apoios.map((x: { apoio: { id: string } }) => x.apoio.id);
+  assert.ok(ind.includes("mpr-2026-6"));
+  assert.equal((await chamar("GET", `/v1/empresas/${h.json.id}/apoios`, S.emp)).status, 403);
+
+  // pedido de estudo: precisa de autorização de contacto; só a empresa pede; a equipa recebe um e-mail
+  emails.length = 0;
+  const base = { apoioId: "m2030-2026-38", nome: "Rita Gomes", email: "Rita@EmpresaA.pt", telefone: "+351 291 000 000", mensagem: "Queremos candidatar a renda e a eletricidade." };
+  assert.equal((await chamar("POST", `/v1/empresas/${id}/estudos`, S.emp, base)).status, 400);
+  assert.equal((await chamar("POST", `/v1/empresas/${id}/estudos`, S.cc, { ...base, autorizoContacto: true })).status, 403);
+  assert.equal((await chamar("POST", `/v1/empresas/${id}/estudos`, S.emp, { ...base, apoioId: "nao-existe", autorizoContacto: true })).status, 404);
+  const e = await chamar("POST", `/v1/empresas/${id}/estudos`, S.emp, { ...base, autorizoContacto: true });
+  assert.equal(e.status, 201, JSON.stringify(e.json));
+  assert.equal(e.json.email, "rita@empresaa.pt");
+  assert.match(e.json.apoioNome, /^M2030-2026-38 · Funcionamento 2030/);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(emails.length, 1);
+  assert.equal(emails[0].para, "estudos@contabia.test");
+  assert.ok(emails[0].texto.includes("Empresa A, Lda.") && emails[0].texto.includes("CAE: 56111") && emails[0].texto.includes("autorizou o contacto"));
+  assert.equal((await chamar("GET", `/v1/empresas/${id}/estudos`, S.cc)).json.length, 1);
+  // limite de 3 pedidos por dia
+  await chamar("POST", `/v1/empresas/${id}/estudos`, S.emp, { ...base, apoioId: null, autorizoContacto: true });
+  await chamar("POST", `/v1/empresas/${id}/estudos`, S.emp, { ...base, apoioId: null, autorizoContacto: true });
+  assert.equal((await chamar("POST", `/v1/empresas/${id}/estudos`, S.emp, { ...base, autorizoContacto: true })).status, 429);
+  // a equipa vê a lista e atualiza o estado; o registo de atividade guarda o pedido
+  assert.equal((await chamar("GET", "/v1/admin/estudos", S.emp)).status, 403);
+  const adm = await chamar("GET", "/v1/admin/estudos", undefined, undefined, { "x-admin-token": "admin" });
+  assert.equal(adm.json.length, 3);
+  assert.equal(adm.json[0].empresa.nif, "509999999");
+  assert.equal((await chamar("POST", `/v1/admin/estudos/${e.json.id}/estado`, undefined, { estado: "em_contacto" }, { "x-admin-token": "admin" })).json.estado, "em_contacto");
+  const ativ = (await chamar("GET", `/v1/empresas/${id}/atividade`, S.emp)).json.map((x: { acao: string }) => x.acao);
+  assert.ok(ativ.includes("pediu um estudo de viabilidade económica") && ativ.includes("atualizou o CAE e a dimensão da empresa"));
+
+  // o catálogo atualiza-se sem nova versão da app: um aviso fechado deixa de aparecer
+  const cat = (await import("@contabia/shared")).CATALOGO_BASE;
+  assert.equal((await chamar("POST", "/v1/admin/apoios", undefined, { versao: "x" }, { "x-admin-token": "admin" })).status, 400);
+  const novo = { ...cat, versao: "2026-11-13", linhas: cat.linhas.map((l) => (l.id === "m2030-2026-35" ? { ...l, estado: "fechado" } : l)) };
+  assert.equal((await chamar("POST", "/v1/admin/apoios", undefined, novo, { "x-admin-token": "admin" })).status, 201);
+  const depois = (await chamar("GET", `/v1/empresas/${id}/apoios`, S.emp)).json.apoios.map((x: { apoio: { id: string } }) => x.apoio.id);
+  assert.ok(!depois.includes("m2030-2026-35") && depois.includes("m2030-2026-38"));
 });

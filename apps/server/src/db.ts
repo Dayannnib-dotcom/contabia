@@ -275,6 +275,28 @@ const MIGRACOES: string[] = [
      regras jsonb NOT NULL,
      publicada_em text NOT NULL
    )`,
+  // Apoios europeus: CAE (Rev. 4) e dimensão da empresa, catálogo de avisos e pedidos de estudo.
+  `ALTER TABLE empresas ADD COLUMN IF NOT EXISTS cae text`,
+  `ALTER TABLE empresas ADD COLUMN IF NOT EXISTS caes_secundarios jsonb NOT NULL DEFAULT '[]'::jsonb`,
+  `ALTER TABLE empresas ADD COLUMN IF NOT EXISTS dimensao text`,
+  `CREATE TABLE IF NOT EXISTS apoios_versoes (
+     versao text PRIMARY KEY,
+     catalogo jsonb NOT NULL,
+     publicada_em text NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS pedidos_estudo (
+     id text PRIMARY KEY,
+     empresa_id text NOT NULL REFERENCES empresas(id),
+     apoio_id text,
+     apoio_nome text,
+     nome text NOT NULL,
+     email text NOT NULL,
+     telefone text,
+     mensagem text,
+     estado text NOT NULL DEFAULT 'recebido',
+     criado_em text NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS pedidos_estudo_empresa ON pedidos_estudo(empresa_id, criado_em)`,
 ];
 
 async function migrar(db: Db) {

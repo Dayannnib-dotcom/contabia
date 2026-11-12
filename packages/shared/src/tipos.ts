@@ -1,4 +1,5 @@
 import type { Regiao, RegimeIVA } from "./regras.ts";
+import type { Dimensao } from "./apoios.ts";
 
 export type Papel = "empresa" | "contabilista";
 
@@ -11,6 +12,10 @@ export interface Empresa {
   regimeIVA: RegimeIVA;
   /** E-mail para recuperar a senha (empresas antigas podem não ter). */
   email?: string | null;
+  /** CAE principal (Rev. 4, 5 algarismos), CAE secundários e dimensão: servem para os apoios europeus. */
+  cae?: string | null;
+  caesSecundarios?: string[];
+  dimensao?: Dimensao | null;
 }
 
 export interface Contabilista {
