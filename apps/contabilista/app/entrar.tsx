@@ -28,6 +28,7 @@ export default function Entrar() {
       <Campo rotulo="Senha" value={senha} onChangeText={setSenha} secureTextEntry />
       <Erro texto={erro} />
       <Botao titulo="Entrar" onPress={enviar} carregando={aEnviar} desativado={!email.includes("@") || senha.length < 8} />
+      <Botao titulo="Ainda não tenho conta — criar conta" variante="secundario" onPress={() => router.replace("/registar")} />
     </Ecra>
   );
 }
