@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Contabia — O seu contabilista, à mão. E os fundos europeus para a sua empresa.</title>
+<title>Contabia — A maré certa. O seu contabilista, à mão.</title>
 <meta name="description" content="Faturas, prazos e IVA numa app ligada ao seu Contabilista Certificado. Descubra pelo CAE os fundos europeus a que a sua empresa se pode candidatar e peça o estudo de viabilidade em 2 minutos.">
 <meta name="theme-color" content="#12232E">
-<meta property="og:title" content="Contabia — O seu contabilista, à mão">
+<meta property="og:title" content="Contabia — A maré certa. O seu contabilista, à mão.">
 <meta property="og:description" content="Faturas, prazos e IVA num só sítio, ligado ao seu Contabilista Certificado em tempo real.">
 <meta property="og:locale" content="pt_PT">
 <link rel="icon" href="/site/img/contabia-simbolo.svg" type="image/svg+xml">
@@ -414,6 +414,12 @@ html{scroll-padding-top:76px}
   .folha-painel,.item-menu,.doca{transition:none!important}
   .item-menu{opacity:1;transform:none}
 }
+
+/* slogan: «A maré certa.» */
+.mare{display:flex;align-items:center;gap:12px;margin:0 0 10px;font:700 22px/28px var(--font-display);letter-spacing:-.01em;color:var(--mint)}
+@media(min-width:640px){.mare{font-size:26px;line-height:32px}}
+.mare::before{content:"";width:46px;height:12px;flex:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 12'%3E%3Cpath d='M2 6q5-6 10.5 0t10.5 0t10.5 0t10.5 0' fill='none' stroke='%233CC6A0' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center/contain}
+.mare-rodape{color:var(--on-ink);font-weight:600}
 </style>
 </head>
 <body>
@@ -485,7 +491,7 @@ html{scroll-padding-top:76px}
   <div class="contentor">
     <div class="revela">
       <a class="novo" href="#fundos"><b>NOVO</b>Fundos europeus pelo seu CAE <span aria-hidden="true">→</span></a>
-      <p class="eyebrow">Contabilidade para empresas em Portugal</p>
+      <p class="mare">A maré certa.</p>
       <h1 class="display-hero">O seu contabilista, <span class="onda">à mão.<svg viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" vector-effect="non-scaling-stroke" d="M2 6q7.5-7 15 0t15 0t15 0t15 0t15 0t15 0t15 0t13 0"/></svg></span></h1>
       <p class="lead">Fotografe as faturas, acompanhe os prazos e fale com o seu Contabilista Certificado — tudo numa app, em tempo real.</p>
       <div class="acoes">
@@ -792,7 +798,7 @@ html{scroll-padding-top:76px}
   <div class="contentor">
     <a class="marca" href="/"><svg viewBox="0 0 64 64" aria-hidden="true" style="width:30px;height:30px"><circle cx="32" cy="32" r="32" fill="#1F3B4A"/><path d="M43 19a16 16 0 1 0 0 26" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/><path d="M27 37q5-5 10 0t10 0t10 0" fill="none" stroke="#3CC6A0" stroke-width="4.5" stroke-linecap="round"/></svg>contabia</a>
     <nav aria-label="Rodapé"><a href="/empresa/">App da empresa</a><a href="#fundos">Fundos europeus</a><a href="#estudos">Estudos de viabilidade</a><a href="/contabilista/">App do contabilista</a><a href="#seguranca">Segurança</a><a href="#perguntas">Perguntas</a></nav>
-    <p style="margin:0">Feito na Madeira, para empresas de todo o Portugal.</p>
+    <p style="margin:0"><span class="mare-rodape">A maré certa. O seu contabilista, à mão.</span><br>Feito na Madeira, para empresas de todo o Portugal.</p>
   </div>
 </footer>
 
