@@ -38,6 +38,8 @@ export interface Config {
   enviarEmail?: EnviarEmail;
   /** Endereço público do site, para as ligações nos e-mails. */
   urlPublico?: string;
+  /** Catálogo de apoios de partida (por omissão, o do código; nos testes, uma cópia fixa). */
+  catalogoBase?: Catalogo;
   /** Caixa da equipa que recebe os pedidos de estudo de viabilidade económica. */
   emailEstudos?: string;
   /** Verificar os prazos e enviar avisos todos os dias às 9h de Lisboa. */
@@ -939,9 +941,12 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   });
 
   // ═════════════ Apoios europeus e estudos de viabilidade ═════════════
+  const base = cfg.catalogoBase ?? CATALOGO_BASE;
   const catalogoAtual = async (): Promise<Catalogo> => {
+    // Vale a versão mais recente: a publicada pelo administrador ou a que vem no código
+    // (a revisão automática bissemanal atualiza o código e o Render publica sozinho).
     const [r] = await db.query<{ catalogo: Catalogo }>(`SELECT catalogo FROM apoios_versoes ORDER BY publicada_em DESC LIMIT 1`);
-    return r?.catalogo ?? CATALOGO_BASE;
+    return r && r.catalogo.versao > base.versao ? r.catalogo : base;
   };
   const perfilDe = (e: Empresa): PerfilApoios => ({ cae: e.cae ?? null, caesSecundarios: e.caesSecundarios ?? [], dimensao: e.dimensao ?? null, regiao: e.regiao });
   const zCAE = z.string().transform(normalizarCAE).superRefine((v, ctx) => {

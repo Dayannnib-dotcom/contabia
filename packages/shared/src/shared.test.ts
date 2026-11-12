@@ -83,7 +83,8 @@ test("leitura do extrato bancário (montante único ou débito/crédito, com lin
 });
 
 test("CAE Rev. 4 e apoios compatíveis", async () => {
-  const { erroCAE, apoiosCompativeis, CATALOGO_BASE, SECCOES_CAE } = await import("./apoios.ts");
+  const { erroCAE, apoiosCompativeis, SECCOES_CAE } = await import("./apoios.ts");
+  const { CATALOGO_TESTE: CATALOGO_BASE } = await import("./catalogo-teste.ts");
   assert.equal(SECCOES_CAE.flatMap((s) => s.divisoes).length, 87, "a NACE Rev. 2.1 tem 87 divisões");
   assert.equal(erroCAE("56111"), null);
   assert.equal(erroCAE("56.111"), null);
@@ -101,4 +102,21 @@ test("CAE Rev. 4 e apoios compatíveis", async () => {
   // um CAE secundário elegível chega
   const sec = apoiosCompativeis({ cae: "64190", caesSecundarios: ["62010"], dimensao: "pequena", regiao: "PT" }, CATALOGO_BASE, "2026-11-11T10:00:00Z");
   assert.ok(sec.some((a) => a.apoio.id === "mpr-2026-6"));
+});
+
+test("o catálogo real de apoios está bem formado (protege a revisão automática)", async () => {
+  const { CATALOGO_BASE, validarCatalogo, erroCAE } = await import("./apoios.ts");
+  assert.ok(validarCatalogo(CATALOGO_BASE));
+  assert.match(CATALOGO_BASE.versao, /^\d{4}-\d{2}-\d{2}/);
+  assert.match(CATALOGO_BASE.verificadoEm, /^\d{4}-\d{2}-\d{2}$/);
+  const ids = CATALOGO_BASE.linhas.map((l) => l.id);
+  assert.equal(new Set(ids).size, ids.length, "ids repetidos");
+  for (const l of CATALOGO_BASE.linhas) {
+    if (l.fim) assert.match(l.fim, /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/, l.id);
+    if (l.inicio) assert.match(l.inicio, /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/, l.id);
+    assert.ok(l.regioes.every((r) => ["PT", "PT-MA", "PT-AC"].includes(r)), l.id);
+    assert.ok(l.dimensoes.length && l.dimensoes.every((d) => ["micro", "pequena", "media", "grande"].includes(d)), l.id);
+    for (const d of [...(l.divisoes ?? []), ...(l.excluiDivisoes ?? [])]) assert.equal(erroCAE(d + "000"), null, `${l.id}: divisão ${d}`);
+    assert.ok(l.resumo.length > 10 && l.programa.length > 2, l.id);
+  }
 });

@@ -5,6 +5,7 @@ import { abrirDb, type Db } from "../src/db.ts";
 import { criarApp } from "../src/app.ts";
 import { criarPush, type MensagemPush } from "../src/push.ts";
 import { REGRAS_BASE } from "@contabia/shared";
+import { CATALOGO_TESTE } from "../../../packages/shared/src/catalogo-teste.ts";
 
 let db: Db;
 let app: Awaited<ReturnType<typeof criarApp>>["app"];
@@ -27,7 +28,7 @@ async function chamar(metodo: string, caminho: string, token?: string, corpo?: u
 
 before(async () => {
   db = await abrirDb(process.env.TEST_DATABASE_URL);
-  ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => new Date("2026-11-11T10:00:00Z"), enviarPush: enviarFalso, enviarEmail: async (e) => { emails.push(e); return true; }, urlPublico: "https://contabia-eu.onrender.com", emailEstudos: "estudos@contabia.test" }));
+  ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => new Date("2026-11-11T10:00:00Z"), enviarPush: enviarFalso, enviarEmail: async (e) => { emails.push(e); return true; }, urlPublico: "https://contabia-eu.onrender.com", emailEstudos: "estudos@contabia.test", catalogoBase: CATALOGO_TESTE }));
   url = await app.listen({ port: 0, host: "127.0.0.1" });
 });
 after(async () => {
@@ -571,9 +572,12 @@ test("24. apoios europeus pelo CAE e pedido de estudo de viabilidade", async () 
   assert.ok(ativ.includes("pediu um estudo de viabilidade económica") && ativ.includes("atualizou o CAE e a dimensão da empresa"));
 
   // o catálogo atualiza-se sem nova versão da app: um aviso fechado deixa de aparecer
-  const cat = (await import("@contabia/shared")).CATALOGO_BASE;
+  const cat = CATALOGO_TESTE;
   assert.equal((await chamar("POST", "/v1/admin/apoios", undefined, { versao: "x" }, { "x-admin-token": "admin" })).status, 400);
-  const novo = { ...cat, versao: "2026-11-13", linhas: cat.linhas.map((l) => (l.id === "m2030-2026-35" ? { ...l, estado: "fechado" } : l)) };
+  const antigo = { ...cat, versao: "2026-01-01", linhas: [] };
+  assert.equal((await chamar("POST", "/v1/admin/apoios", undefined, antigo, { "x-admin-token": "admin" })).status, 201);
+  assert.ok((await chamar("GET", `/v1/empresas/${id}/apoios`, S.emp)).json.apoios.length > 0, "uma versão mais antiga não substitui a do código");
+  const novo = { ...cat, versao: "9999-12-31", linhas: cat.linhas.map((l) => (l.id === "m2030-2026-35" ? { ...l, estado: "fechado" } : l)) };
   assert.equal((await chamar("POST", "/v1/admin/apoios", undefined, novo, { "x-admin-token": "admin" })).status, 201);
   const depois = (await chamar("GET", `/v1/empresas/${id}/apoios`, S.emp)).json.apoios.map((x: { apoio: { id: string } }) => x.apoio.id);
   assert.ok(!depois.includes("m2030-2026-35") && depois.includes("m2030-2026-38"));
