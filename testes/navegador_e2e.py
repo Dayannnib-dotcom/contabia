@@ -115,6 +115,8 @@ with sync_playwright() as p:
         emp.get_by_role("tab", name="Painel").click()
         emp.get_by_text("Pedido do contabilista: Extrato bancário").wait_for(timeout=15000)
         shot(emp, "15_painel_pedido_cc")
+        emp.get_by_role("button", name="Já enviei").first.click()
+        emp.get_by_text("Pedido do contabilista: Extrato bancário").wait_for(state="detached", timeout=15000)
 
         # ── Assistente ──
         emp.get_by_role("tab", name="Assistente").click()
@@ -131,6 +133,40 @@ with sync_playwright() as p:
         emp.get_by_role("tab", name="Prazos").click()
         emp.get_by_text("Submetida").first.wait_for()
         shot(emp, "18_prazos")
+
+        # ── Sentido inverso: uma 2.ª empresa convida o contabilista pelo n.º OCC ──
+        emp2 = b.new_page(viewport=vp)
+        emp2.on("pageerror", lambda e: erros.append(f"empresa2: {e}"))
+        emp2.goto(BASE + "/empresa/")
+        emp2.get_by_text("Criar conta").first.wait_for(timeout=20000)
+        emp2.get_by_text("Criar conta").first.click()
+        emp2.get_by_label("Nome da empresa").fill("Funchal Digital, Lda.")
+        emp2.get_by_label("Utilizador da empresa").fill("funchal.digital")
+        emp2.get_by_label("NIF da empresa").fill("510100007")
+        emp2.get_by_label("Senha").fill("segredo123")
+        emp2.get_by_role("button", name="Criar conta").click()
+        emp2.get_by_text("Precisa da sua atenção").wait_for(timeout=15000)
+        emp2.get_by_text("Ligação ao contabilista").first.click()
+        emp2.get_by_label("Email ou n.º OCC do contabilista").fill("99999")
+        emp2.get_by_role("button", name="Enviar convite").click()
+        emp2.get_by_text("Não encontrámos", exact=False).wait_for()
+        emp2.get_by_label("Email ou n.º OCC do contabilista").fill("12345")
+        emp2.get_by_role("button", name="Enviar convite").click()
+        emp2.get_by_text("À espera do contabilista").wait_for()
+        shot(emp2, "19_empresa_convite_enviado")
+
+        cc.goto(BASE + "/contabilista/")
+        cc.get_by_role("button", name="Ver convites").wait_for(timeout=15000)
+        shot(cc, "20_cc_carteira_convite")
+        cc.get_by_role("button", name="Ver convites").click()
+        cc.get_by_role("button", name="Aceitar convite").wait_for()
+        shot(cc, "21_cc_convite")
+        cc.get_by_role("button", name="Aceitar convite").click()
+        emp2.get_by_text("Ligação ativa").wait_for(timeout=15000)
+        shot(emp2, "22_empresa_ligada")
+        cc.get_by_role("tab", name="Carteira").click()
+        cc.get_by_text("Funchal Digital, Lda.").first.wait_for(timeout=15000)
+        shot(cc, "23_cc_carteira_2")
 
 
     except Exception:

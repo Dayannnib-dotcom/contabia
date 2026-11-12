@@ -17,7 +17,13 @@ Duas apps móveis (iOS e Android) e um servidor partilhado:
 - **App da empresa** (abra no telemóvel): https://contabia.onrender.com/empresa/
 - **App do Contabilista Certificado**: https://contabia.onrender.com/contabilista/
 
-Versão de demonstração no plano gratuito do Render: adormece após 15 minutos sem uso (o primeiro acesso demora cerca de 1 minuto) e os dados apagam-se quando o serviço reinicia.
+Plano gratuito do Render: o servidor adormece após 15 minutos sem uso (o primeiro acesso demora cerca de 1 minuto). Os dados ficam numa base de dados PostgreSQL (`contabia-db`) e já não se perdem quando o serviço reinicia ou é atualizado. A base de dados gratuita do Render expira 30 dias após ser criada; antes disso, passe-a para um plano pago (Basic) no painel do Render.
+
+### Ligação empresa ⇄ contabilista (dois sentidos)
+
+- **O contabilista pede**: em «Ligar empresa» escreve o utilizador e o NIF da empresa; a empresa aceita com biometria.
+- **A empresa convida**: em «Ligação ao contabilista» escreve o e-mail ou o n.º OCC do contabilista; ele aceita em «Convites recebidos».
+- Se os dois se convidarem ao mesmo tempo, a ligação fica ativa logo. Quem enviou pode cancelar; quem recebeu aceita ou recusa. Qualquer lado pode terminar a ligação, e o acesso é cortado no mesmo instante.
 
 ## Começar em 5 minutos
 

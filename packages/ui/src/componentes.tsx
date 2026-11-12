@@ -82,16 +82,26 @@ export function Campo({ rotulo, ajuda, erro, ...p }: TextInputProps & { rotulo: 
   );
 }
 
-export function Linha({ esquerda, direita, sub, onPress }: { esquerda: ReactNode; direita?: ReactNode; sub?: string; onPress?: () => void }) {
-  const c = (
-    <View style={s.linha}>
-      <View style={{ flex: 1, gap: 2 }}>
-        {typeof esquerda === "string" ? <Texto forte>{esquerda}</Texto> : esquerda}
-        {sub ? <Texto sec tamanho={12}>{sub}</Texto> : null}
-      </View>
-      {direita}
+/**
+ * Linha de lista. Se `direita` contém um botão próprio, use `direitaInterativa`:
+ * assim tocar no botão não dispara também o toque na linha.
+ */
+export function Linha({ esquerda, direita, sub, onPress, direitaInterativa }: { esquerda: ReactNode; direita?: ReactNode; sub?: string; onPress?: () => void; direitaInterativa?: boolean }) {
+  const texto = (
+    <View style={{ flex: 1, gap: 2 }}>
+      {typeof esquerda === "string" ? <Texto forte>{esquerda}</Texto> : esquerda}
+      {sub ? <Texto sec tamanho={12}>{sub}</Texto> : null}
     </View>
   );
+  if (onPress && direitaInterativa) {
+    return (
+      <View style={s.linha}>
+        <Pressable accessibilityRole="button" onPress={onPress} style={{ flex: 1 }}>{texto}</Pressable>
+        {direita}
+      </View>
+    );
+  }
+  const c = <View style={s.linha}>{texto}{direita}</View>;
   return onPress ? <Pressable accessibilityRole="button" onPress={onPress}>{c}</Pressable> : c;
 }
 

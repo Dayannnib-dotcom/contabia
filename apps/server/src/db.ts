@@ -179,6 +179,7 @@ const MIGRACOES: string[] = [
      usos integer NOT NULL DEFAULT 1,
      PRIMARY KEY (empresa_id, nif)
    )`,
+  `ALTER TABLE ligacoes ADD COLUMN IF NOT EXISTS iniciada_por text NOT NULL DEFAULT 'contabilista'`,
   `CREATE TABLE IF NOT EXISTS regras_versoes (
      versao text PRIMARY KEY,
      regras jsonb NOT NULL,

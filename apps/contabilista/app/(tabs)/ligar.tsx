@@ -2,7 +2,8 @@ import { useState } from "react";
 import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { ajudaNIF, formatarNIF } from "@contabia/shared";
-import { Botao, Campo, Cartao, Chip, Ecra, Erro, MensagemLuis, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
+import { type Ligacao } from "@contabia/shared";
+import { Botao, Campo, Cartao, Chip, Ecra, Erro, MensagemLuis, Texto, Titulo, confirmarBiometria, cor, useDados, useSessao } from "@contabia/ui";
 
 const ESTADO: Record<string, [string, "bom" | "aviso" | "erro" | "neutro"]> = {
   pendente: ["À espera da empresa", "aviso"], ativa: ["Ligada", "bom"], recusada: ["Recusada", "erro"], revogada: ["Revogada", "neutro"], expirada: ["Expirada", "neutro"],
@@ -17,6 +18,27 @@ export default function Ligar() {
   const [aEnviar, setAEnviar] = useState(false);
   const { dados, recarregar } = useDados(() => api.ligacoes(), [sessao!.id]);
   const ajuda = ajudaNIF(nif);
+  const [aTratar, setATratar] = useState<string | null>(null);
+  const lista = dados ?? [];
+  const convites = lista.filter((l) => l.estado === "pendente" && l.iniciadaPor === "empresa");
+  const resto = lista.filter((l) => !(l.estado === "pendente" && l.iniciadaPor === "empresa"));
+  const dataCurta = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
+
+  async function acao(l: Ligacao, tipo: "aceitar" | "recusar" | "revogar") {
+    setErro(null);
+    if (tipo === "aceitar" && !(await confirmarBiometria("Aceitar ligação à empresa"))) return setErro("Confirmação biométrica cancelada.");
+    setATratar(l.id + tipo);
+    try {
+      if (tipo === "aceitar") await api.aceitarLigacao(l.id, l.versao);
+      else if (tipo === "recusar") await api.recusarLigacao(l.id, l.versao);
+      else await api.revogarLigacao(l.id, l.versao);
+    } catch (e) {
+      setErro((e as Error).message);
+    } finally {
+      setATratar(null);
+      await recarregar();
+    }
+  }
 
   async function enviar() {
     setAEnviar(true);
@@ -35,6 +57,20 @@ export default function Ligar() {
 
   return (
     <Ecra>
+      {convites.length ? <Texto forte tamanho={16}>Convites recebidos</Texto> : null}
+      {convites.map((l) => (
+        <Cartao key={l.id} destaque>
+          <Chip texto="Convite de empresa" tipo="aviso" />
+          <Texto forte tamanho={16}>{l.empresa?.nome}</Texto>
+          <Texto sec tamanho={12}>{l.empresa?.utilizador} · NIF {formatarNIF(l.empresa?.nif ?? "")} · expira a {dataCurta(l.expiraEm)}</Texto>
+          <Texto>Esta empresa convidou-o para ser o contabilista dela. Ao aceitar, entra na sua carteira com acesso a documentos, lançamentos, IVA, SAF-T e fecho.</Texto>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <Botao titulo="Recusar" variante="secundario" onPress={() => acao(l, "recusar")} carregando={aTratar === l.id + "recusar"} estilo={{ flex: 1 }} />
+            <Botao titulo="Aceitar convite" onPress={() => acao(l, "aceitar")} carregando={aTratar === l.id + "aceitar"} estilo={{ flex: 2 }} />
+          </View>
+        </Cartao>
+      ))}
+
       <Titulo sub="Peça à empresa o utilizador e o NIF que ela vê em «Ligação ao contabilista». Os dois têm de coincidir.">Ligar uma empresa</Titulo>
       <Campo rotulo="Utilizador da empresa" value={utilizador} onChangeText={setUtilizador} autoCapitalize="none" autoCorrect={false} placeholder="ex.: atlantico.servicos" />
       <Campo rotulo="NIF da empresa" value={nif} onChangeText={setNif} keyboardType="number-pad"
@@ -43,8 +79,8 @@ export default function Ligar() {
       <Botao titulo="Enviar pedido de ligação" onPress={enviar} carregando={aEnviar} desativado={!utilizador.trim() || ajuda.estado !== "valido"} />
       {ultimoEvento?.tipo === "ligacao.aceite" ? <MensagemLuis texto="Uma empresa acabou de aceitar a ligação. Já está na sua carteira." acao={<Botao titulo="Ver carteira" variante="menta" onPress={() => router.push("/(tabs)")} estilo={{ alignSelf: "flex-start", minHeight: 40 }} />} /> : null}
 
-      <Texto forte tamanho={16}>Pedidos e ligações</Texto>
-      {(dados ?? []).map((l) => (
+      {resto.length ? <Texto forte tamanho={16}>Pedidos e ligações</Texto> : null}
+      {resto.map((l) => (
         <Cartao key={l.id}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <View style={{ flex: 1 }}>
@@ -55,10 +91,10 @@ export default function Ligar() {
           </View>
           {l.estado === "pendente" ? <Texto sec tamanho={12}>A empresa recebeu o pedido na app e confirma com biometria. Expira a {l.expiraEm.slice(0, 10).split("-").reverse().join("/")}.</Texto> : null}
           {l.estado === "ativa" ? <Botao titulo="Abrir empresa" variante="secundario" onPress={() => router.push({ pathname: "/empresa/[id]", params: { id: l.empresaId } })} /> : null}
-          {l.estado === "ativa" || l.estado === "pendente" ? <Botao titulo={l.estado === "ativa" ? "Terminar ligação" : "Cancelar pedido"} variante="perigo" onPress={async () => { await api.revogarLigacao(l.id, l.versao); recarregar(); }} /> : null}
+          {l.estado === "ativa" || l.estado === "pendente" ? <Botao titulo={l.estado === "ativa" ? "Terminar ligação" : "Cancelar pedido"} variante={l.estado === "ativa" ? "perigo" : "secundario"} onPress={() => acao(l, "revogar")} carregando={aTratar === l.id + "revogar"} /> : null}
         </Cartao>
       ))}
-      <Texto sec tamanho={12} cor={cor.textoSec}>Por segurança: máximo de 5 pedidos por hora; os pedidos expiram em 72 horas.</Texto>
+      <Texto sec tamanho={12} cor={cor.textoSec}>A empresa também pode convidá-lo a partir da app dela, com o seu email ou n.º OCC; o convite aparece aqui no topo. Por segurança: máximo de 5 pedidos por hora; os pedidos expiram em 72 horas.</Texto>
     </Ecra>
   );
 }

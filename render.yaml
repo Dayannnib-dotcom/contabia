@@ -1,4 +1,11 @@
-# Publicação em Render (render.com): «New» → «Blueprint» → este repositório.
+# Render Blueprint — servidor + base de dados PostgreSQL permanente.
+# Os dados ficam na base de dados (não se perdem quando o serviço reinicia ou é atualizado).
+databases:
+  - name: contabia-db
+    plan: free
+    databaseName: contabia
+    user: contabia
+
 services:
   - type: web
     name: contabia
@@ -6,9 +13,11 @@ services:
     plan: free
     healthCheckPath: /v1/saude
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: contabia-db
+          property: connectionString
       - key: JWT_SECRET
         generateValue: true
       - key: ADMIN_TOKEN
         generateValue: true
-      - key: PASTA_DADOS
-        value: /tmp/contabia-dados

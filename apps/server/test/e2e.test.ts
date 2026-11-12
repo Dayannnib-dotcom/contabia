@@ -21,7 +21,7 @@ async function chamar(metodo: string, caminho: string, token?: string, corpo?: u
 }
 
 before(async () => {
-  db = await abrirDb();
+  db = await abrirDb(process.env.TEST_DATABASE_URL);
   ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => new Date("2026-11-11T10:00:00Z") }));
   url = await app.listen({ port: 0, host: "127.0.0.1" });
 });
@@ -36,6 +36,8 @@ test("1. registo e sessão", async () => {
   S.emp = e.json.token; S.empId = e.json.id;
   const dup = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "empresa.a", nif: "509999999", nome: "Outra", senha: "segredo123", regiao: "PT", regimeIVA: "mensal" });
   assert.equal(dup.json.codigo, "utilizador_existe");
+  const nifRepetido = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "outra.empresa", nif: "509999999", nome: "Outra", senha: "segredo123", regiao: "PT", regimeIVA: "mensal" });
+  assert.equal(nifRepetido.json.codigo, "nif_existe");
   const nifMau = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "empresa.b", nif: "509999998", nome: "Empresa B", senha: "segredo123", regiao: "PT", regimeIVA: "mensal" });
   assert.equal(nifMau.json.codigo, "nif_invalido");
   const c = await chamar("POST", "/v1/auth/contabilistas", undefined, { email: "cc@exemplo.pt", nome: "Ana CC", numeroOCC: "12345", senha: "segredo123" });
@@ -49,7 +51,7 @@ test("1. registo e sessão", async () => {
 test("2. ligação em duas vias com utilizador + NIF", async () => {
   assert.equal((await chamar("POST", "/v1/ligacoes", S.cc, { utilizador: "empresa.a", nif: "500000000" })).json.codigo, "dados_nao_coincidem");
   assert.equal((await chamar("POST", "/v1/ligacoes", S.cc, { utilizador: "empresa.a", nif: "123" })).json.codigo, "nif_invalido");
-  assert.equal((await chamar("POST", "/v1/ligacoes", S.emp, { utilizador: "empresa.a", nif: "509999999" })).status, 403);
+  assert.equal((await chamar("POST", "/v1/ligacoes", S.emp, { utilizador: "empresa.a", nif: "509999999" })).status, 400);
   const p = await chamar("POST", "/v1/ligacoes", S.cc, { utilizador: "empresa.a", nif: "509999999" });
   assert.equal(p.status, 201);
   assert.equal(p.json.estado, "pendente");
@@ -57,6 +59,7 @@ test("2. ligação em duas vias com utilizador + NIF", async () => {
   const lista = await chamar("GET", "/v1/ligacoes", S.emp);
   assert.equal(lista.json[0].contabilista.nome, "Ana CC");
   assert.equal((await chamar("POST", `/v1/ligacoes/${p.json.id}/aceitar`, S.cc, { versao: 1 })).status, 403);
+  assert.equal(p.json.iniciadaPor, "contabilista");
   const ok = await chamar("POST", `/v1/ligacoes/${p.json.id}/aceitar`, S.emp, { versao: 1 });
   assert.equal(ok.json.estado, "ativa");
   S.lig = p.json.id;
@@ -166,4 +169,65 @@ test("10. revogação corta o acesso", async () => {
   const [l] = (await chamar("GET", "/v1/ligacoes", S.emp)).json;
   assert.equal((await chamar("DELETE", `/v1/ligacoes/${S.lig}`, S.emp, { versao: l.versao })).json.estado, "revogada");
   assert.equal((await chamar("GET", `/v1/empresas/${S.empId}/documentos`, S.cc)).status, 403);
+});
+
+test("11. a empresa também convida o contabilista; aceita sempre o outro lado", async () => {
+  const e = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "empresa.c", nif: "500000000", nome: "Empresa C", senha: "segredo123", regiao: "PT", regimeIVA: "mensal" });
+  const c = await chamar("POST", "/v1/auth/contabilistas", undefined, { email: "rui@gabinete.pt", nome: "Rui CC", numeroOCC: "777", senha: "segredo123" });
+  assert.equal((await chamar("POST", "/v1/ligacoes", e.json.token, { contabilista: "ninguem@x.pt" })).json.codigo, "contabilista_nao_encontrado");
+  const conv = await chamar("POST", "/v1/ligacoes", e.json.token, { contabilista: "777" });
+  assert.equal(conv.status, 201);
+  assert.equal(conv.json.iniciadaPor, "empresa");
+  assert.equal(conv.json.contabilista.nome, "Rui CC");
+  // quem convidou não pode aceitar o próprio convite
+  assert.equal((await chamar("POST", `/v1/ligacoes/${conv.json.id}/aceitar`, e.json.token, { versao: 1 })).status, 403);
+  // o contabilista vê o convite e aceita
+  const lista = await chamar("GET", "/v1/ligacoes", c.json.token);
+  assert.equal(lista.json[0].empresa.nome, "Empresa C");
+  const ok = await chamar("POST", `/v1/ligacoes/${conv.json.id}/aceitar`, c.json.token, { versao: 1 });
+  assert.equal(ok.json.estado, "ativa");
+  assert.equal((await chamar("GET", "/v1/carteira", c.json.token)).json.length, 1);
+  // convite repetido com e-mail devolve a ligação já ativa
+  assert.equal((await chamar("POST", "/v1/ligacoes", e.json.token, { contabilista: "RUI@gabinete.pt" })).json.estado, "ativa");
+});
+
+test("12. convites cruzados ficam ativos logo (os dois lados consentiram)", async () => {
+  const e = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "empresa.d", nif: "509999980", nome: "Empresa D", senha: "segredo123", regiao: "PT-AC", regimeIVA: "mensal" });
+  assert.equal(e.status, 201, JSON.stringify(e.json));
+  const c = await chamar("POST", "/v1/auth/contabilistas", undefined, { email: "eva@gabinete.pt", nome: "Eva CC", numeroOCC: "888", senha: "segredo123" });
+  const a = await chamar("POST", "/v1/ligacoes", e.json.token, { contabilista: "eva@gabinete.pt" });
+  assert.equal(a.json.estado, "pendente");
+  const b = await chamar("POST", "/v1/ligacoes", c.json.token, { utilizador: "empresa.d", nif: "509999980" });
+  assert.equal(b.json.estado, "ativa");
+  // recusa só se aplica a pendentes
+  assert.equal((await chamar("POST", `/v1/ligacoes/${a.json.id}/recusar`, c.json.token, { versao: b.json.versao })).status, 409);
+});
+
+test("13. revogar corta também o tempo real do contabilista", async () => {
+  const e = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "empresa.e", nif: "509999972", nome: "Empresa E", senha: "segredo123", regiao: "PT", regimeIVA: "mensal" });
+  assert.equal(e.status, 201, JSON.stringify(e.json));
+  const c = await chamar("POST", "/v1/auth/contabilistas", undefined, { email: "teo@gabinete.pt", nome: "Teo CC", numeroOCC: "999", senha: "segredo123" });
+  const l = await chamar("POST", "/v1/ligacoes", c.json.token, { utilizador: "empresa.e", nif: "509999972" });
+  const ativa = await chamar("POST", `/v1/ligacoes/${l.json.id}/aceitar`, e.json.token, { versao: 1 });
+  const ws = new WebSocket(`${url.replace("http", "ws")}/v1/tempo-real?token=${c.json.token}`);
+  const tipos: string[] = [];
+  await new Promise<void>((ok) => ws.on("message", (m) => { const j = JSON.parse(String(m)); tipos.push(j.tipo); if (j.tipo === "ligado") ok(); }));
+  await chamar("POST", `/v1/empresas/${e.json.id}/documentos`, e.json.token, { tipo: "compra", terceiroNif: "500000000", terceiroNome: "X", numero: "FT 1", data: "2026-11-01", base: 10, iva: 2.3, taxa: 23 });
+  await new Promise((r) => setTimeout(r, 100));
+  assert.ok(tipos.includes("documento.criado"));
+  await chamar("DELETE", `/v1/ligacoes/${l.json.id}`, e.json.token, { versao: ativa.json.versao });
+  tipos.length = 0;
+  await chamar("POST", `/v1/empresas/${e.json.id}/documentos`, e.json.token, { tipo: "compra", terceiroNif: "500000000", terceiroNome: "X", numero: "FT 2", data: "2026-11-01", base: 10, iva: 2.3, taxa: 23 });
+  await new Promise((r) => setTimeout(r, 100));
+  assert.ok(!tipos.includes("documento.criado"), tipos.join());
+  ws.close();
+});
+
+test("14. sessão de uma conta que já não existe termina com 401", async () => {
+  const e = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "empresa.f", nif: "509999964", nome: "Empresa F", senha: "segredo123", regiao: "PT", regimeIVA: "mensal" });
+  assert.equal(e.status, 201, JSON.stringify(e.json));
+  await db.query(`DELETE FROM empresas WHERE id = $1`, [e.json.id]);
+  const r = await chamar("GET", "/v1/auth/eu", e.json.token);
+  assert.equal(r.status, 401);
+  assert.equal(r.json.codigo, "sessao_invalida");
 });

@@ -88,6 +88,12 @@ export function ProvedorSessao({ children, urlApi, chave = "contabia.sessao" }: 
     setSessao(null);
   }, [api, guardar]);
 
+  // Conta inexistente ou sessão expirada: volta ao ecrã de entrada em vez de mostrar erros.
+  useEffect(() => {
+    api.aoSessaoInvalida = () => { void sair(); };
+    return () => { api.aoSessaoInvalida = null; };
+  }, [api, sair]);
+
   const definirEmpresas = useCallback((ids: string[]) => {
     const novas = ids.filter((i) => !empresas.current.includes(i));
     empresas.current = ids;

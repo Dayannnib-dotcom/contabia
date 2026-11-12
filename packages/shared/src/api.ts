@@ -23,6 +23,8 @@ const novaChave = () =>
 
 export class ApiContabia {
   token: string | null = null;
+  /** Chamado quando o servidor diz que a sessão já não é válida (ex.: conta apagada). */
+  aoSessaoInvalida: (() => void) | null = null;
 
   constructor(public base: string, private esperar = (ms: number) => new Promise((r) => setTimeout(r, ms))) {}
 
@@ -40,15 +42,26 @@ export class ApiContabia {
           body: corpo === undefined ? undefined : JSON.stringify(corpo),
         });
         const texto = await r.text();
-        const json = texto ? JSON.parse(texto) : null;
+        let json: { codigo?: string; mensagem?: string } | null = null;
+        try {
+          json = texto ? JSON.parse(texto) : null;
+        } catch {
+          // resposta não-JSON (ex.: página de erro do alojamento enquanto o servidor arranca)
+          if (!r.ok && i + 1 < tentativas) throw new ErroApi("indisponivel", "O servidor está a arrancar. Tente de novo dentro de um minuto.", r.status);
+        }
         if (!r.ok) {
           const erro = new ErroApi(json?.codigo ?? "erro", json?.mensagem ?? `Erro ${r.status}`, r.status);
+          if (r.status === 401 && json?.codigo === "sessao_invalida" && this.token) this.aoSessaoInvalida?.();
           if (r.status >= 500 && i + 1 < tentativas) throw erro;
           throw Object.assign(erro, { final: true });
         }
         return json as T;
       } catch (e) {
-        if ((e as { final?: boolean }).final || i + 1 >= tentativas) throw e;
+        if ((e as { final?: boolean }).final) throw e;
+        if (i + 1 >= tentativas) {
+          if (e instanceof ErroApi) throw e;
+          throw new ErroApi("sem_ligacao", "Sem ligação ao servidor. Verifique a internet e tente de novo.", 0);
+        }
         await this.esperar(Math.min(8000, 500 * 2 ** i));
       }
     }
@@ -69,8 +82,13 @@ export class ApiContabia {
   }
 
   // ── Ligação ──
+  /** Contabilista → empresa: com o utilizador e o NIF da empresa. */
   pedirLigacao(utilizador: string, nif: string) {
     return this.pedido<Ligacao>("POST", "/v1/ligacoes", { utilizador, nif });
+  }
+  /** Empresa → contabilista: com o e-mail ou o n.º OCC do contabilista. */
+  convidarContabilista(contabilista: string) {
+    return this.pedido<Ligacao>("POST", "/v1/ligacoes", { contabilista });
   }
   ligacoes() {
     return this.pedido<Ligacao[]>("GET", "/v1/ligacoes");
@@ -199,9 +217,13 @@ export class TempoReal {
     };
     ws.onclose = () => {
       this.aoEstado?.(false);
-      if (this.parado) return;
+      if (this.parado || !this.api.token) return;
       const espera = Math.min(30_000, 1000 * 2 ** this.tentativa++);
-      setTimeout(() => this.ligar(), espera);
+      setTimeout(() => {
+        if (this.parado) return;
+        // confirma a sessão antes de voltar a ligar (uma sessão inválida termina aqui)
+        this.api.eu().then(() => this.ligar(), (e: ErroApi) => { if (e.status !== 401) this.ligar(); });
+      }, espera);
     };
   }
 

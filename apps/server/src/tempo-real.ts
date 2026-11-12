@@ -44,6 +44,13 @@ export class Hub {
     for (const s of this.porContabilista.get(contabilistaId) ?? []) this.addEmpresa(s, empresaId);
   }
 
+  /** Ligação revogada: o contabilista deixa de receber os eventos dessa empresa. */
+  desligarContabilista(contabilistaId: string, empresaId: string) {
+    const daEmpresa = this.porEmpresa.get(empresaId);
+    if (!daEmpresa) return;
+    for (const s of this.porContabilista.get(contabilistaId) ?? []) daEmpresa.delete(s);
+  }
+
   emitir(e: Evento, tambemContabilista?: string) {
     const alvo = new Set(this.porEmpresa.get(e.empresaId) ?? []);
     if (tambemContabilista) for (const s of this.porContabilista.get(tambemContabilista) ?? []) alvo.add(s);

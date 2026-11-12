@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { dataPT, diasAte, nomePeriodo, saudacao } from "@contabia/shared";
-import { Cartao, Chip, Ecra, Erro, Icone, Linha, MensagemLuis, Numero, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
+import { Botao, Cartao, Chip, Ecra, Erro, Icone, Linha, MensagemLuis, Numero, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
 
 const MESES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
@@ -9,9 +9,9 @@ export default function Painel() {
   const { api, sessao, online, sair } = useSessao();
   const router = useRouter();
   const id = sessao!.id;
-  const { dados, erro } = useDados(async () => {
+  const { dados, erro, recarregar } = useDados(async () => {
     const [resumo, prazos, pedidos, ligacoes] = await Promise.all([api.resumo(id), api.prazos(id), api.pedidos(id), api.ligacoes()]);
-    return { resumo, prazos, pedidos: pedidos.filter((p) => p.estado === "pendente"), ligPendente: ligacoes.find((l) => l.estado === "pendente"), ligAtiva: ligacoes.find((l) => l.estado === "ativa") };
+    return { resumo, prazos, pedidos: pedidos.filter((p) => p.estado === "pendente"), ligPendente: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "contabilista"), conviteEnviado: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "empresa"), ligAtiva: ligacoes.find((l) => l.estado === "ativa") };
   }, [id]);
 
   const hoje = new Date().toISOString().slice(0, 10);
@@ -50,17 +50,22 @@ export default function Painel() {
         {dados?.ligPendente ? (
           <Linha esquerda="Pedido de ligação do contabilista" sub={dados.ligPendente.contabilista?.nome} direita={<Chip texto="Responder" tipo="aviso" />} onPress={() => router.push("/ligacao")} />
         ) : null}
+        {dados?.conviteEnviado && !dados.ligAtiva ? (
+          <Linha esquerda="Convite enviado ao contabilista" sub={`${dados.conviteEnviado.contabilista?.nome ?? ""} · à espera que aceite`} direita={<Chip texto="Enviado" />} onPress={() => router.push("/ligacao")} />
+        ) : null}
         {(dados?.resumo.documentosPorValidar ?? 0) > 0 ? (
           <Linha esquerda={`${dados!.resumo.documentosPorValidar} documentos por validar`} sub="A IA já sugeriu a classificação" direita={<Chip texto="Validar" tipo="erro" />} onPress={() => router.push("/(tabs)/documentos")} />
         ) : null}
         {dados?.pedidos.map((p) => (
-          <Linha key={p.id} esquerda={`Pedido do contabilista: ${p.tipo}`} sub={p.detalhe || undefined} direita={<Chip texto="Pendente" tipo="aviso" />} onPress={() => router.push("/(tabs)/digitalizar")} />
+          <Linha key={p.id} esquerda={`Pedido do contabilista: ${p.tipo}`} sub={p.detalhe || "Carregue o documento e depois toque em «Já enviei»"}
+            direita={<Botao titulo="Já enviei" variante="menta" estilo={{ minHeight: 36, paddingHorizontal: 12 }} onPress={async () => { try { await api.marcarRecebido(id, p.id); recarregar(); } catch {} }} />}
+            onPress={() => router.push("/(tabs)/digitalizar")} direitaInterativa />
         ))}
         {dados && faltas === 0 ? <Texto sec>Nada pendente.</Texto> : null}
       </Cartao>
 
       <Cartao>
-        <Linha esquerda="Ligação ao contabilista" sub={dados?.ligAtiva ? `Ativa · ${dados.ligAtiva.contabilista?.nome}` : "Partilhe o utilizador e o NIF com o seu contabilista"} direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/ligacao")} />
+        <Linha esquerda="Ligação ao contabilista" sub={dados?.ligAtiva ? `Ativa · ${dados.ligAtiva.contabilista?.nome}` : "Convide o seu contabilista ou partilhe o utilizador e o NIF"} direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/ligacao")} />
         <Linha esquerda="Atualizações fiscais" sub="Aplicadas automaticamente na data legal" direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/atualizacoes")} />
       </Cartao>
     </Ecra>

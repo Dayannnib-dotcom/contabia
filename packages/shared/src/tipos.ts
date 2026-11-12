@@ -95,6 +95,7 @@ export interface Ligacao {
   criadaEm: string;
   expiraEm: string;
   versao: number;
+  iniciadaPor: Papel;
   contabilista?: { nome: string; numeroOCC: string };
   empresa?: { nome: string; nif: string; utilizador: string };
 }

@@ -4,3 +4,5 @@ export * from "./componentes";
 export * from "./sessao";
 export * from "./entrada";
 export * from "./icones";
+export * from "./partilhar";
+export * from "./biometria";

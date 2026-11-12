@@ -47,7 +47,11 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const h = req.headers.authorization;
     const q = (req.query as { token?: string } | undefined)?.token;
     const token = h?.startsWith("Bearer ") ? h.slice(7) : q;
-    if (token) (req as FastifyRequest & { ator?: Ator }).ator = await tokens.verificar(token);
+    if (!token) return;
+    const a = await tokens.verificar(token);
+    const [existe] = await db.query(a.papel === "empresa" ? `SELECT 1 FROM empresas WHERE id = $1` : `SELECT 1 FROM contabilistas WHERE id = $1`, [a.id]);
+    if (!existe) throw new ErroApp("sessao_invalida", "A sua sessão terminou. Entre novamente.", 401);
+    (req as FastifyRequest & { ator?: Ator }).ator = a;
   });
 
   // ── Idempotência: o mesmo pedido reenviado devolve a mesma resposta ──
@@ -106,6 +110,8 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     if (!validarNIF(nif)) throw new ErroApp("nif_invalido", ajudaNIF(nif).mensagem);
     const [existe] = await db.query(`SELECT 1 FROM empresas WHERE utilizador = $1`, [utilizador]);
     if (existe) throw new ErroApp("utilizador_existe", "Este utilizador já está registado. Escolha outro.", 409);
+    const [nifUsado] = await db.query(`SELECT 1 FROM empresas WHERE nif = $1`, [nif]);
+    if (nifUsado) throw new ErroApp("nif_existe", "Já existe uma conta Contabia com este NIF. Use «Entrar» com o utilizador dessa conta.", 409);
     const id = novoId();
     await db.query(`INSERT INTO empresas (id, utilizador, nif, nome, regiao, regime_iva, senha_hash, criada_em) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
       [id, utilizador, nif, b.nome, b.regiao, b.regimeIVA, await hashSenha(b.senha), agoraISO()]);
@@ -113,10 +119,12 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   });
 
   app.post("/v1/auth/contabilistas", async (req, reply) => {
-    const b = z.object({ email: z.string().email(), nome: z.string().min(2), numeroOCC: z.string().min(1), senha: z.string().min(8) }).parse(req.body);
+    const b = z.object({ email: z.string().email("E-mail inválido"), nome: z.string().min(2), numeroOCC: z.string().regex(/^\d{1,10}$/, "O n.º OCC só tem algarismos"), senha: z.string().min(8) }).parse(req.body);
     const email = b.email.trim().toLowerCase();
     const [existe] = await db.query(`SELECT 1 FROM contabilistas WHERE email = $1`, [email]);
-    if (existe) throw new ErroApp("email_existe", "Este e-mail já está registado.", 409);
+    if (existe) throw new ErroApp("email_existe", "Este e-mail já está registado. Use «Entrar».", 409);
+    const [occUsado] = await db.query(`SELECT 1 FROM contabilistas WHERE numero_occ = $1`, [b.numeroOCC]);
+    if (occUsado) throw new ErroApp("occ_existe", "Já existe uma conta com este n.º OCC.", 409);
     const id = novoId();
     await db.query(`INSERT INTO contabilistas (id, email, nome, numero_occ, senha_hash, criado_em) VALUES ($1,$2,$3,$4,$5,$6)`,
       [id, email, b.nome, b.numeroOCC, await hashSenha(b.senha), agoraISO()]);
@@ -142,52 +150,82 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   });
 
   // ═════════════ Ligação em duas vias ═════════════
-  type LinhaLig = { id: string; empresa_id: string; contabilista_id: string; estado: string; permissoes: string[]; criada_em: string; expira_em: string; versao: number };
+  // Qualquer lado pode iniciar: o contabilista com utilizador + NIF da empresa,
+  // a empresa com o e-mail ou o n.º OCC do contabilista. Aceita sempre o OUTRO lado.
+  // Se os dois lados se convidarem mutuamente, a ligação fica ativa logo.
+  type LinhaLig = { id: string; empresa_id: string; contabilista_id: string; estado: string; permissoes: string[]; criada_em: string; expira_em: string; versao: number; iniciada_por: string };
   const ligacaoDe = (l: LinhaLig, extra: Partial<Ligacao> = {}): Ligacao => ({
     id: l.id, empresaId: l.empresa_id, contabilistaId: l.contabilista_id, estado: l.estado as Ligacao["estado"], permissoes: l.permissoes,
-    criadaEm: l.criada_em, expiraEm: l.expira_em, versao: Number(l.versao), ...extra,
+    criadaEm: l.criada_em, expiraEm: l.expira_em, versao: Number(l.versao), iniciadaPor: (l.iniciada_por ?? "contabilista") as Ligacao["iniciadaPor"], ...extra,
   });
   const expirarPendentes = () => db.query(`UPDATE ligacoes SET estado = 'expirada', versao = versao + 1 WHERE estado = 'pendente' AND expira_em < $1`, [agora().toISOString()]);
+  const limitar = (id: string) => {
+    const t = agora().getTime();
+    const recentes = (tentativasLigacao.get(id) ?? []).filter((x) => t - x < 3600_000);
+    if (recentes.length >= MAX_PEDIDOS_HORA) throw new ErroApp("demasiadas_tentativas", "Demasiadas tentativas. Tente de novo dentro de uma hora.", 429);
+    tentativasLigacao.set(id, [...recentes, t]);
+  };
+  const infoEmpresa = async (id: string) => {
+    const [e] = await db.query<{ nome: string; nif: string; utilizador: string }>(`SELECT nome, nif, utilizador FROM empresas WHERE id = $1`, [id]);
+    return { nome: e.nome, nif: e.nif, utilizador: e.utilizador };
+  };
+  const infoCC = async (id: string) => {
+    const [c] = await db.query<{ nome: string; numero_occ: string }>(`SELECT nome, numero_occ FROM contabilistas WHERE id = $1`, [id]);
+    return { nome: c.nome, numeroOCC: c.numero_occ };
+  };
+  const ativar = async (l: LinhaLig, quem: Ator) => {
+    const [n] = await db.query<LinhaLig>(`UPDATE ligacoes SET estado = 'ativa', versao = versao + 1, atualizada_em = $1 WHERE id = $2 AND versao = $3 RETURNING *`,
+      [agoraISO(), l.id, l.versao]);
+    if (!n) throw new ErroApp("conflito_versao", "Os dados mudaram entretanto. Atualize e tente de novo.", 409);
+    hub.ligarContabilista(l.contabilista_id, l.empresa_id);
+    await publicar(db, hub, l.empresa_id, "ligacao.aceite", quem.papel, { ligacaoId: l.id }, l.contabilista_id);
+    return n;
+  };
 
   app.post("/v1/ligacoes", async (req, reply) => {
     const a = ator(req);
-    exigirPapel(a, "contabilista");
-    const b = z.object({ utilizador: z.string(), nif: z.string() }).parse(req.body);
-    const t = agora().getTime();
-    const recentes = (tentativasLigacao.get(a.id) ?? []).filter((x) => t - x < 3600_000);
-    if (recentes.length >= MAX_PEDIDOS_HORA) throw new ErroApp("demasiadas_tentativas", "Demasiadas tentativas. Tente de novo dentro de uma hora.", 429);
-    tentativasLigacao.set(a.id, [...recentes, t]);
-    const nif = limparNIF(b.nif);
-    if (!validarNIF(nif)) throw new ErroApp("nif_invalido", "O NIF indicado não é válido.");
-    const [e] = await db.query<{ id: string; nome: string; nif: string; utilizador: string }>(
-      `SELECT id, nome, nif, utilizador FROM empresas WHERE utilizador = $1 AND nif = $2`, [normalizarUtilizador(b.utilizador), nif]);
-    if (!e) throw new ErroApp("dados_nao_coincidem", "Utilizador e NIF não coincidem com nenhuma empresa.", 404);
+    limitar(a.id);
+    let empresaId: string, contabilistaId: string;
+    if (a.papel === "contabilista") {
+      const b = z.object({ utilizador: z.string().min(1), nif: z.string() }).parse(req.body);
+      const nif = limparNIF(b.nif);
+      if (!validarNIF(nif)) throw new ErroApp("nif_invalido", "O NIF indicado não é válido.");
+      const [e] = await db.query<{ id: string }>(`SELECT id FROM empresas WHERE utilizador = $1 AND nif = $2`, [normalizarUtilizador(b.utilizador), nif]);
+      if (!e) throw new ErroApp("dados_nao_coincidem", "Utilizador e NIF não coincidem com nenhuma empresa. Confirme os dados com a empresa.", 404);
+      empresaId = e.id; contabilistaId = a.id;
+    } else {
+      const b = z.object({ contabilista: z.string().min(1) }).parse(req.body);
+      const v = b.contabilista.trim().toLowerCase();
+      const [c] = await db.query<{ id: string }>(
+        v.includes("@") ? `SELECT id FROM contabilistas WHERE email = $1` : `SELECT id FROM contabilistas WHERE numero_occ = $1`, [v]);
+      if (!c) throw new ErroApp("contabilista_nao_encontrado", "Não encontrámos nenhum contabilista com esse e-mail ou n.º OCC na Contabia. Confirme com ele os dados da conta.", 404);
+      empresaId = a.id; contabilistaId = c.id;
+    }
     await expirarPendentes();
-    const [ja] = await db.query<LinhaLig>(`SELECT * FROM ligacoes WHERE empresa_id = $1 AND contabilista_id = $2 AND estado IN ('pendente','ativa')`, [e.id, a.id]);
-    const info = { empresa: { nome: e.nome, nif: e.nif, utilizador: e.utilizador } };
-    if (ja) return ligacaoDe(ja, info);
-    const [cc] = await db.query<{ nome: string; numero_occ: string }>(`SELECT nome, numero_occ FROM contabilistas WHERE id = $1`, [a.id]);
+    const [ja] = await db.query<LinhaLig>(`SELECT * FROM ligacoes WHERE empresa_id = $1 AND contabilista_id = $2 AND estado IN ('pendente','ativa')`, [empresaId, contabilistaId]);
+    const extra = { empresa: await infoEmpresa(empresaId), contabilista: await infoCC(contabilistaId) };
+    if (ja?.estado === "ativa") return ligacaoDe(ja, extra);
+    if (ja && ja.iniciada_por === a.papel) return ligacaoDe(ja, extra);
+    if (ja) return ligacaoDe(await ativar(ja, a), extra); // o outro lado já tinha convidado: ambos consentiram
+    const t = agora().getTime();
     const l: LinhaLig = {
-      id: novoId(), empresa_id: e.id, contabilista_id: a.id, estado: "pendente", permissoes: PERMISSOES_PADRAO,
-      criada_em: agora().toISOString(), expira_em: new Date(t + HORAS_PEDIDO * 3600_000).toISOString(), versao: 1,
+      id: novoId(), empresa_id: empresaId, contabilista_id: contabilistaId, estado: "pendente", permissoes: PERMISSOES_PADRAO,
+      criada_em: agora().toISOString(), expira_em: new Date(t + HORAS_PEDIDO * 3600_000).toISOString(), versao: 1, iniciada_por: a.papel,
     };
-    await db.query(`INSERT INTO ligacoes (id, empresa_id, contabilista_id, estado, permissoes, criada_em, expira_em, atualizada_em, versao) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$6,$8)`,
-      [l.id, l.empresa_id, l.contabilista_id, l.estado, JSON.stringify(l.permissoes), l.criada_em, l.expira_em, l.versao]);
-    await publicar(db, hub, e.id, "ligacao.pedida", "contabilista", { ligacaoId: l.id, contabilista: { nome: cc.nome, numeroOCC: cc.numero_occ } }, a.id);
-    return reply.code(201).send(ligacaoDe(l, info));
+    await db.query(`INSERT INTO ligacoes (id, empresa_id, contabilista_id, estado, permissoes, criada_em, expira_em, atualizada_em, versao, iniciada_por) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$6,$8,$9)`,
+      [l.id, l.empresa_id, l.contabilista_id, l.estado, JSON.stringify(l.permissoes), l.criada_em, l.expira_em, l.versao, l.iniciada_por]);
+    await publicar(db, hub, empresaId, "ligacao.pedida", a.papel, { ligacaoId: l.id, iniciadaPor: a.papel, ...extra }, contabilistaId);
+    return reply.code(201).send(ligacaoDe(l, extra));
   });
 
   app.get("/v1/ligacoes", async (req) => {
     const a = ator(req);
     await expirarPendentes();
-    if (a.papel === "empresa") {
-      const ls = await db.query<LinhaLig & { cc_nome: string; cc_occ: string }>(
-        `SELECT l.*, c.nome AS cc_nome, c.numero_occ AS cc_occ FROM ligacoes l JOIN contabilistas c ON c.id = l.contabilista_id WHERE l.empresa_id = $1 ORDER BY l.criada_em DESC`, [a.id]);
-      return ls.map((l) => ligacaoDe(l, { contabilista: { nome: l.cc_nome, numeroOCC: l.cc_occ } }));
-    }
-    const ls = await db.query<LinhaLig & { e_nome: string; e_nif: string; e_user: string }>(
-      `SELECT l.*, e.nome AS e_nome, e.nif AS e_nif, e.utilizador AS e_user FROM ligacoes l JOIN empresas e ON e.id = l.empresa_id WHERE l.contabilista_id = $1 ORDER BY l.criada_em DESC`, [a.id]);
-    return ls.map((l) => ligacaoDe(l, { empresa: { nome: l.e_nome, nif: l.e_nif, utilizador: l.e_user } }));
+    const ls = await db.query<LinhaLig & { cc_nome: string; cc_occ: string; e_nome: string; e_nif: string; e_user: string }>(
+      `SELECT l.*, c.nome AS cc_nome, c.numero_occ AS cc_occ, e.nome AS e_nome, e.nif AS e_nif, e.utilizador AS e_user
+         FROM ligacoes l JOIN contabilistas c ON c.id = l.contabilista_id JOIN empresas e ON e.id = l.empresa_id
+        WHERE ${a.papel === "empresa" ? "l.empresa_id" : "l.contabilista_id"} = $1 ORDER BY l.criada_em DESC`, [a.id]);
+    return ls.map((l) => ligacaoDe(l, { contabilista: { nome: l.cc_nome, numeroOCC: l.cc_occ }, empresa: { nome: l.e_nome, nif: l.e_nif, utilizador: l.e_user } }));
   });
 
   const mudarEstado = async (req: FastifyRequest, para: "ativa" | "recusada" | "revogada") => {
@@ -197,19 +235,21 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const [l] = await db.query<LinhaLig>(`SELECT * FROM ligacoes WHERE id = $1`, [params(req).id]);
     const dono = l && (a.papel === "empresa" ? l.empresa_id === a.id : l.contabilista_id === a.id);
     if (!dono) throw new ErroApp("nao_encontrada", "Ligação não encontrada.", 404);
+    if (Number(l.versao) !== versao) throw new ErroApp("conflito_versao", "Os dados mudaram entretanto. Atualize e tente de novo.", 409);
     if (para !== "revogada") {
-      exigirPapel(a, "empresa");
-      if (l.estado === "expirada") throw new ErroApp("expirada", "Este pedido expirou. Peça ao contabilista para enviar outro.", 410);
+      if ((l.iniciada_por ?? "contabilista") === a.papel)
+        throw new ErroApp("sem_permissao", "Este pedido foi enviado por si. Quem o recebe é que o aceita ou recusa.", 403);
+      if (l.estado === "expirada") throw new ErroApp("expirada", "Este pedido expirou. Envie um novo pedido.", 410);
       if (l.estado !== "pendente") throw new ErroApp("estado_invalido", `O pedido já está ${l.estado}.`, 409);
+      if (para === "ativa") return ligacaoDe(await ativar(l, a));
     } else if (l.estado !== "ativa" && l.estado !== "pendente") {
       return ligacaoDe(l);
     }
     const [n] = await db.query<LinhaLig>(`UPDATE ligacoes SET estado = $1, versao = versao + 1, atualizada_em = $2 WHERE id = $3 AND versao = $4 RETURNING *`,
       [para, agoraISO(), l.id, versao]);
     if (!n) throw new ErroApp("conflito_versao", "Os dados mudaram entretanto. Atualize e tente de novo.", 409);
-    if (para === "ativa") hub.ligarContabilista(l.contabilista_id, l.empresa_id);
-    const tipo = { ativa: "ligacao.aceite", recusada: "ligacao.recusada", revogada: "ligacao.revogada" }[para];
-    await publicar(db, hub, l.empresa_id, tipo, a.papel, { ligacaoId: l.id }, l.contabilista_id);
+    await publicar(db, hub, l.empresa_id, para === "recusada" ? "ligacao.recusada" : "ligacao.revogada", a.papel, { ligacaoId: l.id }, l.contabilista_id);
+    if (para === "revogada") hub.desligarContabilista(l.contabilista_id, l.empresa_id);
     return ligacaoDe(n);
   };
   app.post("/v1/ligacoes/:id/aceitar", (req) => mudarEstado(req, "ativa"));

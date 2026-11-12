@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Pressable, ScrollView, Share, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { euros, nomePeriodo, type Lancamento } from "@contabia/shared";
-import { Botao, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, cor, useDados, useSessao } from "@contabia/ui";
+import { Botao, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
 
 type Sec = "revisao" | "iva" | "pedidos" | "saft" | "fecho";
 const SECS: [Sec, string][] = [["revisao", "Revisão"], ["iva", "IVA"], ["pedidos", "Pedidos"], ["saft", "SAF-T"], ["fecho", "Fecho"]];
@@ -145,7 +145,7 @@ function Iva({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
       ) : (
         <Cartao>
           <Chip texto={ficheiro.nome} tipo="bom" />
-          <Botao titulo="Partilhar ficheiro" variante="secundario" onPress={() => Share.share({ title: ficheiro.nome, message: ficheiro.xml })} />
+          <Botao titulo="Descarregar / partilhar ficheiro" variante="secundario" onPress={() => entregarFicheiro(ficheiro.nome, ficheiro.xml)} />
           <Texto>2. Submeta-o no Portal das Finanças e registe aqui o comprovativo.</Texto>
           <Campo rotulo="N.º do comprovativo de entrega" value={comp} onChangeText={setComp} />
           <Botao titulo="Registar submissão" carregando={aEnviar} desativado={comp.length < 3}
@@ -214,7 +214,7 @@ function Saft({ id }: { id: string }) {
           <View style={{ gap: 8 }}>
             <Chip texto={r.nome} tipo="bom" />
             {r.avisos.length ? r.avisos.map((a) => <Texto key={a} cor={cor.ambarTexto} tamanho={13}>! {a}</Texto>) : <Texto cor={cor.verdeEscuro}>✓ Sem avisos</Texto>}
-            <Botao titulo="Partilhar ficheiro" variante="secundario" onPress={() => Share.share({ title: r.nome, message: r.xml })} />
+            <Botao titulo="Descarregar / partilhar ficheiro" variante="secundario" onPress={() => entregarFicheiro(r.nome, r.xml)} />
           </View>
         ) : null}
       </Cartao>
