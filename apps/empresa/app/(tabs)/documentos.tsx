@@ -1,3 +1,4 @@
+import { FilaPendente } from "../../components/FilaPendente";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
@@ -17,6 +18,7 @@ export default function Documentos() {
   return (
     <Ecra>
       <Titulo sub={dados ? `${dados.length} documentos · ${dados.filter((d) => d.estado === "validado").length} validados` : undefined}>Documentos</Titulo>
+      <FilaPendente />
       <View accessibilityRole="tablist" style={{ flexDirection: "row", backgroundColor: "#E8ECE9", borderRadius: 12, padding: 4, gap: 4 }}>
         {TIPOS.map(([t, n]) => (
           <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected: t === tipo }} onPress={() => setTipo(t)}
@@ -31,7 +33,7 @@ export default function Documentos() {
         {lista.map((d) => (
           <Linha key={d.id} onPress={() => router.push({ pathname: "/documento/[id]", params: { id: d.id } })}
             esquerda={d.terceiroNome}
-            sub={`${dataPT(d.data)} · ${d.contaSugerida} ${d.categoria}${d.ivaDedutivel ? "" : " · IVA não dedutível"}`}
+            sub={`${dataPT(d.data)} · ${d.numero}${d.anexos ? " · 📎" : ""} · ${d.categoria}${d.ivaDedutivel ? "" : " · IVA não dedutível"}`}
             direita={<View style={{ alignItems: "flex-end", gap: 4 }}><Text style={{ fontVariant: ["tabular-nums"], fontWeight: "600", color: cor.texto }}>{euros(d.total)}</Text><Chip texto={ESTADO[d.estado][0]} tipo={ESTADO[d.estado][1]} /></View>} />
         ))}
       </Cartao>

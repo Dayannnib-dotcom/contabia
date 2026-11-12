@@ -156,6 +156,22 @@ with sync_playwright() as p:
         shot(emp, "18c_anulado")
         emp.go_back()
 
+        # ── Sem internet: a fatura fica no telemóvel e é enviada sozinha quando a rede volta ──
+        emp.context.set_offline(True)
+        emp.get_by_role("tab", name="Digitalizar").click()
+        emp.get_by_text("Introduzir documento").wait_for()
+        emp.get_by_label("NIF do fornecedor").fill("500000000")
+        emp.get_by_label("Nome").fill("Papelaria Atlântico")
+        emp.get_by_label("N.º do documento").fill("FT 2026/419")
+        emp.get_by_label("Data (AAAA-MM-DD)").fill("2026-11-02")
+        emp.get_by_label("Valor sem IVA (€)").fill("50")
+        emp.get_by_role("button", name="Guardar documento").click()
+        emp.get_by_text("À espera de internet (1)").wait_for(timeout=30000)
+        shot(emp, "18d_sem_internet")
+        emp.context.set_offline(False)
+        emp.get_by_text("À espera de internet (1)").wait_for(state="detached", timeout=60000)
+        emp.get_by_text("FT 2026/419", exact=False).first.wait_for(timeout=15000)
+
         # ── Sentido inverso: uma 2.ª empresa convida o contabilista pelo n.º OCC ──
         emp2 = b.new_page(viewport=vp)
         emp2.on("pageerror", lambda e: erros.append(f"empresa2: {e}"))

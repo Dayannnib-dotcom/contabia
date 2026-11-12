@@ -31,8 +31,9 @@ export class ApiContabia {
 
   constructor(public base: string, private esperar = (ms: number) => new Promise((r) => setTimeout(r, ms))) {}
 
-  async pedido<T>(metodo: Metodo, caminho: string, corpo?: unknown, tentativas = 4): Promise<T> {
-    const chave = novaChave();
+  /** `chaveFixa`: a fila sem internet reenvia sempre com a mesma chave, por isso nunca duplica. */
+  async pedido<T>(metodo: Metodo, caminho: string, corpo?: unknown, tentativas = 4, chaveFixa?: string): Promise<T> {
+    const chave = chaveFixa ?? novaChave();
     for (let i = 0; ; i++) {
       try {
         const r = await fetch(this.base + caminho, {

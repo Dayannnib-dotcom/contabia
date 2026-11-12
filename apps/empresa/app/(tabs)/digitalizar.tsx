@@ -1,3 +1,4 @@
+import { porNaFila, semRede } from "../../lib/fila";
 import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -33,10 +34,17 @@ export default function Digitalizar() {
     if (!lido) return;
     setAEnviar(true);
     try {
-      const d = await api.pedido<{ id: string }>("POST", `/v1/empresas/${sessao!.id}/documentos`, { qr: lido.texto, tipo: "compra", terceiroNome: nome || undefined });
+      const corpo = { qr: lido.texto, tipo: "compra", terceiroNome: nome || undefined };
+      try {
+        const d = await api.pedido<{ id: string }>("POST", `/v1/empresas/${sessao!.id}/documentos`, corpo);
+        router.push({ pathname: "/documento/[id]", params: { id: d.id, novo: "1" } });
+      } catch (e) {
+        if (!semRede(e)) throw e;
+        await porNaFila(sessao!.id, corpo, `${lido.dados.identificacao} · ${nome || `NIF ${lido.dados.nifEmitente}`}`);
+        router.push("/(tabs)/documentos");
+      }
       setLido(null);
       setNome("");
-      router.push({ pathname: "/documento/[id]", params: { id: d.id, novo: "1" } });
     } catch (e) {
       setErro((e as Error).message);
     } finally {
@@ -115,8 +123,15 @@ function Manual({ voltar }: { voltar?: () => void }) {
   async function guardar() {
     setAEnviar(true);
     try {
-      const d = await api.criarDocumento(sessao!.id, { tipo, terceiroNif: nif.replace(/\s/g, ""), terceiroNome: nome, numero, data, base: b, iva, taxa: t });
-      router.push({ pathname: "/documento/[id]", params: { id: d.id, novo: "1" } });
+      const corpo = { tipo, terceiroNif: nif.replace(/\s/g, ""), terceiroNome: nome, numero, data, base: b, iva, taxa: t };
+      try {
+        const d = await api.criarDocumento(sessao!.id, corpo);
+        router.push({ pathname: "/documento/[id]", params: { id: d.id, novo: "1" } });
+      } catch (e) {
+        if (!semRede(e)) throw e;
+        await porNaFila(sessao!.id, corpo, `${numero} · ${nome}`);
+        router.push("/(tabs)/documentos");
+      }
     } catch (e) {
       setErro((e as Error).message);
     } finally {

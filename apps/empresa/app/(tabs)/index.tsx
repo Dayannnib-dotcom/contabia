@@ -1,3 +1,4 @@
+import { FilaPendente } from "../../components/FilaPendente";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { dataPT, diasAte, nomePeriodo, saudacao } from "@contabia/shared";
@@ -30,10 +31,11 @@ export default function Painel() {
   return (
     <Ecra>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <Titulo sub={online ? "Sincronizado em tempo real" : "Sem internet — o que já enviou está seguro na nuvem; volte a enviar quando houver rede"}>{dados?.resumo.empresa.nome ?? sessao!.nome}</Titulo>
+        <Titulo sub={online ? "Sincronizado em tempo real" : "Sem internet — pode continuar a registar faturas; enviamos quando a rede voltar"}>{dados?.resumo.empresa.nome ?? sessao!.nome}</Titulo>
       </View>
       <MensagemLuis texto={msg} escuro rotulo="Luís · o seu gestor virtual" />
       <Erro texto={erro} />
+      <FilaPendente compacto />
 
       {prox ? (
         <Cartao onPress={() => router.push("/(tabs)/prazos")} estilo={{ backgroundColor: cor.ambar, borderColor: cor.ambar, flexDirection: "row", alignItems: "center" }}>

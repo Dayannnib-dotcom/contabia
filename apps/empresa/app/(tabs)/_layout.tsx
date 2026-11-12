@@ -1,12 +1,21 @@
 import { Redirect, Tabs } from "expo-router";
 import { View } from "react-native";
 import { Icone, cor, useSessao } from "@contabia/ui";
+import { useEnvioAutomatico } from "../../lib/fila";
+
+function EnvioAutomatico() {
+  const { api } = useSessao();
+  useEnvioAutomatico(api);
+  return null;
+}
 
 export default function Separadores() {
   const { sessao, pronto } = useSessao();
   if (!pronto) return null;
   if (!sessao) return <Redirect href="/" />;
   return (
+    <>
+    <EnvioAutomatico />
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -33,5 +42,6 @@ export default function Separadores() {
       <Tabs.Screen name="assistente" options={{ title: "Assistente", tabBarIcon: ({ color }) => <Icone nome="assistente" cor={String(color)} /> }} />
       <Tabs.Screen name="prazos" options={{ title: "Prazos", tabBarIcon: ({ color }) => <Icone nome="prazos" cor={String(color)} /> }} />
     </Tabs>
+    </>
   );
 }
