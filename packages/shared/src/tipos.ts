@@ -180,3 +180,17 @@ export function motivoLegivel(m: string): string {
   const base = MOTIVOS_ANULACAO[chave as MotivoAnulacao] ?? chave;
   return resto.length ? `${base} — ${resto.join(": ")}` : base;
 }
+
+export type EstadoMovimento = "por_conciliar" | "conciliado" | "falta_documento" | "ignorado";
+export interface MovimentoBancario {
+  id: string;
+  empresaId: string;
+  data: string;
+  descricao: string;
+  /** Negativo = saída (pagamento), positivo = entrada (recebimento). */
+  valor: number;
+  estado: EstadoMovimento;
+  documentoId: string | null;
+  documento?: { numero: string; terceiroNome: string; total: number; data: string } | null;
+  sugestao?: { documentoId: string; numero: string; terceiroNome: string; total: number; data: string; motivo: string; confianca: "alta" | "media" } | null;
+}

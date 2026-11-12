@@ -19,6 +19,7 @@ function Navegacao() {
         <Stack.Screen name="documento/[id]" options={{ headerShown: true, title: "Documento", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="ligacao" options={{ headerShown: true, title: "Ligação ao contabilista", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="importar" options={{ headerShown: true, title: "Importar do e-Fatura", headerBackTitle: "Voltar" }} />
+        <Stack.Screen name="banco" options={{ headerShown: true, title: "Banco", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="conta" options={{ headerShown: true, title: "Conta e segurança", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="atualizacoes" options={{ headerShown: true, title: "Atualizações fiscais", headerBackTitle: "Voltar" }} />
       </Stack.Protected>

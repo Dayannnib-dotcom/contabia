@@ -5,12 +5,13 @@
  * - Tempo real por WebSocket com recuperação por cursor ao reconectar.
  */
 import type {
-  MotivoAnulacao, Anexo,
+  MotivoAnulacao, Anexo, MovimentoBancario,
   ApuramentoIVA, Documento, Empresa, Evento, Lancamento, Ligacao, Pedido, RespostaAssistente,
   ResumoEmpresa, Sessao, Submissao, VerificacaoFecho, Contabilista,
 } from "./tipos.ts";
 import type { Regras, Regiao, RegimeIVA } from "./regras.ts";
 import type { LinhaEfatura } from "./efatura.ts";
+import type { LinhaExtrato } from "./extrato.ts";
 
 export class ErroApi extends Error {
   constructor(public codigo: string, mensagem: string, public status: number) {
@@ -131,6 +132,28 @@ export class ApiContabia {
   importarEfatura(empresaId: string, linhas: Omit<LinhaEfatura, "tipoDoc" | "situacao">[], tipo: "compra" | "venda" = "compra") {
     return this.pedido<{ importados: number; repetidos: number; erros: number; resultados: { numero: string; estado: "importado" | "repetido" | "erro"; mensagem?: string }[] }>(
       "POST", `/v1/empresas/${empresaId}/documentos/importar`, { tipo, linhas: linhas.map(({ nif, nome, numero, atcud, data, base, iva, total }) => ({ nif, nome, numero, atcud, data, base, iva, total })) });
+  }
+  // ── Banco ──
+  importarExtrato(empresaId: string, movimentos: LinhaExtrato[]) {
+    return this.pedido<{ novos: number; repetidos: number; comSugestao: number }>("POST", `/v1/empresas/${empresaId}/banco/importar`, { movimentos });
+  }
+  movimentos(empresaId: string) {
+    return this.pedido<MovimentoBancario[]>("GET", `/v1/empresas/${empresaId}/banco/movimentos`);
+  }
+  conciliar(empresaId: string, movimentoId: string, documentoId: string) {
+    return this.pedido<MovimentoBancario>("POST", `/v1/empresas/${empresaId}/banco/movimentos/${movimentoId}/conciliar`, { documentoId });
+  }
+  conciliarAutomatico(empresaId: string) {
+    return this.pedido<{ conciliados: number }>("POST", `/v1/empresas/${empresaId}/banco/conciliar-automatico`, {});
+  }
+  desfazerConciliacao(empresaId: string, movimentoId: string) {
+    return this.pedido<MovimentoBancario>("POST", `/v1/empresas/${empresaId}/banco/movimentos/${movimentoId}/desfazer`, {});
+  }
+  pedirFaturaEmFalta(empresaId: string, movimentoId: string) {
+    return this.pedido<MovimentoBancario>("POST", `/v1/empresas/${empresaId}/banco/movimentos/${movimentoId}/pedir-fatura`, {});
+  }
+  ignorarMovimento(empresaId: string, movimentoId: string) {
+    return this.pedido<MovimentoBancario>("POST", `/v1/empresas/${empresaId}/banco/movimentos/${movimentoId}/ignorar`, {});
   }
   anexos(empresaId: string, documentoId: string) {
     return this.pedido<Anexo[]>("GET", `/v1/empresas/${empresaId}/documentos/${documentoId}/anexos`);

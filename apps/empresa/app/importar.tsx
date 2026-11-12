@@ -1,30 +1,8 @@
 import { useState } from "react";
-import { Platform, View } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
-import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system/legacy";
 import { dataPT, euros, lerCSVEfatura, type LeituraEfatura } from "@contabia/shared";
-import { Botao, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Texto, Titulo, cor, useSessao } from "@contabia/ui";
-
-/** O e-Fatura exporta às vezes em Latin-1; se não for UTF-8 válido, lê como Latin-1. */
-function decodificar(bytes: Uint8Array): string {
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    let s = "";
-    for (const b of bytes) s += String.fromCharCode(b);
-    return s;
-  }
-}
-
-async function lerFicheiro(uri: string): Promise<string> {
-  if (Platform.OS === "web") return decodificar(new Uint8Array(await (await fetch(uri)).arrayBuffer()));
-  const b64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-  const bin = globalThis.atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return decodificar(bytes);
-}
+import { Botao, Cartao, Chip, Ecra, escolherFicheiroTexto, Erro, Linha, MensagemLuis, Texto, Titulo, cor, useSessao } from "@contabia/ui";
 
 const PASSOS = [
   "Entre no Portal das Finanças e abra o e-Fatura.",
@@ -46,14 +24,14 @@ export default function Importar() {
   async function escolher() {
     setErro(null);
     setResultado(null);
-    const r = await DocumentPicker.getDocumentAsync({ type: ["text/csv", "text/comma-separated-values", "application/vnd.ms-excel", "text/plain", "*/*"], copyToCacheDirectory: true });
-    if (r.canceled || !r.assets[0]) return;
     try {
-      const l = lerCSVEfatura(await lerFicheiro(r.assets[0].uri));
+      const f = await escolherFicheiroTexto();
+      if (!f) return;
+      const l = lerCSVEfatura(f.texto);
       if (!l.linhas.length) setErro(l.ignoradas[0]?.motivo ?? "O ficheiro não tem faturas.");
       setLeitura(l);
-    } catch {
-      setErro("Não consegui ler o ficheiro. Confirme que é o ficheiro exportado do e-Fatura.");
+    } catch (e) {
+      setErro((e as Error).message || "Não consegui ler o ficheiro. Confirme que é o ficheiro exportado do e-Fatura.");
     }
   }
 

@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { z, ZodError } from "zod";
 import {
   ajudaNIF, lerQR, limparNIF, normalizarUtilizador, proximasObrigacoes, qrConsistente, REGRAS_BASE, taxasEm, utilizadorValido, validarNIF,
-  type Anexo, type Documento, type Empresa, type Ligacao, type Pedido, type Regras, type ResumoEmpresa, type Sessao, type VerificacaoFecho,
+  type Anexo, type Documento, type MovimentoBancario, type Empresa, type Ligacao, type Pedido, type Regras, type ResumoEmpresa, type Sessao, type VerificacaoFecho,
 } from "@contabia/shared";
 import type { Db } from "./db.ts";
 import {
@@ -19,6 +19,7 @@ import {
   apurarIVA, aprender, classificar, diarioDe, equilibrado, gerarSAFT, lancamentoDeLinha, mesesDoPeriodo, periodoIVADoMes, proporLinhas, xmlDP,
 } from "./contabilidade.ts";
 import { perguntar } from "./assistente.ts";
+import { sugerir, type DocConc } from "./conciliacao.ts";
 
 export interface Config {
   segredoJWT: string;
@@ -549,6 +550,126 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     if (!x) throw new ErroApp("nao_encontrado", "Ficheiro não encontrado.", 404);
     return reply.header("content-type", x.tipo).header("content-disposition", `inline; filename="${x.nome}"`)
       .header("cache-control", "private, max-age=86400").send(Buffer.from(x.dados));
+  });
+
+  // ═════════════ Banco e conciliação ═════════════
+  type LinhaMov = { id: string; empresa_id: string; data: string; descricao: string; valor: string; estado: string; documento_id: string | null; sugestao_documento_id: string | null; sugestao_motivo: string | null; sugestao_confianca: string | null };
+  async function movimentosDe(id: string, so?: string): Promise<MovimentoBancario[]> {
+    const ms = await db.query<LinhaMov>(`SELECT * FROM movimentos WHERE empresa_id = $1 ${so ? "AND id = $2" : ""} ORDER BY data DESC, criado_em DESC`, so ? [id, so] : [id]);
+    const ids = [...new Set(ms.flatMap((m) => [m.documento_id, m.sugestao_documento_id]).filter((x): x is string => !!x))];
+    const docs = ids.length ? await db.query<{ id: string; numero: string; terceiro_nome: string; total: string; data: string }>(
+      `SELECT id, numero, terceiro_nome, total, data FROM documentos WHERE id = ANY($1)`, [ids]) : [];
+    const porId = new Map(docs.map((d) => [d.id, { numero: d.numero, terceiroNome: d.terceiro_nome, total: Number(d.total), data: d.data }]));
+    return ms.map((m) => ({
+      id: m.id, empresaId: m.empresa_id, data: m.data, descricao: m.descricao, valor: Number(m.valor), estado: m.estado as MovimentoBancario["estado"],
+      documentoId: m.documento_id, documento: m.documento_id ? porId.get(m.documento_id) ?? null : null,
+      sugestao: m.sugestao_documento_id && porId.get(m.sugestao_documento_id)
+        ? { documentoId: m.sugestao_documento_id, ...porId.get(m.sugestao_documento_id)!, motivo: m.sugestao_motivo ?? "", confianca: (m.sugestao_confianca ?? "media") as "alta" | "media" } : null,
+    }));
+  }
+  /** Volta a calcular as sugestões dos movimentos por conciliar. */
+  async function recalcularSugestoes(id: string) {
+    const docs = (await db.query<DocConc>(`SELECT id, tipo, terceiro_nif, terceiro_nome, numero, data, total FROM documentos WHERE empresa_id = $1 AND estado <> 'anulado'`, [id])).map((d) => ({ ...d, total: Number(d.total) }));
+    const usados = new Set((await db.query<{ documento_id: string }>(`SELECT documento_id FROM movimentos WHERE empresa_id = $1 AND documento_id IS NOT NULL`, [id])).map((x) => x.documento_id));
+    const pendentes = await db.query<LinhaMov>(`SELECT * FROM movimentos WHERE empresa_id = $1 AND estado IN ('por_conciliar','falta_documento') ORDER BY data`, [id]);
+    for (const m of pendentes) {
+      const s = sugerir({ data: m.data, descricao: m.descricao, valor: Number(m.valor) }, docs, usados);
+      if (s?.confianca === "alta") usados.add(s.documentoId); // não sugerir a mesma fatura a dois movimentos
+      await db.query(`UPDATE movimentos SET sugestao_documento_id = $1, sugestao_motivo = $2, sugestao_confianca = $3 WHERE id = $4`,
+        [s?.documentoId ?? null, s?.motivo ?? null, s?.confianca ?? null, m.id]);
+    }
+  }
+
+  app.post("/v1/empresas/:id/banco/importar", async (req) => {
+    const a = ator(req);
+    const id = params(req).id;
+    await exigirAcesso(db, a, id);
+    const b = z.object({ movimentos: z.array(z.object({ data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), descricao: z.string(), valor: z.number() })).min(1).max(5000) }).parse(req.body);
+    let novos = 0;
+    const vistos = new Map<string, number>();
+    for (const m of b.movimentos) {
+      // dois cafés iguais no mesmo dia são dois movimentos: a ordem entra na impressão digital
+      const base = `${m.data}|${m.descricao}|${m.valor.toFixed(2)}`;
+      const n = (vistos.get(base) ?? 0) + 1;
+      vistos.set(base, n);
+      const r = await db.query(`INSERT INTO movimentos (id, empresa_id, data, descricao, valor, impressao, estado, criado_em) VALUES ($1,$2,$3,$4,$5,$6,'por_conciliar',$7) ON CONFLICT (empresa_id, impressao) DO NOTHING RETURNING id`,
+        [novoId(), id, m.data, m.descricao, m.valor, `${base}|${n}`, agoraISO()]);
+      if (r.length) novos++;
+    }
+    await recalcularSugestoes(id);
+    await publicar(db, hub, id, "banco.importado", a.papel, { novos });
+    const todos = await movimentosDe(id);
+    return { novos, repetidos: b.movimentos.length - novos, comSugestao: todos.filter((m) => m.estado === "por_conciliar" && m.sugestao).length };
+  });
+  app.get("/v1/empresas/:id/banco/movimentos", async (req) => {
+    const id = params(req).id;
+    await exigirAcesso(db, ator(req), id);
+    return movimentosDe(id);
+  });
+  async function conciliar(id: string, mid: string, documentoId: string) {
+    const [m] = await db.query<LinhaMov>(`SELECT * FROM movimentos WHERE id = $1 AND empresa_id = $2`, [mid, id]);
+    if (!m) throw new ErroApp("nao_encontrado", "Movimento não encontrado.", 404);
+    const d = await docDaEmpresa(id, documentoId);
+    if (d.estado === "anulado") throw new ErroApp("documento_anulado", "Esse documento está anulado.", 409);
+    const [outro] = await db.query(`SELECT 1 FROM movimentos WHERE documento_id = $1 AND id <> $2`, [documentoId, mid]);
+    if (outro) throw new ErroApp("ja_conciliado", "Essa fatura já está ligada a outro movimento do banco.", 409);
+    await db.query(`UPDATE movimentos SET estado = 'conciliado', documento_id = $1 WHERE id = $2`, [documentoId, mid]);
+  }
+  app.post("/v1/empresas/:id/banco/movimentos/:mid/conciliar", async (req) => {
+    const a = ator(req);
+    const { id, mid } = params(req);
+    await exigirAcesso(db, a, id);
+    const b = z.object({ documentoId: z.string() }).parse(req.body);
+    await conciliar(id, mid, b.documentoId);
+    await recalcularSugestoes(id);
+    await publicar(db, hub, id, "banco.conciliado", a.papel, { movimentoId: mid });
+    return (await movimentosDe(id, mid))[0];
+  });
+  app.post("/v1/empresas/:id/banco/conciliar-automatico", async (req) => {
+    const a = ator(req);
+    const id = params(req).id;
+    exigirPapel(a, "contabilista");
+    await exigirAcesso(db, a, id, "lancamentos.escrever");
+    const altas = await db.query<LinhaMov>(`SELECT * FROM movimentos WHERE empresa_id = $1 AND estado = 'por_conciliar' AND sugestao_confianca = 'alta'`, [id]);
+    let n = 0;
+    for (const m of altas) {
+      try { await conciliar(id, m.id, m.sugestao_documento_id!); n++; } catch { /* já usada: fica para revisão */ }
+    }
+    await recalcularSugestoes(id);
+    if (n) await publicar(db, hub, id, "banco.conciliado", a.papel, { n });
+    return { conciliados: n };
+  });
+  app.post("/v1/empresas/:id/banco/movimentos/:mid/desfazer", async (req) => {
+    const a = ator(req);
+    const { id, mid } = params(req);
+    await exigirAcesso(db, a, id);
+    await db.query(`UPDATE movimentos SET estado = 'por_conciliar', documento_id = NULL WHERE id = $1 AND empresa_id = $2`, [mid, id]);
+    await recalcularSugestoes(id);
+    return (await movimentosDe(id, mid))[0];
+  });
+  /** Pagamento sem fatura: pede-a à empresa (o pedido aparece no Painel dela). */
+  app.post("/v1/empresas/:id/banco/movimentos/:mid/pedir-fatura", async (req) => {
+    const a = ator(req);
+    const { id, mid } = params(req);
+    exigirPapel(a, "contabilista");
+    await exigirAcesso(db, a, id);
+    const [m] = await db.query<LinhaMov>(`SELECT * FROM movimentos WHERE id = $1 AND empresa_id = $2`, [mid, id]);
+    if (!m) throw new ErroApp("nao_encontrado", "Movimento não encontrado.", 404);
+    const detalhe = `${m.data.split("-").reverse().join("/")} · ${m.descricao} · ${Math.abs(Number(m.valor)).toFixed(2).replace(".", ",")} €`;
+    const pid = novoId();
+    await db.query(`INSERT INTO pedidos (id, empresa_id, contabilista_id, tipo, detalhe, estado, criado_em) VALUES ($1,$2,$3,$4,$5,'pendente',$6)`,
+      [pid, id, a.id, "Fatura em falta (banco)", detalhe, agoraISO()]);
+    await db.query(`UPDATE movimentos SET estado = 'falta_documento' WHERE id = $1`, [mid]);
+    await publicar(db, hub, id, "pedido.criado", "contabilista", { pedidoId: pid, tipo: "Fatura em falta (banco)", detalhe });
+    return (await movimentosDe(id, mid))[0];
+  });
+  app.post("/v1/empresas/:id/banco/movimentos/:mid/ignorar", async (req) => {
+    const a = ator(req);
+    const { id, mid } = params(req);
+    exigirPapel(a, "contabilista");
+    await exigirAcesso(db, a, id);
+    await db.query(`UPDATE movimentos SET estado = 'ignorado' WHERE id = $1 AND empresa_id = $2`, [mid, id]);
+    return (await movimentosDe(id, mid))[0];
   });
 
   // ═════════════ Lançamentos ═════════════

@@ -327,3 +327,38 @@ test("18. importação do e-Fatura: importa, salta repetidas e explica erros", a
   assert.equal(rest.taxa, 13); // 2,60 / 20 = 13 % (taxa intermédia)
   assert.equal(rest.origem, "efatura");
 });
+
+test("19. conciliação bancária: sugere com explicação, concilia, pede a fatura em falta", async () => {
+  const id = S.empCId;
+  // faturas já existentes da Empresa C: FT 2026/700 (123 €, Papelaria 500000000, 15/10) e FS 9/1 (22,60 €, 16/10)
+  const imp = await chamar("POST", `/v1/empresas/${id}/banco/importar`, S.empC, { movimentos: [
+    { data: "2026-10-20", descricao: "COMPRA PAPELARIA FUNCHAL", valor: -123 },
+    { data: "2026-10-16", descricao: "COMPRA RESTAUR 4421", valor: -22.6 },
+    { data: "2026-10-21", descricao: "DD EDP COMERCIAL", valor: -45.3 },
+    { data: "2026-10-22", descricao: "TRF RECEBIDA", valor: 500 },
+  ] });
+  assert.equal(imp.json.novos, 4);
+  // importar o mesmo extrato outra vez não duplica
+  assert.equal((await chamar("POST", `/v1/empresas/${id}/banco/importar`, S.empC, { movimentos: [{ data: "2026-10-21", descricao: "DD EDP COMERCIAL", valor: -45.3 }] })).json.novos, 0);
+  const ms = (await chamar("GET", `/v1/empresas/${id}/banco/movimentos`, S.ccC)).json;
+  const pap = ms.find((m: { descricao: string }) => m.descricao.includes("PAPELARIA"));
+  assert.equal(pap.sugestao.numero, "FT 2026/700");
+  assert.equal(pap.sugestao.confianca, "alta");
+  assert.match(pap.sugestao.motivo, /mesmo valor \(123,00 €\), 5 dias depois da fatura, a descrição menciona «PAPELARIA»/);
+  const rest = ms.find((m: { descricao: string }) => m.descricao.includes("RESTAUR"));
+  assert.equal(rest.sugestao.confianca, "media"); // só valor e data: um humano confirma
+  // a empresa não pode conciliar automaticamente; o contabilista sim
+  assert.equal((await chamar("POST", `/v1/empresas/${id}/banco/conciliar-automatico`, S.empC, {})).status, 403);
+  assert.equal((await chamar("POST", `/v1/empresas/${id}/banco/conciliar-automatico`, S.ccC, {})).json.conciliados, 1);
+  // confirmar a sugestão média
+  const c = await chamar("POST", `/v1/empresas/${id}/banco/movimentos/${rest.id}/conciliar`, S.ccC, { documentoId: rest.sugestao.documentoId });
+  assert.equal(c.json.estado, "conciliado");
+  // a mesma fatura não pode ficar ligada a dois movimentos
+  const edp = ms.find((m: { descricao: string }) => m.descricao.includes("EDP"));
+  assert.equal((await chamar("POST", `/v1/empresas/${id}/banco/movimentos/${edp.id}/conciliar`, S.ccC, { documentoId: rest.sugestao.documentoId })).json.codigo, "ja_conciliado");
+  // pagamento sem fatura → pedido à empresa
+  const p = await chamar("POST", `/v1/empresas/${id}/banco/movimentos/${edp.id}/pedir-fatura`, S.ccC, {});
+  assert.equal(p.json.estado, "falta_documento");
+  const pedidos = (await chamar("GET", `/v1/empresas/${id}/pedidos`, S.empC)).json;
+  assert.ok(pedidos.some((x: { tipo: string; detalhe: string }) => x.tipo === "Fatura em falta (banco)" && x.detalhe.includes("EDP")));
+});

@@ -200,6 +200,22 @@ const MIGRACOES: string[] = [
      criado_em text NOT NULL
    )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS anexos_unicos ON anexos(documento_id, sha256)`,
+  // Conciliação bancária: movimentos do extrato e a fatura a que correspondem.
+  `CREATE TABLE IF NOT EXISTS movimentos (
+     id text PRIMARY KEY,
+     empresa_id text NOT NULL REFERENCES empresas(id),
+     data text NOT NULL,
+     descricao text NOT NULL,
+     valor numeric(14,2) NOT NULL,
+     impressao text NOT NULL,
+     estado text NOT NULL,
+     documento_id text REFERENCES documentos(id),
+     sugestao_documento_id text REFERENCES documentos(id),
+     sugestao_motivo text,
+     sugestao_confianca text,
+     criado_em text NOT NULL
+   )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS movimentos_unicos ON movimentos(empresa_id, impressao)`,
   `CREATE TABLE IF NOT EXISTS regras_versoes (
      versao text PRIMARY KEY,
      regras jsonb NOT NULL,

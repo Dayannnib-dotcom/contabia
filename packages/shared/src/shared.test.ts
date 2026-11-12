@@ -73,3 +73,11 @@ test("leitura do CSV exportado do e-Fatura", async () => {
   assert.equal(r.ignoradas.length, 3);
   assert.match(lerCSVEfatura("a;b\n1;2").ignoradas[0].motivo, /Não reconheço/);
 });
+
+test("leitura do extrato bancário (montante único ou débito/crédito, com linhas antes do cabeçalho)", async () => {
+  const { lerCSVExtrato } = await import("./extrato.ts");
+  const a = lerCSVExtrato(["Conta;0035 0001 000123456789", "Titular;ATLANTICO SERVICOS LDA", "", "Data Mov.;Data Valor;Descrição;Montante;Saldo", "02-11-2026;02-11-2026;COMPRA PAPELARIA ATLANTICO;-61,00;1.000,00", "05/11/2026;05/11/2026;TRF RECEBIDA CLIENTE X;1.230,00;2.230,00", "Saldo final;;;;2.230,00"].join("\n"));
+  assert.deepEqual(a.movimentos, [{ data: "2026-11-02", descricao: "COMPRA PAPELARIA ATLANTICO", valor: -61 }, { data: "2026-11-05", descricao: "TRF RECEBIDA CLIENTE X", valor: 1230 }]);
+  const b = lerCSVExtrato("Data;Descritivo;Débito;Crédito\n2026-10-01;DD EDP;45,30;\n2026-10-03;TRF;;100,00\n");
+  assert.deepEqual(b.movimentos.map((m) => m.valor), [-45.3, 100]);
+});

@@ -71,6 +71,7 @@ export default function Painel() {
 
       <Cartao>
         <Linha esquerda="Ligação ao contabilista" sub={dados?.ligAtiva ? `Ativa · ${dados.ligAtiva.contabilista?.nome}` : "Convide o seu contabilista ou partilhe o utilizador e o NIF"} direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/ligacao")} />
+        <Linha esquerda="Banco" sub="Importar extrato e ligar pagamentos às faturas" direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/banco")} />
         <Linha esquerda="Conta e segurança" sub="Os seus dados estão guardados na nuvem" direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/conta")} />
         <Linha esquerda="Atualizações fiscais" sub="Aplicadas automaticamente na data legal" direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/atualizacoes")} />
       </Cartao>

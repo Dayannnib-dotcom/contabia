@@ -188,6 +188,27 @@ with sync_playwright() as p:
         shot(emp, "18f_efatura_feito")
         emp.get_by_role("button", name="Ver documentos").click()
 
+        # ── Banco: o contabilista importa o extrato; a app liga o pagamento à fatura e explica porquê ──
+        extrato = ("Conta;0035 0001 000123456789\nTitular;ATLANTICO SERVICOS LDA\n\n"
+                   "Data Mov.;Data Valor;Descrição;Montante;Saldo\n"
+                   "02-11-2026;02-11-2026;COMPRA PAPELARIA ATLANTICO;-61,00;1.000,00\n"
+                   "05-11-2026;05-11-2026;DD EDP COMERCIAL;-45,30;954,70\n")
+        with open("/tmp/extrato.csv", "wb") as f: f.write(extrato.encode("latin-1"))
+        cc.get_by_role("tab", name="Banco").click()
+        with cc.expect_file_chooser() as fc:
+            cc.get_by_role("button", name="Importar extrato do banco").click()
+        fc.value.set_files("/tmp/extrato.csv")
+        cc.get_by_text("Importei 2 movimentos", exact=False).wait_for(timeout=15000)
+        cc.get_by_text("a descrição menciona «PAPELARIA»", exact=False).wait_for()
+        shot(cc, "18g_cc_banco")
+        cc.get_by_role("button", name="Conciliar a de confiança alta").click()
+        cc.get_by_text("Ver o conciliado", exact=False).wait_for(timeout=15000)
+        cc.get_by_role("button", name="Pedir fatura à empresa").click()
+        cc.get_by_text("Faturas pedidas à empresa").wait_for()
+        shot(cc, "18h_cc_banco_feito")
+        emp.get_by_role("tab", name="Painel").click()
+        emp.get_by_text("Pedido do contabilista: Fatura em falta (banco)").wait_for(timeout=15000)
+
         # ── Sentido inverso: uma 2.ª empresa convida o contabilista pelo n.º OCC ──
         emp2 = b.new_page(viewport=vp)
         emp2.on("pageerror", lambda e: erros.append(f"empresa2: {e}"))
