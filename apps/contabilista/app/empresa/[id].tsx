@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { euros, motivoLegivel, nomePeriodo, type Lancamento } from "@contabia/shared";
-import { Botao, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
+import { Botao, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, VerOriginal, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
 
 type Sec = "revisao" | "iva" | "pedidos" | "saft" | "fecho";
 const SECS: [Sec, string][] = [["revisao", "Revisão"], ["iva", "IVA"], ["pedidos", "Pedidos"], ["saft", "SAF-T"], ["fecho", "Fecho"]];
@@ -83,6 +83,7 @@ function Anulacoes({ id, aoMudar }: { id: string; aoMudar: () => void }) {
             </View>
             <Chip texto="Anulação pedida" tipo="aviso" />
           </View>
+          <VerOriginal api={api} empresaId={id} documentoId={d.id} />
           {d.anulacao ? <Texto>Motivo da empresa: {motivoLegivel(d.anulacao.motivo)}</Texto> : null}
           <Texto sec tamanho={12}>Ao aprovar, o documento deixa de contar e os lançamentos são estornados com data de hoje. O documento fica guardado.</Texto>
           <View style={{ flexDirection: "row", gap: 10 }}>
@@ -130,6 +131,7 @@ function Revisao({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
             <View style={{ flex: 1 }}><Texto forte>{l.descricao}</Texto><Texto sec tamanho={12}>{l.diario} · {l.data.split("-").reverse().join("/")}</Texto></View>
             <Chip texto={l.confianca === "alta" ? "Confiança alta" : "Confiança média"} tipo={l.confianca === "alta" ? "bom" : "aviso"} />
           </View>
+          {l.documentoId ? <VerOriginal api={api} empresaId={id} documentoId={l.documentoId} /> : null}
           {l.linhas.map((x, i) => (
             <View key={i} style={{ flexDirection: "row", gap: 8 }}>
               <Text style={{ width: 54, fontVariant: ["tabular-nums"], fontWeight: "600", color: cor.texto }}>{x.conta}</Text>

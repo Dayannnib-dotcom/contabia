@@ -2,12 +2,13 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
 import estatico from "@fastify/static";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { z, ZodError } from "zod";
 import {
   ajudaNIF, lerQR, limparNIF, normalizarUtilizador, proximasObrigacoes, qrConsistente, REGRAS_BASE, taxasEm, utilizadorValido, validarNIF,
-  type Documento, type Empresa, type Ligacao, type Pedido, type Regras, type ResumoEmpresa, type Sessao, type VerificacaoFecho,
+  type Anexo, type Documento, type Empresa, type Ligacao, type Pedido, type Regras, type ResumoEmpresa, type Sessao, type VerificacaoFecho,
 } from "@contabia/shared";
 import type { Db } from "./db.ts";
 import {
@@ -280,12 +281,13 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   });
 
   // ═════════════ Documentos ═════════════
-  type LinhaDoc = { id: string; empresa_id: string; tipo: string; terceiro_nif: string; terceiro_nome: string; numero: string; atcud: string; data: string; base: string; iva: string; total: string; taxa: string; espaco_fiscal: string; estado: string; conta_sugerida: string; categoria: string; iva_dedutivel: boolean; origem: string; criado_em: string; estado_anterior?: string | null; anulacao_motivo?: string | null; anulacao_pedida_por?: string | null; anulacao_em?: string | null };
+  type LinhaDoc = { id: string; empresa_id: string; tipo: string; terceiro_nif: string; terceiro_nome: string; numero: string; atcud: string; data: string; base: string; iva: string; total: string; taxa: string; espaco_fiscal: string; estado: string; conta_sugerida: string; categoria: string; iva_dedutivel: boolean; origem: string; criado_em: string; estado_anterior?: string | null; anulacao_motivo?: string | null; anulacao_pedida_por?: string | null; anulacao_em?: string | null; n_anexos?: number };
   const docDe = (d: LinhaDoc): Documento => ({
     id: d.id, empresaId: d.empresa_id, tipo: d.tipo as Documento["tipo"], terceiroNif: d.terceiro_nif, terceiroNome: d.terceiro_nome, numero: d.numero,
     atcud: d.atcud, data: d.data, base: Number(d.base), iva: Number(d.iva), total: Number(d.total), taxa: Number(d.taxa), espacoFiscal: d.espaco_fiscal,
     estado: d.estado as Documento["estado"], contaSugerida: d.conta_sugerida, categoria: d.categoria, ivaDedutivel: d.iva_dedutivel,
     origem: d.origem as Documento["origem"], criadoEm: d.criado_em,
+    anexos: Number(d.n_anexos ?? 0),
     anulacao: d.anulacao_motivo ? { motivo: d.anulacao_motivo, pedidaPor: d.anulacao_pedida_por as "empresa" | "contabilista", em: d.anulacao_em ?? "" } : null,
   });
 
@@ -294,7 +296,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     await exigirAcesso(db, ator(req), id);
     const periodo = (req.query as { periodo?: string }).periodo;
     const rows = await db.query<LinhaDoc>(
-      `SELECT * FROM documentos WHERE empresa_id = $1 ${periodo ? "AND data LIKE $2" : ""} ORDER BY data DESC, criado_em DESC`,
+      `SELECT d.*, (SELECT count(*) FROM anexos a WHERE a.documento_id = d.id)::int AS n_anexos FROM documentos d WHERE d.empresa_id = $1 ${periodo ? "AND d.data LIKE $2" : ""} ORDER BY d.data DESC, d.criado_em DESC`,
       periodo ? [id, `${periodo}%`] : [id]);
     return rows.map(docDe);
   });
@@ -452,6 +454,54 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
       `UPDATE documentos SET estado = COALESCE(estado_anterior, 'validar'), estado_anterior = NULL, anulacao_motivo = NULL, anulacao_pedida_por = NULL, anulacao_em = NULL WHERE id = $1 RETURNING *`, [doc]);
     await publicar(db, hub, id, "documento.anulacao_recusada", "contabilista", { documentoId: doc, numero: d.numero });
     return docDe(r);
+  });
+
+  // ═════════════ Arquivo digital (fotos e PDF das faturas) ═════════════
+  const TIPOS_ANEXO: Record<string, (b: Buffer) => boolean> = {
+    "image/jpeg": (b) => b[0] === 0xff && b[1] === 0xd8,
+    "image/png": (b) => b[0] === 0x89 && b.subarray(1, 4).toString() === "PNG",
+    "image/webp": (b) => b.subarray(0, 4).toString() === "RIFF" && b.subarray(8, 12).toString() === "WEBP",
+    "application/pdf": (b) => b.subarray(0, 4).toString() === "%PDF",
+  };
+  const MAX_ANEXO = 10 * 1024 * 1024;
+  app.addContentTypeParser(Object.keys(TIPOS_ANEXO), { parseAs: "buffer", bodyLimit: MAX_ANEXO }, (_req, corpo, feito) => feito(null, corpo));
+  type LinhaAnexo = { id: string; documento_id: string; tipo: string; nome: string; tamanho: number; enviado_por: string; criado_em: string };
+  const anexoDe = (a: LinhaAnexo): Anexo => ({ id: a.id, documentoId: a.documento_id, tipo: a.tipo, nome: a.nome, tamanho: Number(a.tamanho), enviadoPor: a.enviado_por as Anexo["enviadoPor"], criadoEm: a.criado_em });
+
+  app.post("/v1/empresas/:id/documentos/:doc/anexos", async (req, reply) => {
+    const a = ator(req);
+    const { id, doc } = params(req);
+    await exigirAcesso(db, a, id);
+    const d = await docDaEmpresa(id, doc);
+    const tipo = String(req.headers["content-type"] ?? "").split(";")[0].trim();
+    const corpo = req.body as Buffer;
+    if (!Buffer.isBuffer(corpo) || !TIPOS_ANEXO[tipo]) throw new ErroApp("tipo_anexo", "Envie uma fotografia (JPG, PNG) ou um PDF.");
+    if (!corpo.length) throw new ErroApp("anexo_vazio", "O ficheiro está vazio.");
+    if (!TIPOS_ANEXO[tipo](corpo)) throw new ErroApp("anexo_invalido", "O ficheiro não é uma imagem ou PDF válido.");
+    const sha256 = createHash("sha256").update(corpo).digest("hex");
+    const [ja] = await db.query<LinhaAnexo>(`SELECT id, documento_id, tipo, nome, tamanho, enviado_por, criado_em FROM anexos WHERE documento_id = $1 AND sha256 = $2`, [doc, sha256]);
+    if (ja) return anexoDe(ja); // o mesmo ficheiro enviado duas vezes
+    const ext = tipo === "application/pdf" ? "pdf" : tipo.split("/")[1].replace("jpeg", "jpg");
+    const nome = `${d.numero.replace(/[^\w.-]+/g, "_")}.${ext}`;
+    const novo: LinhaAnexo = { id: novoId(), documento_id: doc, tipo, nome, tamanho: corpo.length, enviado_por: a.papel, criado_em: agoraISO() };
+    await db.query(`INSERT INTO anexos (id, empresa_id, documento_id, tipo, nome, tamanho, sha256, dados, enviado_por, criado_em) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [novo.id, id, doc, tipo, nome, corpo.length, sha256, corpo, a.papel, novo.criado_em]);
+    if (d.estado === "sem_anexo") await db.query(`UPDATE documentos SET estado = 'validar' WHERE id = $1`, [doc]);
+    await publicar(db, hub, id, "documento.anexo", a.papel, { documentoId: doc, anexoId: novo.id });
+    return reply.code(201).send(anexoDe(novo));
+  });
+  app.get("/v1/empresas/:id/documentos/:doc/anexos", async (req) => {
+    const { id, doc } = params(req);
+    await exigirAcesso(db, ator(req), id);
+    return (await db.query<LinhaAnexo>(`SELECT id, documento_id, tipo, nome, tamanho, enviado_por, criado_em FROM anexos WHERE documento_id = $1 AND empresa_id = $2 ORDER BY criado_em`, [doc, id])).map(anexoDe);
+  });
+  app.get("/v1/empresas/:id/documentos/:doc/anexos/:aid", async (req, reply) => {
+    const { id, doc, aid } = params(req);
+    await exigirAcesso(db, ator(req), id);
+    const [x] = await db.query<{ tipo: string; nome: string; dados: Uint8Array }>(`SELECT tipo, nome, dados FROM anexos WHERE id = $1 AND documento_id = $2 AND empresa_id = $3`, [aid, doc, id]);
+    if (!x) throw new ErroApp("nao_encontrado", "Ficheiro não encontrado.", 404);
+    return reply.header("content-type", x.tipo).header("content-disposition", `inline; filename="${x.nome}"`)
+      .header("cache-control", "private, max-age=86400").send(Buffer.from(x.dados));
   });
 
   // ═════════════ Lançamentos ═════════════

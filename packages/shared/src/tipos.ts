@@ -50,6 +50,18 @@ export interface Documento {
   criadoEm: string;
   /** Preenchido quando alguém pediu ou fez a anulação. Nada se apaga: fica no histórico 10 anos. */
   anulacao?: { motivo: string; pedidaPor: "empresa" | "contabilista"; em: string } | null;
+  /** Número de ficheiros (foto/PDF) guardados na nuvem para este documento. */
+  anexos?: number;
+}
+
+export interface Anexo {
+  id: string;
+  documentoId: string;
+  tipo: string;
+  nome: string;
+  tamanho: number;
+  enviadoPor: "empresa" | "contabilista";
+  criadoEm: string;
 }
 
 export interface LinhaLancamento {

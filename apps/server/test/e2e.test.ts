@@ -282,3 +282,27 @@ test("16. sessão deslizante: quem usa a app recebe um token renovado", async ()
   assert.equal(r2.statusCode, 200);
   assert.equal(r2.headers["x-contabia-token"], undefined);
 });
+
+test("17. arquivo digital: foto/PDF de cada fatura guardado na nuvem", async () => {
+  const base = `/v1/empresas/${S.empCId}/documentos`;
+  const d = await chamar("POST", base, S.empC, { tipo: "compra", terceiroNif: "509999999", terceiroNome: "Fornecedor Z", numero: "FT 2026/90", data: "2026-11-05", base: 50, iva: 11.5, taxa: 23 });
+  const pdf = Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF");
+  const env = (corpo: Buffer, tipo: string, token = S.empC) => app.inject({ method: "POST", url: `${base}/${d.json.id}/anexos`, headers: { authorization: `Bearer ${token}`, "content-type": tipo }, payload: corpo });
+  // um ficheiro que diz ser PDF mas não é → recusado
+  assert.equal((await env(Buffer.from("olá"), "application/pdf")).statusCode, 400);
+  const r = await env(pdf, "application/pdf");
+  assert.equal(r.statusCode, 201, r.body);
+  const a = JSON.parse(r.body);
+  assert.equal(a.nome, "FT_2026_90.pdf");
+  // o mesmo ficheiro outra vez não duplica
+  assert.equal(JSON.parse((await env(pdf, "application/pdf")).body).id, a.id);
+  // o contabilista também vê e descarrega o original
+  const lista = (await chamar("GET", `${base}/${d.json.id}/anexos`, S.ccC)).json;
+  assert.equal(lista.length, 1);
+  const f = await app.inject({ method: "GET", url: `${base}/${d.json.id}/anexos/${a.id}?token=${S.ccC}` });
+  assert.equal(f.statusCode, 200);
+  assert.equal(f.headers["content-type"], "application/pdf");
+  assert.equal(f.rawPayload.toString(), pdf.toString());
+  const docs = (await chamar("GET", base, S.empC)).json;
+  assert.equal(docs.find((x: { id: string }) => x.id === d.json.id).anexos, 1);
+});

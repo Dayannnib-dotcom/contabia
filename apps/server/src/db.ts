@@ -186,6 +186,20 @@ const MIGRACOES: string[] = [
   `ALTER TABLE documentos ADD COLUMN IF NOT EXISTS anulacao_motivo text`,
   `ALTER TABLE documentos ADD COLUMN IF NOT EXISTS anulacao_pedida_por text`,
   `ALTER TABLE documentos ADD COLUMN IF NOT EXISTS anulacao_em text`,
+  // Arquivo digital: a imagem/PDF original de cada documento, guardada na base de dados (nunca apagada).
+  `CREATE TABLE IF NOT EXISTS anexos (
+     id text PRIMARY KEY,
+     empresa_id text NOT NULL REFERENCES empresas(id),
+     documento_id text NOT NULL REFERENCES documentos(id),
+     tipo text NOT NULL,
+     nome text NOT NULL,
+     tamanho integer NOT NULL,
+     sha256 text NOT NULL,
+     dados bytea NOT NULL,
+     enviado_por text NOT NULL,
+     criado_em text NOT NULL
+   )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS anexos_unicos ON anexos(documento_id, sha256)`,
   `CREATE TABLE IF NOT EXISTS regras_versoes (
      versao text PRIMARY KEY,
      regras jsonb NOT NULL,

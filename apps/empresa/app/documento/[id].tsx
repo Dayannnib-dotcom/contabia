@@ -2,14 +2,35 @@ import { useEffect, useState } from "react";
 import { Switch, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MOTIVOS_ANULACAO, dataPT, euros, formatarNIF, motivoLegivel, type MotivoAnulacao } from "@contabia/shared";
-import { Botao, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
+import { Botao, Campo, Cartao, Chip, Ecra, Erro, Linha, ListaAnexos, MensagemLuis, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
+import { enviarAnexo, escolherDaGaleria, escolherPDF, fotografar, type Ficheiro } from "../../lib/anexar";
 import { Pressable } from "react-native";
 
 export default function DetalheDocumento() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, novo } = useLocalSearchParams<{ id: string; novo?: string }>();
   const { api, sessao } = useSessao();
   const router = useRouter();
-  const { dados, recarregar } = useDados(async () => (await api.documentos(sessao!.id)).find((d) => d.id === id) ?? null, [id]);
+  const { dados, recarregar } = useDados(async () => {
+    const doc = (await api.documentos(sessao!.id)).find((d) => d.id === id) ?? null;
+    return doc ? { ...doc, ficheiros: await api.anexos(sessao!.id, doc.id) } : null;
+  }, [id]);
+  const [aAnexar, setAAnexar] = useState(false);
+  const [erroAnexo, setErroAnexo] = useState<string | null>(null);
+
+  async function anexar(escolher: () => Promise<Ficheiro | null>) {
+    setErroAnexo(null);
+    try {
+      const f = await escolher();
+      if (!f) return;
+      setAAnexar(true);
+      await enviarAnexo(api, sessao!.id, id, f);
+      await recarregar();
+    } catch (e) {
+      setErroAnexo((e as Error).message);
+    } finally {
+      setAAnexar(false);
+    }
+  }
   const [conta, setConta] = useState("");
   const [dedutivel, setDedutivel] = useState(true);
   const [nome, setNome] = useState("");
@@ -28,7 +49,7 @@ export default function DetalheDocumento() {
     setAEnviar(true);
     try {
       await api.validarDocumento(sessao!.id, dados!.id, { contaSugerida: conta, ivaDedutivel: dedutivel, ...(nome !== dados!.terceiroNome ? { terceiroNome: nome } : {}) });
-      router.back();
+      router.dismissTo("/(tabs)/documentos");
     } catch (e) {
       setErro((e as Error).message);
     } finally {
@@ -63,6 +84,22 @@ export default function DetalheDocumento() {
         <Linha esquerda="Base" direita={<Texto>{euros(dados.base)}</Texto>} />
         <Linha esquerda={`IVA ${dados.taxa}%`} direita={<Texto>{euros(dados.iva)}</Texto>} />
         <Linha esquerda="Total" direita={<Texto forte>{euros(dados.total)}</Texto>} />
+      </Cartao>
+      <Cartao>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Texto forte tamanho={15}>Original da fatura</Texto>
+          <Chip texto={dados.ficheiros.length ? "Guardado na nuvem" : "Falta o original"} tipo={dados.ficheiros.length ? "bom" : "aviso"} />
+        </View>
+        {!dados.ficheiros.length ? (
+          <Texto sec tamanho={12}>{novo ? "Documento registado! Agora fotografe a fatura em papel ou junte o PDF: o original fica guardado 10 anos, como a lei exige." : "Fotografe a fatura ou junte o PDF. Assim não precisa de guardar o papel."}</Texto>
+        ) : null}
+        <ListaAnexos api={api} empresaId={sessao!.id} documentoId={dados.id} anexos={dados.ficheiros} />
+        <Erro texto={erroAnexo} />
+        <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+          <Botao titulo="Fotografar" onPress={() => anexar(fotografar)} carregando={aAnexar} estilo={{ flexGrow: 1 }} />
+          <Botao titulo="Galeria" variante="secundario" onPress={() => anexar(escolherDaGaleria)} desativado={aAnexar} estilo={{ flexGrow: 1 }} />
+          <Botao titulo="PDF" variante="secundario" onPress={() => anexar(escolherPDF)} desativado={aAnexar} estilo={{ flexGrow: 1 }} />
+        </View>
       </Cartao>
       <MensagemLuis texto={`Sugestão: ${dados.categoria} (conta SNC ${dados.contaSugerida})${dados.ivaDedutivel ? ", IVA dedutível." : ", IVA não dedutível."} Confirme ou corrija.`} />
       {anulado ? (

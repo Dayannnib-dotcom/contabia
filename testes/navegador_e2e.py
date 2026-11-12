@@ -80,13 +80,18 @@ with sync_playwright() as p:
         emp.get_by_label("Valor sem IVA (€)").fill("120")
         shot(emp, "08_documento_manual")
         emp.get_by_role("button", name="Guardar documento").click()
-        emp.get_by_text("Papelaria Atlântico").first.wait_for()
-        shot(emp, "09_documentos")
-        emp.get_by_text("Papelaria Atlântico").first.click()
         emp.get_by_role("button", name="Validar documento").wait_for()
+        emp.get_by_text("Falta o original").wait_for()
+        # o original da fatura (PDF) fica guardado na nuvem
+        with open("/tmp/fatura_teste.pdf", "wb") as f: f.write(b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF")
+        with emp.expect_file_chooser() as fc:
+            emp.get_by_role("button", name="PDF").click()
+        fc.value.set_files("/tmp/fatura_teste.pdf")
+        emp.get_by_text("Guardado na nuvem").wait_for(timeout=15000)
+        shot(emp, "09_original_guardado")
         shot(emp, "10_validar")
         emp.get_by_role("button", name="Validar documento").click()
-        emp.get_by_text("Validado").first.wait_for()
+        emp.get_by_text("Validado", exact=True).first.wait_for()
 
         # ── Contabilista revê, apura IVA, regista submissão ──
         cc.get_by_role("tab", name="Carteira").click()

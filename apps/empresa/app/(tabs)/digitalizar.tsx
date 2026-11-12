@@ -33,10 +33,10 @@ export default function Digitalizar() {
     if (!lido) return;
     setAEnviar(true);
     try {
-      await api.pedido("POST", `/v1/empresas/${sessao!.id}/documentos`, { qr: lido.texto, tipo: "compra", terceiroNome: nome || undefined });
+      const d = await api.pedido<{ id: string }>("POST", `/v1/empresas/${sessao!.id}/documentos`, { qr: lido.texto, tipo: "compra", terceiroNome: nome || undefined });
       setLido(null);
       setNome("");
-      router.push("/(tabs)/documentos");
+      router.push({ pathname: "/documento/[id]", params: { id: d.id, novo: "1" } });
     } catch (e) {
       setErro((e as Error).message);
     } finally {
@@ -115,8 +115,8 @@ function Manual({ voltar }: { voltar?: () => void }) {
   async function guardar() {
     setAEnviar(true);
     try {
-      await api.criarDocumento(sessao!.id, { tipo, terceiroNif: nif.replace(/\s/g, ""), terceiroNome: nome, numero, data, base: b, iva, taxa: t });
-      router.push("/(tabs)/documentos");
+      const d = await api.criarDocumento(sessao!.id, { tipo, terceiroNif: nif.replace(/\s/g, ""), terceiroNome: nome, numero, data, base: b, iva, taxa: t });
+      router.push({ pathname: "/documento/[id]", params: { id: d.id, novo: "1" } });
     } catch (e) {
       setErro((e as Error).message);
     } finally {

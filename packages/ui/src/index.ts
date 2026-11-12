@@ -8,3 +8,4 @@ export * from "./partilhar";
 export * from "./biometria";
 export * from "./avisos";
 export * from "./ativar-avisos";
+export * from "./anexos";

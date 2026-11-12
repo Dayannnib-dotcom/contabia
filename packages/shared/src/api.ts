@@ -5,7 +5,7 @@
  * - Tempo real por WebSocket com recuperação por cursor ao reconectar.
  */
 import type {
-  MotivoAnulacao,
+  MotivoAnulacao, Anexo,
   ApuramentoIVA, Documento, Empresa, Evento, Lancamento, Ligacao, Pedido, RespostaAssistente,
   ResumoEmpresa, Sessao, Submissao, VerificacaoFecho, Contabilista,
 } from "./tipos.ts";
@@ -125,6 +125,16 @@ export class ApiContabia {
   }
   criarDocumento(empresaId: string, d: Partial<Documento>) {
     return this.pedido<Documento>("POST", `/v1/empresas/${empresaId}/documentos`, d);
+  }
+  anexos(empresaId: string, documentoId: string) {
+    return this.pedido<Anexo[]>("GET", `/v1/empresas/${empresaId}/documentos/${documentoId}/anexos`);
+  }
+  /** Endereço para ver/descarregar o original (imagem ou PDF). */
+  urlAnexo(empresaId: string, documentoId: string, anexoId: string) {
+    return `${this.base}/v1/empresas/${empresaId}/documentos/${documentoId}/anexos/${anexoId}?token=${encodeURIComponent(this.token ?? "")}`;
+  }
+  urlEnvioAnexo(empresaId: string, documentoId: string) {
+    return `${this.base}/v1/empresas/${empresaId}/documentos/${documentoId}/anexos`;
   }
   /** Empresa: pede a anulação (o contabilista decide). Contabilista: anula logo. Nada é apagado. */
   pedirAnulacao(empresaId: string, id: string, motivo: MotivoAnulacao, detalhe?: string) {
