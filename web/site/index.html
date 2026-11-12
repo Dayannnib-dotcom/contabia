@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Contabia — O seu contabilista, à mão</title>
-<meta name="description" content="Fotografe as faturas, acompanhe os prazos e fale com o seu Contabilista Certificado — tudo numa app, em tempo real. Dados alojados na UE.">
+<title>Contabia — O seu contabilista, à mão. E os fundos europeus para a sua empresa.</title>
+<meta name="description" content="Faturas, prazos e IVA numa app ligada ao seu Contabilista Certificado. Descubra pelo CAE os fundos europeus a que a sua empresa se pode candidatar e peça o estudo de viabilidade em 2 minutos.">
 <meta name="theme-color" content="#12232E">
 <meta property="og:title" content="Contabia — O seu contabilista, à mão">
 <meta property="og:description" content="Faturas, prazos e IVA num só sítio, ligado ao seu Contabilista Certificado em tempo real.">
@@ -74,12 +74,12 @@ header.topo{position:sticky;top:0;z-index:50;background:rgba(246,247,245,.92);ba
 .topo .contentor{display:flex;align-items:center;justify-content:space-between;height:68px;gap:16px}
 .marca{display:flex;align-items:center;gap:10px;text-decoration:none;font:700 23px/1 var(--font-display);letter-spacing:-.02em;color:var(--ink)}
 .marca svg{width:36px;height:36px}
-nav.menu{display:none;gap:28px;align-items:center}
+nav.menu{display:none;gap:24px;align-items:center;white-space:nowrap}
 nav.menu a{text-decoration:none;font-weight:600;font-size:15px;color:var(--ink-muted)}nav.menu a:hover{color:var(--ink)}
 .topo .acoes-topo{display:flex;gap:10px;align-items:center}
 .topo .btn{min-height:42px;padding:0 16px;font-size:15px}
 .topo .entrar{display:none}
-@media(min-width:980px){nav.menu{display:flex}.topo .entrar{display:inline-flex}}
+@media(min-width:1100px){nav.menu{display:flex}}@media(min-width:980px){.topo .entrar{display:inline-flex}}
 
 /* secções */
 section{padding:var(--space-16) 0}
@@ -217,6 +217,108 @@ footer nav{display:flex;flex-wrap:wrap;gap:20px}footer nav a{text-decoration:non
 .revela{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s ease}
 .revela.visivel{opacity:1;transform:none}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}.revela,.flutua{opacity:1;transform:none}.onda path{stroke-dashoffset:0}.dupla{transform:none}.recibo{display:none}.cartao-doc{opacity:1;transform:none}html{scroll-behavior:auto}}
+
+/* novidade no hero */
+.novo{display:inline-flex;align-items:center;gap:10px;margin:0 0 18px;padding:6px 14px 6px 6px;border-radius:var(--radius-pill);background:rgba(60,198,160,.12);border:1px solid rgba(60,198,160,.35);color:var(--on-ink);text-decoration:none;font-size:14px;font-weight:600}
+.novo b{background:var(--mint);color:var(--on-mint);border-radius:var(--radius-pill);padding:2px 10px;font:600 12px/18px var(--font-mono);letter-spacing:.06em}
+.novo:hover{border-color:var(--mint)}
+
+/* fundos europeus */
+.faixa{background:linear-gradient(180deg,var(--mint-tint),#F1F8F5 70%,var(--surface))}
+.fundos-grid{display:grid;gap:48px;align-items:start}
+@media(min-width:1000px){.fundos-grid{grid-template-columns:.95fr 1.05fr}}
+.pulso{list-style:none;padding:0;margin:28px 0 0;display:grid;gap:8px;font-size:15px}
+.pulso b.mono{font-size:28px;line-height:1;color:var(--primary);margin-right:6px}
+.pulso li:first-child{display:flex;align-items:baseline}
+.pulso .pulso-ver{font-size:13px;color:var(--ink-muted)}
+.pulso .pulso-ver::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mint);margin-right:8px;box-shadow:0 0 0 4px rgba(60,198,160,.2);animation:batida 2s ease-in-out infinite}
+@keyframes batida{50%{box-shadow:0 0 0 7px rgba(60,198,160,.05)}}
+.mini-passos{list-style:none;padding:0;margin:28px 0 0;display:grid;gap:10px}
+.mini-passos li{display:flex;gap:12px;align-items:baseline;color:var(--ink)}
+.mini-passos .mono{color:var(--primary);font-size:13px;width:24px;flex:none}
+.verificador{background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xl);box-shadow:var(--shadow-device);padding:22px}
+@media(min-width:640px){.verificador{padding:28px}}
+.v-topo{display:flex;gap:12px;align-items:center;margin-bottom:18px}
+.v-topo .av{width:40px;height:40px;border-radius:50%;background:var(--luis-sage);flex:none}
+.v-rot{margin:0;font:600 12px/16px var(--font-sans);color:var(--primary)}
+.v-tit{font-size:20px;line-height:26px}
+.v-form{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+@media(min-width:640px){.v-form{grid-template-columns:.8fr 1fr 1fr auto;align-items:end}}
+.v-campo{display:grid;gap:5px;font-size:13px;font-weight:600}
+.v-cae{grid-column:1/-1}@media(min-width:640px){.v-cae{grid-column:auto}}
+.v-campo input,.v-campo select,.campo input,.campo select,.campo textarea{font:400 16px/22px var(--font-sans);color:var(--ink);background:var(--surface-raised);border:1.5px solid var(--border-strong);border-radius:var(--radius-s);padding:11px 12px;min-height:48px;width:100%}
+.v-campo input{font-family:var(--font-mono);letter-spacing:.08em}
+.v-btn{grid-column:1/-1}@media(min-width:640px){.v-btn{grid-column:auto;min-height:48px}}
+.v-ajuda{margin:10px 0 0;font-size:13px;color:var(--ink-muted)}.v-ajuda a{color:var(--primary);font-weight:600}
+.v-exemplos{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px;font-size:13px;color:var(--ink-muted)}
+.chip-ex{font:600 13px/18px var(--font-sans);color:var(--on-mint-tint);background:var(--mint-tint);border:1px solid transparent;border-radius:var(--radius-pill);padding:7px 12px;cursor:pointer}
+.chip-ex:hover,.chip-ex[aria-pressed="true"]{border-color:var(--primary)}
+.v-res{margin-top:18px;display:grid;gap:12px;min-height:40px}
+.v-cab{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:14px;color:var(--ink-muted);border-top:1px solid var(--line);padding-top:14px}
+.v-cab b{color:var(--ink)}
+.ap{border:1px solid var(--border);border-radius:var(--radius-m);padding:14px 16px;display:grid;gap:6px;animation:entra .35s ease both}
+.ap:nth-child(3){animation-delay:.06s}.ap:nth-child(4){animation-delay:.12s}.ap:nth-child(5){animation-delay:.18s}
+@keyframes entra{from{opacity:0;transform:translateY(8px)}}
+.ap .chips{display:flex;gap:6px;flex-wrap:wrap}
+.pill.av{background:var(--amber-tint);color:var(--amber-ink)}.pill.neu{background:var(--line);color:var(--ink)}
+.ap h4{margin:0;font:700 17px/23px var(--font-display)}
+.ap .prog{margin:0;font-size:12px;line-height:17px;color:var(--ink-muted)}
+.ap .valor-ap{margin:0;font-weight:600;font-size:14px;line-height:20px;color:var(--primary)}
+.ap .porque{margin:0;font-size:13px;line-height:19px;color:var(--ink-muted)}
+.ap .ap-acoes{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}
+.ap .ap-acoes a,.ap .ap-acoes button{font:600 14px/20px var(--font-sans);color:var(--primary);background:none;border:0;padding:6px 0;cursor:pointer;text-decoration:none}
+.ap .ap-acoes button{color:var(--ink);text-decoration:underline;text-decoration-color:var(--mint);text-decoration-thickness:2px;text-underline-offset:4px}
+.v-vazio{border:1px dashed var(--border-strong);border-radius:var(--radius-m);padding:16px;font-size:14px;color:var(--ink-muted)}
+.v-erro{color:var(--danger);font-size:14px;margin:0}
+.v-nota{margin:16px 0 0;font-size:12px;line-height:18px;color:var(--ink-muted)}
+.esqueleto{height:96px;border-radius:var(--radius-m);background:linear-gradient(90deg,var(--line),#F7F9F8,var(--line));background-size:200% 100%;animation:brilho 1.2s linear infinite}
+@keyframes brilho{to{background-position:-200% 0}}
+
+/* estudos */
+.estudo-grid{display:grid;gap:48px;align-items:center}
+@media(min-width:960px){.estudo-grid{grid-template-columns:1fr .9fr}}
+.passos-estudo{list-style:none;padding:0;margin:0;display:grid;gap:24px}
+.passos-estudo li{display:flex;gap:18px}
+.passos-estudo .mono{flex:none;width:44px;height:44px;border-radius:50%;border:2px solid var(--primary);color:var(--primary);display:grid;place-items:center;font-size:14px}
+.passos-estudo p{margin:4px 0 0;color:var(--ink-muted)}
+.inclui{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:8px}
+.inclui li{display:flex;gap:10px;align-items:baseline}
+.inclui li::before{content:"";flex:none;width:12px;height:7px;border-left:2.5px solid var(--primary);border-bottom:2.5px solid var(--primary);transform:rotate(-45deg) translateY(-3px)}
+.relatorio{background:var(--surface-ink);color:var(--on-ink);border-radius:var(--radius-xl);padding:28px;box-shadow:var(--shadow-device);position:relative;transform:rotate(1.5deg)}
+.r-topo{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.r-tag{background:var(--amber-tint);color:var(--amber-ink);border-radius:var(--radius-pill);padding:3px 10px;font:600 12px/18px var(--font-sans)}
+.r-ref{font-size:11px;letter-spacing:.14em;color:var(--on-ink-muted)}
+.r-proj{margin:22px 0 0;font:700 24px/30px var(--font-display)}
+.r-sub{margin:4px 0 18px;color:var(--on-ink-muted);font-size:14px}
+.r-linhas{margin:0;display:grid}
+.r-linhas div{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-bottom:1px solid #24394A}
+.r-linhas dt{color:var(--on-ink-muted);font-size:15px}.r-linhas dd{margin:0;font-size:17px;white-space:nowrap}
+.r-verde{color:var(--mint)}
+.r-dupla{border-color:var(--on-ink)!important;margin-top:16px}
+.r-veredito{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;font-size:14px;color:var(--on-ink-muted)}
+.r-selo{background:var(--mint);color:var(--on-mint);font:700 15px/1 var(--font-display);padding:9px 16px;border-radius:var(--radius-pill)}
+.r-nota{margin:16px 0 0;font-size:12px;color:var(--on-ink-muted)}
+.pedido{margin-top:var(--space-16);background:var(--surface-raised);border:1px solid var(--border);border-radius:var(--radius-xl);padding:24px;display:grid;gap:28px;scroll-margin-top:90px}
+@media(min-width:900px){.pedido{padding:40px;grid-template-columns:.7fr 1.3fr}}
+.pedido-intro p{color:var(--ink-muted);margin:10px 0 0}
+.pedido-aviso{background:var(--mint-tint);color:var(--on-mint-tint);border-radius:var(--radius-m);padding:12px 14px;font-size:14px;font-weight:600;display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.pedido-aviso button{background:none;border:0;color:inherit;font:600 13px var(--font-sans);text-decoration:underline;cursor:pointer;flex:none}
+.pedido-form{display:grid;gap:14px}
+@media(min-width:640px){.pedido-form{grid-template-columns:1fr 1fr}}
+.campo{display:grid;gap:6px;font-size:14px;font-weight:600}.campo i{font-style:normal;font-weight:400;color:var(--ink-muted)}
+.campo textarea{resize:vertical;min-height:84px}
+.largo{grid-column:1/-1}
+.armadilha{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.consent{display:flex;gap:12px;align-items:flex-start;font-size:14px;line-height:21px;cursor:pointer}
+.consent input{width:22px;height:22px;flex:none;margin:0;accent-color:var(--primary)}
+.pe-erro{margin:0;color:var(--danger);font-weight:600;font-size:14px}
+.pe-acoes{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.pe-nota{font-size:13px;color:var(--amber-ink)}
+.pe-ok{display:flex;gap:16px;align-items:flex-start;grid-column:1/-1}
+@media(min-width:900px){.pe-ok{grid-column:2}}
+.pe-ok .av{width:48px;height:48px;border-radius:50%;background:var(--luis-sage);flex:none}
+.pe-ok p{margin:6px 0 0;color:var(--ink-muted)}
+@media(prefers-reduced-motion:reduce){.relatorio{transform:none}}
 </style>
 </head>
 <body>
@@ -229,8 +331,9 @@ footer nav{display:flex;flex-wrap:wrap;gap:20px}footer nav a{text-decoration:non
       <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="#12232E"/><path d="M43 19a16 16 0 1 0 0 26" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/><path d="M27 37q5-5 10 0t10 0t10 0" fill="none" stroke="#3CC6A0" stroke-width="4.5" stroke-linecap="round"/></svg>contabia</a>
     <nav class="menu" aria-label="Principal">
       <a href="#como-funciona">Como funciona</a>
-      <a href="#contabilistas">Para contabilistas</a>
-      <a href="#seguranca">Segurança</a>
+      <a href="#fundos">Fundos europeus</a>
+      <a href="#estudos">Estudos</a>
+      <a href="#contabilistas">Contabilistas</a>
       <a href="#perguntas">Perguntas</a>
     </nav>
     <div class="acoes-topo">
@@ -245,6 +348,7 @@ footer nav{display:flex;flex-wrap:wrap;gap:20px}footer nav a{text-decoration:non
 <section class="hero escuro">
   <div class="contentor">
     <div class="revela">
+      <a class="novo" href="#fundos"><b>NOVO</b>Fundos europeus pelo seu CAE <span aria-hidden="true">→</span></a>
       <p class="eyebrow">Contabilidade para empresas em Portugal</p>
       <h1 class="display-hero">O seu contabilista, <span class="onda">à mão.<svg viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" vector-effect="non-scaling-stroke" d="M2 6q7.5-7 15 0t15 0t15 0t15 0t15 0t15 0t15 0t13 0"/></svg></span></h1>
       <p class="lead">Fotografe as faturas, acompanhe os prazos e fale com o seu Contabilista Certificado — tudo numa app, em tempo real.</p>
@@ -345,6 +449,118 @@ footer nav{display:flex;flex-wrap:wrap;gap:20px}footer nav a{text-decoration:non
   </div>
 </section>
 
+<!-- 4b. Fundos europeus pelo CAE -->
+<section id="fundos" class="faixa" aria-labelledby="t-fundos">
+  <div class="contentor fundos-grid">
+    <div class="revela">
+      <p class="eyebrow">Fundos europeus · Portugal 2030 e PRR</p>
+      <h2 class="h1" id="t-fundos">Há fundos europeus <span class="onda">para a sua atividade?<svg viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" vector-effect="non-scaling-stroke" d="M2 6q7.5-7 15 0t15 0t15 0t15 0t15 0t15 0t15 0t13 0"/></svg></span></h2>
+      <p class="lead">Indique o CAE. O Luís cruza a atividade, a região e a dimensão da sua empresa com os avisos abertos e diz-lhe a que se pode candidatar, até quando e porquê.</p>
+      <ul class="pulso" id="pulso" hidden aria-live="polite">
+        <li><b class="mono" id="p-abertos">—</b> avisos abertos para empresas</li>
+        <li id="p-prox-li"><span>Próximo a fechar:</span> <b id="p-prox">—</b></li>
+        <li class="pulso-ver">Lista verificada a <span id="p-data">—</span> nos sites oficiais · revista 2 vezes por semana</li>
+      </ul>
+      <ol class="mini-passos">
+        <li><span class="mono">01</span>Indique o CAE (basta os 2 primeiros algarismos)</li>
+        <li><span class="mono">02</span>Veja os avisos compatíveis e o motivo de cada um</li>
+        <li><span class="mono">03</span>Peça o estudo de viabilidade para se candidatar</li>
+      </ol>
+    </div>
+
+    <div class="verificador revela" aria-labelledby="t-verif">
+      <div class="v-topo">
+        <img class="av" src="/site/img/luis.svg" alt="" width="40" height="40">
+        <div><p class="v-rot">Luís · verificador de apoios</p><h3 class="v-tit" id="t-verif">Experimente com a sua empresa</h3></div>
+      </div>
+      <form id="f-verif" class="v-form" novalidate>
+        <label class="v-campo v-cae"><span>CAE</span><input id="v-cae" name="cae" inputmode="numeric" autocomplete="off" maxlength="7" placeholder="ex.: 56" aria-describedby="v-ajuda"></label>
+        <label class="v-campo"><span>Região</span><select id="v-regiao" name="regiao"><option value="PT">Continente</option><option value="PT-MA">Madeira</option><option value="PT-AC">Açores</option></select></label>
+        <label class="v-campo"><span>Dimensão</span><select id="v-dim" name="dimensao"><option value="">Não sei</option><option value="micro">Micro</option><option value="pequena">Pequena</option><option value="media">Média</option><option value="grande">Grande</option></select></label>
+        <button class="btn btn-primario v-btn" type="submit">Ver apoios</button>
+      </form>
+      <p class="v-ajuda" id="v-ajuda">Não sabe o CAE? Está na certidão permanente ou em <a href="https://www.sicae.pt" target="_blank" rel="noopener">sicae.pt</a>.</p>
+      <div class="v-exemplos" role="group" aria-label="Exemplos">
+        <span>Exemplos:</span>
+        <button type="button" class="chip-ex" data-cae="56" data-regiao="PT-MA" data-dim="micro">Restaurante na Madeira</button>
+        <button type="button" class="chip-ex" data-cae="25" data-regiao="PT" data-dim="pequena">Metalomecânica no Continente</button>
+        <button type="button" class="chip-ex" data-cae="62" data-regiao="PT" data-dim="micro">Software no Continente</button>
+      </div>
+      <div id="v-res" class="v-res" aria-live="polite"></div>
+      <p class="v-nota">Resultado indicativo. A elegibilidade final depende das regras de cada aviso e da análise da candidatura.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4c. Estudos de viabilidade -->
+<section id="estudos" aria-labelledby="t-estudos">
+  <div class="contentor">
+    <div class="cabeca-seccao revela">
+      <p class="eyebrow">Estudos de viabilidade económica</p>
+      <h2 class="h1" id="t-estudos">Antes de investir, <span class="onda">saiba se compensa.<svg viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" vector-effect="non-scaling-stroke" d="M2 6q7.5-7 15 0t15 0t15 0t15 0t15 0t15 0t15 0t13 0"/></svg></span></h2>
+      <p class="lead">Peça em 2 minutos. Preparamos o estudo com os números da sua empresa e um Contabilista Certificado revê-o antes de lho entregarmos — pronto para a candidatura ou para o banco.</p>
+    </div>
+
+    <div class="estudo-grid">
+      <div class="revela">
+        <ol class="passos-estudo">
+          <li><span class="mono">01</span><div><h3 class="h3">Conte o que quer fazer</h3><p>Uma esplanada, uma máquina nova, uma loja online. Duas frases chegam.</p></div></li>
+          <li><span class="mono">02</span><div><h3 class="h3">Juntamos os números</h3><p>Se já usa a Contabia, partimos da contabilidade real da empresa. Se não, pedimos-lhe só o essencial.</p></div></li>
+          <li><span class="mono">03</span><div><h3 class="h3">Recebe o estudo revisto</h3><p>Revisto por um Contabilista Certificado, com o enquadramento no aviso a que se quer candidatar.</p></div></li>
+        </ol>
+        <h3 class="h3" style="margin-top:36px">O que o estudo responde</h3>
+        <ul class="inclui">
+          <li>Quanto custa o projeto e como se financia</li>
+          <li>Quanto vai vender e gastar nos próximos anos</li>
+          <li>Se a tesouraria aguenta, mês a mês</li>
+          <li>Em quanto tempo o investimento se paga</li>
+          <li>Que apoio europeu pode cobrir parte do custo</li>
+        </ul>
+      </div>
+
+      <div class="relatorio revela" aria-label="Exemplo ilustrativo do resumo de um estudo de viabilidade, com valores fictícios">
+        <div class="r-topo"><span class="r-tag">Exemplo ilustrativo</span><span class="r-ref mono">ESTUDO · RESUMO</span></div>
+        <p class="r-proj">Esplanada e cozinha nova</p>
+        <p class="r-sub">Restaurante no Funchal · micro empresa</p>
+        <dl class="r-linhas" aria-hidden="true">
+          <div><dt>Investimento</dt><dd class="mono" data-conta="48000">48 000,00 €</dd></div>
+          <div><dt>Apoio possível (30%)</dt><dd class="mono r-verde" data-conta="14400">14 400,00 €</dd></div>
+          <div><dt>Capital próprio e banco</dt><dd class="mono" data-conta="33600">33 600,00 €</dd></div>
+          <div><dt>Recuperação do investimento</dt><dd class="mono">3,2 anos</dd></div>
+        </dl>
+        <div class="dupla r-dupla" aria-hidden="true"></div>
+        <div class="r-veredito"><span class="r-selo">Viável</span><span>Revisto por Contabilista Certificado</span></div>
+        <p class="r-nota">Valores fictícios, só para mostrar o formato do resumo.</p>
+      </div>
+    </div>
+
+    <div class="pedido revela" id="pedido-estudo">
+      <div class="pedido-intro">
+        <h3 class="h2">Pedir um estudo</h3>
+        <p>Não precisa de conta. Respondemos por e-mail ou telefone e explicamos o âmbito, o prazo e o orçamento antes de começar.</p>
+        <p class="pedido-aviso" id="pe-aviso" hidden></p>
+      </div>
+      <form id="f-estudo" class="pedido-form" novalidate>
+        <label class="campo"><span>O seu nome</span><input name="nome" autocomplete="name" required></label>
+        <label class="campo"><span>E-mail</span><input name="email" type="email" autocomplete="email" required></label>
+        <label class="campo"><span>Telefone <i>(opcional)</i></span><input name="telefone" type="tel" autocomplete="tel"></label>
+        <label class="campo"><span>Empresa ou projeto</span><input name="empresa" autocomplete="organization" required></label>
+        <label class="campo"><span>CAE <i>(opcional)</i></span><input name="cae" inputmode="numeric" maxlength="7"></label>
+        <label class="campo"><span>Região</span><select name="regiao"><option value="PT">Continente</option><option value="PT-MA">Madeira</option><option value="PT-AC">Açores</option></select></label>
+        <label class="campo largo"><span>O que quer fazer? <i>(opcional)</i></span><textarea name="mensagem" rows="3" placeholder="Ex.: abrir uma esplanada e renovar a cozinha"></textarea></label>
+        <label class="armadilha" aria-hidden="true">Site<input name="website" tabindex="-1" autocomplete="off"></label>
+        <label class="consent largo"><input type="checkbox" name="autorizo"> <span>Autorizo a Contabia a contactar-me sobre este pedido e a usar estes dados só para preparar o estudo.</span></label>
+        <p class="pe-erro largo" id="pe-erro" role="alert" hidden></p>
+        <div class="largo pe-acoes"><button class="btn btn-primario" type="submit">Enviar pedido <span aria-hidden="true">→</span></button><span class="pe-nota">Use dados fictícios: estamos em fase de testes.</span></div>
+      </form>
+      <div class="pe-ok" id="pe-ok" hidden role="status">
+        <img class="av" src="/site/img/luis.svg" alt="" width="48" height="48">
+        <div><h3 class="h3">Pedido recebido.</h3><p>A nossa equipa vai contactá-lo. Enquanto espera, crie a conta grátis: o estudo fica mais rápido com os números da sua empresa na Contabia.</p><a class="btn btn-menta" href="/empresa/registar" style="margin-top:12px">Criar conta grátis <span aria-hidden="true">→</span></a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- 5. O Luís -->
 <section class="escuro" aria-labelledby="t-luis">
   <div class="contentor luis-grid">
@@ -414,7 +630,8 @@ footer nav{display:flex;flex-wrap:wrap;gap:20px}footer nav a{text-decoration:non
       <details><summary>E se o meu contabilista ainda não usa a Contabia?</summary><p>Convide-o na app com o e-mail ou o n.º OCC dele. Quando aceitar, a ligação fica ativa e ele passa a receber os seus documentos ao segundo.</p></details>
       <details><summary>Os meus dados estão seguros?</summary><p>Os dados ficam alojados na União Europeia (Frankfurt), com sessões protegidas e limite de tentativas de entrada. Nenhum documento se apaga: só pode ser anulado, e apenas com a confirmação do seu contabilista.</p></details>
       <details><summary>Funciona na Madeira e nos Açores?</summary><p>Sim. A app usa as taxas de IVA de cada região (Continente, Madeira e Açores) e o calendário fiscal correspondente.</p></details>
-      <details><summary>A app ajuda a encontrar fundos europeus?</summary><p>Sim. Indique o CAE e a dimensão da empresa e o Luís mostra os avisos do Portugal 2030 e do PRR abertos para a sua atividade e região, com o prazo e o motivo de cada um. Se quiser avançar, peça na app um estudo de viabilidade económica à nossa equipa. A lista é indicativa: a elegibilidade final depende sempre do aviso.</p></details>
+      <details><summary>Como sei a que fundos europeus me posso candidatar?</summary><p>Use o verificador nesta página ou, na app, indique o CAE e a dimensão da empresa. O Luís mostra os avisos do Portugal 2030 e do PRR abertos para a sua atividade e região, com o prazo e o motivo de cada um. A lista é revista duas vezes por semana nos sites oficiais e é indicativa: a elegibilidade final depende sempre do aviso.</p></details>
+      <details><summary>Quem faz os estudos de viabilidade económica?</summary><p>A nossa equipa prepara o estudo com os números da empresa e um Contabilista Certificado revê-o antes da entrega. Antes de começar, explicamos o âmbito, o prazo e o orçamento — sem compromisso.</p></details>
       <details><summary>Preciso de internet?</summary><p>Não para registar. Sem rede, a fatura e a fotografia ficam guardadas no telemóvel e são enviadas sozinhas quando a ligação voltar.</p></details>
       <details><summary>Quanto custa?</summary><p>Estamos em fase de testes e criar conta é gratuito. Antes de lançarmos para clientes reais, publicaremos os preços aqui.</p></details>
     </div>
@@ -437,7 +654,7 @@ footer nav{display:flex;flex-wrap:wrap;gap:20px}footer nav a{text-decoration:non
 <footer>
   <div class="contentor">
     <a class="marca" href="/"><svg viewBox="0 0 64 64" aria-hidden="true" style="width:30px;height:30px"><circle cx="32" cy="32" r="32" fill="#1F3B4A"/><path d="M43 19a16 16 0 1 0 0 26" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/><path d="M27 37q5-5 10 0t10 0t10 0" fill="none" stroke="#3CC6A0" stroke-width="4.5" stroke-linecap="round"/></svg>contabia</a>
-    <nav aria-label="Rodapé"><a href="/empresa/">App da empresa</a><a href="/contabilista/">App do contabilista</a><a href="#seguranca">Segurança</a><a href="#perguntas">Perguntas</a></nav>
+    <nav aria-label="Rodapé"><a href="/empresa/">App da empresa</a><a href="#fundos">Fundos europeus</a><a href="#estudos">Estudos de viabilidade</a><a href="/contabilista/">App do contabilista</a><a href="#seguranca">Segurança</a><a href="#perguntas">Perguntas</a></nav>
     <p style="margin:0">Feito na Madeira, para empresas de todo o Portugal.</p>
   </div>
 </footer>
@@ -484,6 +701,110 @@ footer nav{display:flex;flex-wrap:wrap;gap:20px}footer nav a{text-decoration:non
       (function passo(t) { var p = Math.min(1, (t - t0) / 600), e = 1 - Math.pow(1 - p, 3); el.textContent = fmt(alvo * e); if (p < 1) requestAnimationFrame(passo); })(t0);
     }, { threshold: 0.5 });
     o.observe(el);
+  });
+})();
+</script>
+<script>
+(function () {
+  var API = "/v1";
+  var $ = function (s) { return document.querySelector(s); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  var dataPT = function (iso) { return iso.slice(0, 10).split("-").reverse().join("/"); };
+  var prazo = function (a) {
+    if (a.estado === "previsto") return ["Previsto", "neu"];
+    if (a.diasParaFim == null) return ["Aberto", "ok"];
+    var d = a.diasParaFim;
+    return [d <= 0 ? "Fecha hoje" : "Aberto · " + (d === 1 ? "falta 1 dia" : "faltam " + d + " dias"), d <= 10 ? "av" : "ok"];
+  };
+
+  // pulso: quantos avisos estão abertos hoje (dados reais, revistos 2× por semana)
+  fetch(API + "/apoios/publico").then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+    if (!d || !d.abertos) return;
+    $("#p-abertos").textContent = d.abertos;
+    $("#p-data").textContent = dataPT(d.verificadoEm);
+    if (d.proximo) $("#p-prox").textContent = d.proximo.nome + (d.proximo.diasParaFim != null ? " — " + (d.proximo.diasParaFim <= 0 ? "hoje" : d.proximo.diasParaFim === 1 ? "amanhã" : "daqui a " + d.proximo.diasParaFim + " dias") : "");
+    else $("#p-prox-li").hidden = true;
+    $("#pulso").hidden = false;
+  }).catch(function () {});
+
+  // verificador
+  var res = $("#v-res"), form = $("#f-verif");
+  var ultimo = [];
+  function mostrar(d, cae) {
+    var aps = d.apoios || [];
+    var abertos = aps.filter(function (a) { return a.estado === "aberto"; }).length;
+    var h = '<div class="v-cab"><span><b>' + (aps.length ? abertos + (abertos === 1 ? " aviso aberto" : " avisos abertos") + (aps.length > abertos ? " e " + (aps.length - abertos) + " previsto" + (aps.length - abertos === 1 ? "" : "s") : "") : "Nenhum aviso aberto") + "</b> para " + esc((d.seccao || "CAE " + cae).toLowerCase()) + "</span><span>verificado a " + dataPT(d.verificadoEm) + "</span></div>";
+    if (!aps.length) h += '<p class="v-vazio">Neste momento não há avisos abertos para esta atividade e região. Novos avisos abrem ao longo do ano: crie conta e o Luís avisa-o quando abrir um que lhe sirva.</p>';
+    aps.slice(0, 4).forEach(function (a) {
+      var p = prazo(a);
+      h += '<article class="ap"><div class="chips"><span class="pill ' + p[1] + '">' + esc(p[0]) + '</span><span class="pill ' + (a.compatibilidade === "provavel" ? "ok" : "av") + '">' + (a.compatibilidade === "provavel" ? "Compatível" : "A confirmar") + "</span></div>" +
+        "<h4>" + esc(a.nome) + '</h4><p class="prog">' + esc(a.programa) + " · " + esc(a.codigo) + (a.fim ? " · até " + dataPT(a.fim) : "") + "</p>" +
+        (a.apoio ? '<p class="valor-ap">' + esc(a.apoio) + "</p>" : "") +
+        '<p class="porque">' + esc(a.motivos[a.motivos.length - 1] || "") + "</p>" +
+        '<div class="ap-acoes"><button type="button" data-pedir="' + esc(a.id) + '">Pedir estudo para este aviso</button><a href="' + esc(a.ligacao) + '" target="_blank" rel="noopener">Aviso oficial ↗</a></div></article>';
+    });
+    if (aps.length > 4) h += '<p class="v-vazio">Mais ' + (aps.length - 4) + ' na app, com o motivo de cada um. <a href="/empresa/registar" style="color:var(--primary);font-weight:600">Criar conta grátis →</a></p>';
+    res.innerHTML = h;
+    ultimo = aps;
+  }
+  function verificar() {
+    var cae = $("#v-cae").value.replace(/[\s.\-]/g, "");
+    if (!/^\d{2,5}$/.test(cae)) { res.innerHTML = '<p class="v-erro" role="alert">Indique o CAE: 5 algarismos, ou só os 2 primeiros.</p>'; $("#v-cae").focus(); return; }
+    res.innerHTML = '<div class="esqueleto"></div>';
+    var q = "?cae=" + cae + "&regiao=" + $("#v-regiao").value + ($("#v-dim").value ? "&dimensao=" + $("#v-dim").value : "");
+    fetch(API + "/apoios/publico" + q).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (x) {
+      if (!x.ok) { res.innerHTML = '<p class="v-erro" role="alert">' + esc(x.j.mensagem || "Não foi possível verificar agora.") + "</p>"; return; }
+      mostrar(x.j, cae);
+      var f = $("#f-estudo"); f.cae.value = cae; f.regiao.value = $("#v-regiao").value;
+    }).catch(function () { res.innerHTML = '<p class="v-erro" role="alert">Sem ligação. Tente de novo.</p>'; });
+  }
+  form.addEventListener("submit", function (e) { e.preventDefault(); document.querySelectorAll(".chip-ex").forEach(function (c) { c.removeAttribute("aria-pressed"); }); verificar(); });
+  document.querySelectorAll(".chip-ex").forEach(function (b) {
+    b.addEventListener("click", function () {
+      $("#v-cae").value = b.dataset.cae; $("#v-regiao").value = b.dataset.regiao; $("#v-dim").value = b.dataset.dim;
+      document.querySelectorAll(".chip-ex").forEach(function (c) { c.setAttribute("aria-pressed", c === b ? "true" : "false"); });
+      verificar();
+    });
+  });
+  // o primeiro exemplo corre sozinho quando o verificador aparece
+  var primeiro = document.querySelector(".chip-ex");
+  if ("IntersectionObserver" in window) {
+    var o = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { o.disconnect(); if (!res.innerHTML) primeiro.click(); } }, { threshold: 0.3 });
+    o.observe($(".verificador"));
+  }
+
+  // pedido de estudo
+  var fe = $("#f-estudo"), aviso = $("#pe-aviso"), erro = $("#pe-erro"), apoioId = null;
+  function escolherAviso(id) {
+    var a = ultimo.filter(function (x) { return x.id === id; })[0];
+    apoioId = a ? a.id : null;
+    if (a) { aviso.innerHTML = "<span>Aviso: " + esc(a.codigo + " · " + a.nome) + '</span><button type="button" id="pe-tirar">Tirar</button>'; aviso.hidden = false; $("#pe-tirar").onclick = function () { escolherAviso(null); }; }
+    else aviso.hidden = true;
+  }
+  res.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-pedir]"); if (!b) return;
+    escolherAviso(b.getAttribute("data-pedir"));
+    $("#pedido-estudo").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    setTimeout(function () { fe.nome.focus({ preventScroll: true }); }, 500);
+  });
+  function falha(m) { erro.textContent = m; erro.hidden = false; }
+  fe.addEventListener("submit", function (e) {
+    e.preventDefault(); erro.hidden = true;
+    if (fe.nome.value.trim().length < 2) return falha("Indique o seu nome.");
+    if (!/^\S+@\S+\.\S+$/.test(fe.email.value.trim())) return falha("O e-mail não parece válido.");
+    if (fe.empresa.value.trim().length < 2) return falha("Indique o nome da empresa (ou do projeto).");
+    if (!fe.autorizo.checked) return falha("Para o contactarmos, autorize o contacto.");
+    var btn = fe.querySelector("button[type=submit]"); btn.disabled = true;
+    var corpo = { nome: fe.nome.value.trim(), email: fe.email.value.trim(), empresa: fe.empresa.value.trim(), regiao: fe.regiao.value, autorizoContacto: true, apoioId: apoioId };
+    ["telefone", "cae", "mensagem"].forEach(function (k) { var v = fe[k].value.trim(); if (v) corpo[k] = v; });
+    if (fe.website.value) corpo.website = fe.website.value;
+    fetch(API + "/estudos/site", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corpo) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (x) {
+        btn.disabled = false;
+        if (!x.ok) return falha(x.j.mensagem || "Não foi possível enviar. Tente de novo.");
+        fe.hidden = true; aviso.hidden = true; $("#pe-ok").hidden = false; $("#pe-ok").focus && $("#pe-ok").setAttribute("tabindex", "-1"); $("#pe-ok").focus();
+      }).catch(function () { btn.disabled = false; falha("Sem ligação. Tente de novo."); });
   });
 })();
 </script>

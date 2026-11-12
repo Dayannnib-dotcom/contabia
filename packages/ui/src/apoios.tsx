@@ -88,7 +88,7 @@ export function Apoios({ empresaId, papel }: { empresaId: string; papel: "empres
         <Texto forte tamanho={15}>Atividade da empresa</Texto>
         {mostrarFormulario ? (
           <View style={{ gap: 12 }}>
-            <Campo rotulo="CAE principal" placeholder="Ex.: 56111" keyboardType="number-pad" maxLength={7} value={cae} onChangeText={setCae}
+            <Campo rotulo="CAE principal" placeholder="5 algarismos" keyboardType="number-pad" maxLength={7} value={cae} onChangeText={setCae}
               ajuda="5 algarismos (CAE Rev. 4, em vigor desde 2025)." />
             <Campo rotulo="CAE secundários (opcional)" placeholder="Ex.: 47250, 56301" value={secundarios} onChangeText={setSecundarios} ajuda="Separe por vírgulas. Um CAE secundário também pode dar acesso a apoios." />
             <View style={{ gap: 6 }}>

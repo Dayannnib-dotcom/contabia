@@ -297,6 +297,13 @@ const MIGRACOES: string[] = [
      criado_em text NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS pedidos_estudo_empresa ON pedidos_estudo(empresa_id, criado_em)`,
+  // Pedidos de estudo feitos no site (ainda sem conta): empresa_id fica vazio.
+  `ALTER TABLE pedidos_estudo ALTER COLUMN empresa_id DROP NOT NULL`,
+  `ALTER TABLE pedidos_estudo ADD COLUMN IF NOT EXISTS origem text NOT NULL DEFAULT 'app'`,
+  `ALTER TABLE pedidos_estudo ADD COLUMN IF NOT EXISTS empresa_nome text`,
+  `ALTER TABLE pedidos_estudo ADD COLUMN IF NOT EXISTS empresa_nif text`,
+  `ALTER TABLE pedidos_estudo ADD COLUMN IF NOT EXISTS cae text`,
+  `ALTER TABLE pedidos_estudo ADD COLUMN IF NOT EXISTS regiao text`,
 ];
 
 async function migrar(db: Db) {

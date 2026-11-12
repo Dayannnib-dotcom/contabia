@@ -582,3 +582,39 @@ test("24. apoios europeus pelo CAE e pedido de estudo de viabilidade", async () 
   const depois = (await chamar("GET", `/v1/empresas/${id}/apoios`, S.emp)).json.apoios.map((x: { apoio: { id: string } }) => x.apoio.id);
   assert.ok(!depois.includes("m2030-2026-35") && depois.includes("m2030-2026-38"));
 });
+
+test("25. site público: verificador de apoios por CAE e pedido de estudo sem conta", async () => {
+  // resumo do dia (sem CAE)
+  const r = await chamar("GET", "/v1/apoios/publico");
+  assert.equal(r.status, 200);
+  assert.ok(r.json.abertos > 0 && r.json.proximo?.nome, JSON.stringify(r.json));
+  // por CAE: aceita só a divisão (2 algarismos) e diz o setor
+  const m = await chamar("GET", "/v1/apoios/publico?cae=56&regiao=PT-MA&dimensao=micro");
+  assert.equal(m.status, 200);
+  assert.equal(m.json.seccao, "Alojamento e restauração");
+  assert.ok(m.json.apoios.some((a: { codigo: string }) => a.codigo === "M2030-2026-38"));
+  assert.equal((await chamar("GET", "/v1/apoios/publico?cae=45&regiao=PT")).json.codigo, "cae_invalido");
+  assert.equal((await chamar("GET", "/v1/apoios/publico?cae=04&regiao=PT")).status, 400);
+  const fin = await chamar("GET", "/v1/apoios/publico?cae=64190&regiao=PT&dimensao=pequena");
+  assert.ok(!fin.json.apoios.some((a: { id: string }) => a.id === "mpr-2026-6"));
+  // pedido de estudo sem conta
+  emails.length = 0;
+  const base = { nome: "João Teixeira", email: "Joao@Exemplo.pt", empresa: "Oficina Fictícia, Lda.", regiao: "PT-MA", cae: "56", apoioId: "m2030-2026-38", mensagem: "Abrir esplanada" };
+  assert.equal((await chamar("POST", "/v1/estudos/site", undefined, base)).status, 400);
+  assert.equal((await chamar("POST", "/v1/estudos/site", undefined, { ...base, autorizoContacto: true, website: "spam.com" })).status, 400);
+  assert.equal((await chamar("POST", "/v1/estudos/site", undefined, { ...base, autorizoContacto: true, nif: "123" })).json.codigo, "nif_invalido");
+  const ok = await chamar("POST", "/v1/estudos/site", undefined, { ...base, autorizoContacto: true });
+  assert.equal(ok.status, 201, JSON.stringify(ok.json));
+  await new Promise((x) => setTimeout(x, 20));
+  assert.equal(emails.length, 1);
+  assert.ok(emails[0].texto.includes("Oficina Fictícia, Lda. (pedido pelo site, sem conta)") && emails[0].texto.includes("M2030-2026-38"));
+  const adm = await chamar("GET", "/v1/admin/estudos", undefined, undefined, { "x-admin-token": "admin" });
+  const doSite = adm.json.find((x: { id: string }) => x.id === ok.json.id);
+  assert.equal(doSite.origem, "site");
+  assert.equal(doSite.empresa.nome, "Oficina Fictícia, Lda.");
+  assert.equal(doSite.cae, "56");
+  assert.ok(adm.json.some((x: { origem: string; empresa: { nif: string } }) => x.origem === "app" && x.empresa.nif === "509999999"));
+  // limite por endereço: 5 por hora
+  for (let i = 0; i < 4; i++) await chamar("POST", "/v1/estudos/site", undefined, { ...base, autorizoContacto: true });
+  assert.equal((await chamar("POST", "/v1/estudos/site", undefined, { ...base, autorizoContacto: true })).status, 429);
+});

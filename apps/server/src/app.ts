@@ -7,7 +7,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { z, ZodError } from "zod";
 import {
-  apoiosCompativeis, CATALOGO_BASE, erroCAE, normalizarCAE, validarCatalogo, type Catalogo, type Dimensao, type PedidoEstudo, type PerfilApoios,
+  apoiosCompativeis, CATALOGO_BASE, erroCAE, normalizarCAE, seccaoDoCAE, validarCatalogo, type ApoioCompativel, type Catalogo, type Dimensao, type PedidoEstudo, type PerfilApoios,
   ajudaNIF, lerQR, limparNIF, normalizarUtilizador, proximasObrigacoes, qrConsistente, REGRAS_BASE, taxasEm, utilizadorValido, validarNIF,
   type Anexo, type Atividade, type RegraFornecedor, type Colaborador, type Documento, type MovimentoBancario, type Empresa, type Ligacao, type Pedido, type Regras, type ResumoEmpresa, type Sessao, type VerificacaoFecho,
 } from "@contabia/shared";
@@ -1017,9 +1017,10 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   /** Lista de pedidos para a equipa que faz os estudos. */
   app.get("/v1/admin/estudos", async (req) => {
     exigirAdmin(req);
-    const rs = await db.query<LinhaEstudo & { empresa_id: string; empresa_nome: string; empresa_nif: string }>(
-      `SELECT p.*, e.nome AS empresa_nome, e.nif AS empresa_nif FROM pedidos_estudo p JOIN empresas e ON e.id = p.empresa_id ORDER BY p.criado_em DESC LIMIT 500`);
-    return rs.map((r) => ({ ...estudoDe(r), empresa: { id: r.empresa_id, nome: r.empresa_nome, nif: r.empresa_nif } }));
+    const rs = await db.query<LinhaEstudo & { empresa_id: string | null; origem: string; e_nome: string | null; e_nif: string | null; empresa_nome: string | null; empresa_nif: string | null; cae: string | null; regiao: string | null }>(
+      `SELECT p.*, e.nome AS e_nome, e.nif AS e_nif FROM pedidos_estudo p LEFT JOIN empresas e ON e.id = p.empresa_id ORDER BY p.criado_em DESC LIMIT 500`);
+    return rs.map((r) => ({ ...estudoDe(r), origem: r.origem, cae: r.cae, regiao: r.regiao,
+      empresa: { id: r.empresa_id, nome: r.e_nome ?? r.empresa_nome, nif: r.e_nif ?? r.empresa_nif } }));
   });
   app.post("/v1/admin/estudos/:eid/estado", async (req) => {
     exigirAdmin(req);
@@ -1035,6 +1036,72 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     await db.query(`INSERT INTO apoios_versoes (versao, catalogo, publicada_em) VALUES ($1, $2::jsonb, $3) ON CONFLICT (versao) DO UPDATE SET catalogo = $2::jsonb, publicada_em = $3`,
       [req.body.versao, JSON.stringify(req.body), agoraISO()]);
     return reply.code(201).send({ versao: req.body.versao, linhas: req.body.linhas.length });
+  });
+
+  // ═════════════ Site público: verificador de apoios e pedido de estudo sem conta ═════════════
+  const resumoPublico = (a: ApoioCompativel) => ({
+    id: a.apoio.id, codigo: a.apoio.codigo, nome: a.apoio.nome, programa: a.apoio.programa, resumo: a.apoio.resumo, apoio: a.apoio.apoio ?? null,
+    estado: a.apoio.estado, fim: a.apoio.fim ?? null, diasParaFim: a.diasParaFim, territorio: a.apoio.territorio ?? null,
+    ligacao: a.apoio.ligacao, compatibilidade: a.compatibilidade, motivos: a.motivos,
+  });
+  app.get("/v1/apoios/publico", async (req, reply) => {
+    const q = z.object({
+      cae: z.string().trim().transform((v) => v.replace(/[\s.\-]/g, "")).refine((v) => /^\d{2,5}$/.test(v), "Indique o CAE (5 algarismos) ou só os 2 primeiros.").optional(),
+      regiao: z.enum(["PT", "PT-MA", "PT-AC"]).default("PT"),
+      dimensao: z.enum(["micro", "pequena", "media", "grande"]).optional(),
+    }).parse(req.query);
+    const cat = await catalogoAtual();
+    const agoraIso = agora().toISOString();
+    reply.header("cache-control", "public, max-age=300");
+    if (!q.cae) {
+      // resumo para o site: quantos avisos abertos e o próximo a fechar (qualquer região)
+      const todos = (["PT", "PT-MA", "PT-AC"] as const).flatMap((regiao) => apoiosCompativeis({ cae: null, caesSecundarios: [], dimensao: null, regiao }, cat, agoraIso));
+      const unicos = [...new Map(todos.map((a) => [a.apoio.id, a])).values()];
+      const abertos = unicos.filter((a) => a.apoio.estado === "aberto");
+      const prox = abertos.filter((a) => a.diasParaFim !== null).sort((x, y) => x.diasParaFim! - y.diasParaFim!)[0];
+      return { verificadoEm: cat.verificadoEm, abertos: abertos.length, previstos: unicos.length - abertos.length, proximo: prox ? resumoPublico(prox) : null };
+    }
+    const cae5 = q.cae.padEnd(5, "0");
+    const erro = erroCAE(cae5);
+    if (erro && !q.cae.startsWith("45")) throw new ErroApp("cae_invalido", q.cae.length < 5 ? "Esta divisão não existe na CAE Rev. 4. Confirme o CAE no SICAE." : erro);
+    if (erro) throw new ErroApp("cae_invalido", erroCAE("45000")!);
+    const apoios = apoiosCompativeis({ cae: cae5, caesSecundarios: [], dimensao: q.dimensao ?? null, regiao: q.regiao }, cat, agoraIso);
+    return { verificadoEm: cat.verificadoEm, seccao: seccaoDoCAE(cae5)?.nome ?? null, apoios: apoios.map(resumoPublico) };
+  });
+
+  const pedidosSite = new Map<string, number[]>();
+  app.post("/v1/estudos/site", async (req, reply) => {
+    const b = z.object({
+      nome: z.string().trim().min(2, "Indique o seu nome.").max(120),
+      email: z.string().trim().toLowerCase().email("O e-mail não parece válido."),
+      telefone: z.string().trim().max(30).regex(/^[+\d\s()-]*$/, "O telefone só pode ter algarismos, espaços e +.").optional(),
+      empresa: z.string().trim().min(2, "Indique o nome da empresa (ou do projeto).").max(160),
+      nif: z.string().trim().max(15).optional(),
+      cae: z.string().trim().max(7).optional(),
+      regiao: z.enum(["PT", "PT-MA", "PT-AC"]),
+      apoioId: z.string().max(80).nullable().optional(),
+      mensagem: z.string().trim().max(1500).optional(),
+      autorizoContacto: z.literal(true, { errorMap: () => ({ message: "Para o contactarmos, autorize o contacto." }) }),
+      website: z.string().max(0).optional(), // armadilha para robôs: fica sempre vazio
+    }).parse(req.body);
+    const nif = b.nif ? limparNIF(b.nif) : "";
+    if (nif && !validarNIF(nif)) throw new ErroApp("nif_invalido", "O NIF não é válido (pode deixá-lo em branco).");
+    const cae = b.cae ? normalizarCAE(b.cae) : "";
+    if (cae && (!/^\d{2,5}$/.test(cae) || erroCAE(cae.padEnd(5, "0")))) throw new ErroApp("cae_invalido", "O CAE não parece válido (pode deixá-lo em branco).");
+    const t = agora().getTime();
+    const recentes = (pedidosSite.get(req.ip) ?? []).filter((x) => t - x < 3600_000);
+    if (recentes.length >= 5) throw new ErroApp("demasiados_pedidos", "Recebemos vários pedidos seguidos deste endereço. Tente de novo dentro de uma hora.", 429);
+    pedidosSite.set(req.ip, [...recentes, t]);
+    const apoio = b.apoioId ? (await catalogoAtual()).linhas.find((l) => l.id === b.apoioId) : undefined;
+    const [r] = await db.query<LinhaEstudo>(
+      `INSERT INTO pedidos_estudo (id, empresa_id, apoio_id, apoio_nome, nome, email, telefone, mensagem, criado_em, origem, empresa_nome, empresa_nif, cae, regiao)
+       VALUES ($1,NULL,$2,$3,$4,$5,$6,$7,$8,'site',$9,$10,$11,$12) RETURNING *`,
+      [novoId(), apoio?.id ?? null, apoio ? `${apoio.codigo} · ${apoio.nome}` : null, b.nome, b.email, b.telefone || null, b.mensagem || null, agoraISO(),
+        b.empresa, nif || null, cae || null, b.regiao]);
+    const destino = cfg.emailEstudos ?? process.env.EMAIL_ESTUDOS;
+    if (destino) void enviarEmail({ para: destino, ...emailPedidoEstudo({ nome: `${b.empresa} (pedido pelo site, sem conta)`, nif: nif || "não indicado", regiao: b.regiao, cae: cae || null, dimensao: null }, estudoDe(r)) }).catch(() => false);
+    else console.warn(`[estudos] EMAIL_ESTUDOS em falta — pedido do site ${r.id} guardado, sem e-mail para a equipa.`);
+    return reply.code(201).send({ ok: true, id: r.id });
   });
 
   // ═════════════ Avisos push ═════════════
