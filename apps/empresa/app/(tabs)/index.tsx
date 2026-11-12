@@ -10,6 +10,7 @@ export default function Painel() {
   const { api, sessao, online } = useSessao();
   const router = useRouter();
   const id = sessao!.id;
+  const gestor = sessao!.perfil !== "colaborador";
   const { dados, erro, recarregar } = useDados(async () => {
     const [resumo, prazos, pedidos, ligacoes] = await Promise.all([api.resumo(id), api.prazos(id), api.pedidos(id), api.ligacoes()]);
     return { resumo, prazos, pedidos: pedidos.filter((p) => p.estado === "pendente"), ligPendente: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "contabilista"), conviteEnviado: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "empresa"), ligAtiva: ligacoes.find((l) => l.estado === "ativa") };
@@ -31,7 +32,7 @@ export default function Painel() {
   return (
     <Ecra>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <Titulo sub={online ? "Sincronizado em tempo real" : "Sem internet — pode continuar a registar faturas; enviamos quando a rede voltar"}>{dados?.resumo.empresa.nome ?? sessao!.nome}</Titulo>
+        <Titulo sub={`${sessao!.quem ? `${sessao!.quem} · ` : ""}${online ? "Sincronizado em tempo real" : "Sem internet — pode continuar a registar faturas; enviamos quando a rede voltar"}`}>{dados?.resumo.empresa.nome ?? sessao!.nome}</Titulo>
       </View>
       <MensagemLuis texto={msg} escuro rotulo="Luís · o seu gestor virtual" />
       <Erro texto={erro} />
@@ -71,7 +72,8 @@ export default function Painel() {
 
       <Cartao>
         <Linha esquerda="Ligação ao contabilista" sub={dados?.ligAtiva ? `Ativa · ${dados.ligAtiva.contabilista?.nome}` : "Convide o seu contabilista ou partilhe o utilizador e o NIF"} direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/ligacao")} />
-        <Linha esquerda="Banco" sub="Importar extrato e ligar pagamentos às faturas" direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/banco")} />
+        {gestor ? <Linha esquerda="Utilizadores e atividade" sub="Colaboradores e registo de quem fez o quê" direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/utilizadores")} /> : null}
+        {gestor ? <Linha esquerda="Banco" sub="Importar extrato e ligar pagamentos às faturas" direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/banco")} /> : null}
         <Linha esquerda="Conta e segurança" sub="Os seus dados estão guardados na nuvem" direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/conta")} />
         <Linha esquerda="Atualizações fiscais" sub="Aplicadas automaticamente na data legal" direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/atualizacoes")} />
       </Cartao>

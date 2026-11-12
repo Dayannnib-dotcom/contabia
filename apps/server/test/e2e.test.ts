@@ -362,3 +362,35 @@ test("19. conciliação bancária: sugere com explicação, concilia, pede a fat
   const pedidos = (await chamar("GET", `/v1/empresas/${id}/pedidos`, S.empC)).json;
   assert.ok(pedidos.some((x: { tipo: string; detalhe: string }) => x.tipo === "Fatura em falta (banco)" && x.detalhe.includes("EDP")));
 });
+
+test("20. vários utilizadores: o gestor adiciona e desativa; o colaborador faz o dia a dia; tudo fica registado", async () => {
+  const id = S.empCId;
+  // só o gestor da própria empresa gere utilizadores
+  assert.equal((await chamar("POST", `/v1/empresas/${id}/colaboradores`, S.ccC, { nome: "X", email: "x@x.pt", senha: "segredo123" })).status, 403);
+  const c = await chamar("POST", `/v1/empresas/${id}/colaboradores`, S.empC, { nome: "Marta Sousa", email: "Marta@EmpresaC.pt", senha: "segredo123" });
+  assert.equal(c.status, 201, JSON.stringify(c.json));
+  assert.equal((await chamar("POST", `/v1/empresas/${id}/colaboradores`, S.empC, { nome: "Outra", email: "marta@empresac.pt", senha: "segredo123" })).json.codigo, "email_existe");
+  // a colaboradora entra com o próprio e-mail
+  const s = await chamar("POST", "/v1/auth/sessoes", undefined, { papel: "empresa", identificador: "marta@empresac.pt", senha: "segredo123" });
+  assert.equal(s.json.perfil, "colaborador");
+  assert.equal(s.json.quem, "Marta Sousa");
+  assert.equal(s.json.id, id);
+  const marta = s.json.token;
+  // faz o dia a dia: regista documentos
+  const d = await chamar("POST", `/v1/empresas/${id}/documentos`, marta, { tipo: "compra", terceiroNif: "500000000", terceiroNome: "Papelaria", numero: "FT 2026/800", data: "2026-11-06", base: 10, iva: 2.3, taxa: 23 });
+  assert.equal(d.status, 201);
+  // mas não mexe na ligação ao contabilista, nem no banco, nem nos utilizadores
+  assert.equal((await chamar("POST", "/v1/ligacoes", marta, { contabilista: "777" })).json.codigo, "so_gestor");
+  assert.equal((await chamar("POST", `/v1/empresas/${id}/banco/importar`, marta, { movimentos: [{ data: "2026-11-01", descricao: "X", valor: -1 }] })).json.codigo, "so_gestor");
+  assert.equal((await chamar("GET", `/v1/empresas/${id}/colaboradores`, marta)).status, 403);
+  // o registo diz quem fez o quê
+  const reg = (await chamar("GET", `/v1/empresas/${id}/atividade`, S.empC)).json;
+  assert.equal(reg[0].quem, "Marta Sousa");
+  assert.equal(reg[0].acao, "registou um documento");
+  assert.ok(reg.some((x: { acao: string }) => x.acao === "adicionou um utilizador"));
+  assert.ok(reg.some((x: { quem: string }) => x.quem === "Rui CC (contabilista)"));
+  // o gestor desativa: a sessão da Marta acaba logo, em todos os dispositivos
+  await chamar("POST", `/v1/empresas/${id}/colaboradores/${c.json.id}/desativar`, S.empC, {});
+  assert.equal((await chamar("GET", `/v1/empresas/${id}/documentos`, marta)).status, 401);
+  assert.equal((await chamar("POST", "/v1/auth/sessoes", undefined, { papel: "empresa", identificador: "marta@empresac.pt", senha: "segredo123" })).json.codigo, "desativado");
+});

@@ -8,11 +8,11 @@ import { join } from "node:path";
 import { z, ZodError } from "zod";
 import {
   ajudaNIF, lerQR, limparNIF, normalizarUtilizador, proximasObrigacoes, qrConsistente, REGRAS_BASE, taxasEm, utilizadorValido, validarNIF,
-  type Anexo, type Documento, type MovimentoBancario, type Empresa, type Ligacao, type Pedido, type Regras, type ResumoEmpresa, type Sessao, type VerificacaoFecho,
+  type Anexo, type Atividade, type Colaborador, type Documento, type MovimentoBancario, type Empresa, type Ligacao, type Pedido, type Regras, type ResumoEmpresa, type Sessao, type VerificacaoFecho,
 } from "@contabia/shared";
 import type { Db } from "./db.ts";
 import {
-  agoraISO, ator, criarTokens, ErroApp, exigirAcesso, exigirPapel, hashSenha, novoId, PERMISSOES_PADRAO, verificarSenha, type Ator,
+  agoraISO, ator, criarTokens, ErroApp, exigirAcesso, exigirGestor, exigirPapel, hashSenha, novoId, PERMISSOES_PADRAO, verificarSenha, type Ator,
 } from "./comum.ts";
 import { Hub, eventosDesde, publicar } from "./tempo-real.ts";
 import {
@@ -53,9 +53,13 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const a = await tokens.verificar(token);
     const [existe] = await db.query(a.papel === "empresa" ? `SELECT 1 FROM empresas WHERE id = $1` : `SELECT 1 FROM contabilistas WHERE id = $1`, [a.id]);
     if (!existe) throw new ErroApp("sessao_invalida", "A sua sessão terminou. Entre novamente.", 401);
-    (req as FastifyRequest & { ator?: Ator }).ator = { papel: a.papel, id: a.id, nome: a.nome };
+    // um colaborador desativado pelo gestor sai logo, em todos os dispositivos
+    if (a.colaboradorId && !(await db.query(`SELECT 1 FROM colaboradores WHERE id = $1 AND empresa_id = $2 AND ativo`, [a.colaboradorId, a.id])).length)
+      throw new ErroApp("sessao_invalida", "O seu acesso a esta empresa foi desativado pelo gestor.", 401);
+    const { emitidoEm, ...semData } = a;
+    (req as FastifyRequest & { ator?: Ator }).ator = semData;
     // Sessão deslizante: quem usa a app pelo menos uma vez por mês nunca é posto fora.
-    if (h && Date.now() / 1000 - a.emitidoEm > 24 * 3600) reply.header("x-contabia-token", await tokens.emitir(a));
+    if (h && Date.now() / 1000 - emitidoEm > 24 * 3600) reply.header("x-contabia-token", await tokens.emitir(semData));
   });
 
   // ── Idempotência: o mesmo pedido reenviado devolve a mesma resposta ──
@@ -99,7 +103,10 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const [r] = await db.query<{ regras: Regras }>(`SELECT regras FROM regras_versoes ORDER BY publicada_em DESC LIMIT 1`);
     return r?.regras ?? REGRAS_BASE;
   };
-  const sessao = async (a: Ator): Promise<Sessao> => ({ token: await tokens.emitir(a), papel: a.papel, id: a.id, nome: a.nome });
+  const sessao = async (a: Ator): Promise<Sessao> => ({
+    token: await tokens.emitir(a), papel: a.papel, id: a.id, nome: a.nome,
+    ...(a.papel === "empresa" ? { perfil: a.perfil ?? "gestor" } : {}), ...(a.quem ? { quem: a.quem } : {}),
+  });
   const params = (req: FastifyRequest) => req.params as Record<string, string>;
 
   // ═════════════ Autenticação ═════════════
@@ -137,6 +144,14 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
 
   app.post("/v1/auth/sessoes", async (req) => {
     const b = z.object({ papel: z.enum(["empresa", "contabilista"]), identificador: z.string(), senha: z.string() }).parse(req.body);
+    if (b.papel === "empresa" && b.identificador.includes("@")) {
+      // colaborador: entra com o próprio e-mail
+      const [c] = await db.query<{ id: string; nome: string; senha_hash: string; ativo: boolean; empresa_id: string; e_nome: string }>(
+        `SELECT c.id, c.nome, c.senha_hash, c.ativo, c.empresa_id, e.nome AS e_nome FROM colaboradores c JOIN empresas e ON e.id = c.empresa_id WHERE c.email = $1`, [b.identificador.trim().toLowerCase()]);
+      if (!c || !(await verificarSenha(b.senha, c.senha_hash))) throw new ErroApp("credenciais", "E-mail ou senha incorretos.", 401);
+      if (!c.ativo) throw new ErroApp("desativado", "O seu acesso foi desativado pelo gestor da empresa.", 403);
+      return sessao({ papel: "empresa", id: c.empresa_id, nome: c.e_nome, colaboradorId: c.id, perfil: "colaborador", quem: c.nome });
+    }
     const sql = b.papel === "empresa"
       ? `SELECT id, nome, senha_hash FROM empresas WHERE utilizador = $1`
       : `SELECT id, nome, senha_hash FROM contabilistas WHERE email = $1`;
@@ -190,6 +205,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const a = ator(req);
     limitar(a.id);
     let empresaId: string, contabilistaId: string;
+    exigirGestor(a);
     if (a.papel === "contabilista") {
       const b = z.object({ utilizador: z.string().min(1), nif: z.string() }).parse(req.body);
       const nif = limparNIF(b.nif);
@@ -234,6 +250,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
 
   const mudarEstado = async (req: FastifyRequest, para: "ativa" | "recusada" | "revogada") => {
     const a = ator(req);
+    exigirGestor(a);
     const { versao } = z.object({ versao: z.number().int() }).parse(req.body ?? {});
     await expirarPendentes();
     const [l] = await db.query<LinhaLig>(`SELECT * FROM ligacoes WHERE id = $1`, [params(req).id]);
@@ -372,6 +389,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   // Importação do e-Fatura: a app lê o CSV, mostra a pré-visualização e envia as linhas aqui.
   app.post("/v1/empresas/:id/documentos/importar", async (req) => {
     const a = ator(req);
+    exigirGestor(a);
     const id = params(req).id;
     await exigirAcesso(db, a, id);
     const empresa = await empresaPorId(id);
@@ -582,6 +600,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
 
   app.post("/v1/empresas/:id/banco/importar", async (req) => {
     const a = ator(req);
+    exigirGestor(a);
     const id = params(req).id;
     await exigirAcesso(db, a, id);
     const b = z.object({ movimentos: z.array(z.object({ data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), descricao: z.string(), valor: z.number() })).min(1).max(5000) }).parse(req.body);
@@ -617,6 +636,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   }
   app.post("/v1/empresas/:id/banco/movimentos/:mid/conciliar", async (req) => {
     const a = ator(req);
+    exigirGestor(a);
     const { id, mid } = params(req);
     await exigirAcesso(db, a, id);
     const b = z.object({ documentoId: z.string() }).parse(req.body);
@@ -641,6 +661,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   });
   app.post("/v1/empresas/:id/banco/movimentos/:mid/desfazer", async (req) => {
     const a = ator(req);
+    exigirGestor(a);
     const { id, mid } = params(req);
     await exigirAcesso(db, a, id);
     await db.query(`UPDATE movimentos SET estado = 'por_conciliar', documento_id = NULL WHERE id = $1 AND empresa_id = $2`, [mid, id]);
@@ -670,6 +691,85 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     await exigirAcesso(db, a, id);
     await db.query(`UPDATE movimentos SET estado = 'ignorado' WHERE id = $1 AND empresa_id = $2`, [mid, id]);
     return (await movimentosDe(id, mid))[0];
+  });
+
+  // ═════════════ Utilizadores da empresa e registo de atividade ═════════════
+  const exigirMesmaEmpresa = (a: Ator, id: string) => {
+    if (a.papel !== "empresa" || a.id !== id) throw new ErroApp("sem_acesso", "Sem acesso.", 403);
+    exigirGestor(a);
+  };
+  type LinhaColab = { id: string; nome: string; email: string; ativo: boolean; criado_em: string };
+  const colabDe = (c: LinhaColab): Colaborador => ({ id: c.id, nome: c.nome, email: c.email, ativo: c.ativo, criadoEm: c.criado_em });
+  app.get("/v1/empresas/:id/colaboradores", async (req) => {
+    const id = params(req).id;
+    exigirMesmaEmpresa(ator(req), id);
+    return (await db.query<LinhaColab>(`SELECT id, nome, email, ativo, criado_em FROM colaboradores WHERE empresa_id = $1 ORDER BY ativo DESC, nome`, [id])).map(colabDe);
+  });
+  app.post("/v1/empresas/:id/colaboradores", async (req, reply) => {
+    const id = params(req).id;
+    exigirMesmaEmpresa(ator(req), id);
+    const b = z.object({ nome: z.string().trim().min(2), email: z.string().trim().toLowerCase().email(), senha: z.string().min(8) }).parse(req.body);
+    const [ja] = await db.query(`SELECT 1 FROM colaboradores WHERE email = $1 UNION SELECT 1 FROM contabilistas WHERE email = $1`, [b.email]);
+    if (ja) throw new ErroApp("email_existe", "Já existe uma conta com este e-mail.", 409);
+    const c: LinhaColab = { id: novoId(), nome: b.nome, email: b.email, ativo: true, criado_em: agoraISO() };
+    await db.query(`INSERT INTO colaboradores (id, empresa_id, nome, email, senha_hash, ativo, criado_em) VALUES ($1,$2,$3,$4,$5,true,$6)`,
+      [c.id, id, c.nome, c.email, await hashSenha(b.senha), c.criado_em]);
+    return reply.code(201).send(colabDe(c));
+  });
+  for (const [acao, ativo] of [["desativar", false], ["ativar", true]] as const) {
+    app.post(`/v1/empresas/:id/colaboradores/:cid/${acao}`, async (req) => {
+      const { id, cid } = params(req);
+      exigirMesmaEmpresa(ator(req), id);
+      const [c] = await db.query<LinhaColab>(`UPDATE colaboradores SET ativo = $1 WHERE id = $2 AND empresa_id = $3 RETURNING id, nome, email, ativo, criado_em`, [ativo, cid, id]);
+      if (!c) throw new ErroApp("nao_encontrado", "Utilizador não encontrado.", 404);
+      return colabDe(c);
+    });
+  }
+  app.get("/v1/empresas/:id/atividade", async (req) => {
+    const a = ator(req);
+    const id = params(req).id;
+    await exigirAcesso(db, a, id);
+    exigirGestor(a);
+    const r = await db.query<{ quem: string; papel: string; acao: string; em: string }>(`SELECT quem, papel, acao, em FROM atividade WHERE empresa_id = $1 ORDER BY seq DESC LIMIT 200`, [id]);
+    return r.map((x): Atividade => ({ quem: x.quem, papel: x.papel as Atividade["papel"], acao: x.acao, em: x.em }));
+  });
+
+  /** O que cada pedido bem-sucedido significa, em português, para o registo de atividade. */
+  const ACOES: Record<string, string | ((a: Ator) => string)> = {
+    "POST /v1/empresas/:id/documentos": "registou um documento",
+    "POST /v1/empresas/:id/documentos/importar": "importou faturas do e-Fatura",
+    "POST /v1/empresas/:id/documentos/:doc/validar": "validou um documento",
+    "POST /v1/empresas/:id/documentos/:doc/anexos": "guardou o original de uma fatura",
+    "POST /v1/empresas/:id/documentos/:doc/anulacao": (a) => (a.papel === "contabilista" ? "anulou um documento" : "pediu a anulação de um documento"),
+    "POST /v1/empresas/:id/documentos/:doc/anulacao/aprovar": "aprovou a anulação de um documento",
+    "POST /v1/empresas/:id/documentos/:doc/anulacao/recusar": "manteve um documento (anulação recusada)",
+    "POST /v1/empresas/:id/banco/importar": "importou o extrato do banco",
+    "POST /v1/empresas/:id/banco/movimentos/:mid/conciliar": "conciliou um movimento do banco",
+    "POST /v1/empresas/:id/banco/conciliar-automatico": "conciliou movimentos do banco",
+    "POST /v1/empresas/:id/banco/movimentos/:mid/desfazer": "desfez uma conciliação",
+    "POST /v1/empresas/:id/banco/movimentos/:mid/pedir-fatura": "pediu uma fatura em falta",
+    "POST /v1/empresas/:id/banco/movimentos/:mid/ignorar": "ignorou um movimento do banco",
+    "POST /v1/empresas/:id/pedidos": "pediu um documento à empresa",
+    "POST /v1/empresas/:id/pedidos/:pid/recebido": "marcou um pedido como enviado",
+    "POST /v1/empresas/:id/lancamentos/:lid/aprovar": "aprovou um lançamento",
+    "POST /v1/empresas/:id/lancamentos/aprovar-confianca-alta": "aprovou lançamentos de confiança alta",
+    "POST /v1/empresas/:id/lancamentos/:lid/estornar": "estornou um lançamento",
+    "POST /v1/empresas/:id/iva/:periodo/submissao": "registou a submissão do IVA",
+    "POST /v1/empresas/:id/periodos/:periodo/fechar": "fechou um período",
+    "POST /v1/empresas/:id/saft/:ano": "gerou o ficheiro SAF-T",
+    "POST /v1/empresas/:id/colaboradores": "adicionou um utilizador",
+    "POST /v1/empresas/:id/colaboradores/:cid/desativar": "desativou um utilizador",
+    "POST /v1/empresas/:id/colaboradores/:cid/ativar": "reativou um utilizador",
+  };
+  app.addHook("onResponse", async (req, reply) => {
+    if (req.method === "GET" || reply.statusCode >= 400 || (req as FastifyRequest & { repetido?: boolean }).repetido) return;
+    const a = (req as FastifyRequest & { ator?: Ator }).ator;
+    const empresaId = (req.params as { id?: string } | undefined)?.id;
+    const acao = ACOES[`${req.method} ${req.routeOptions.url}`];
+    if (!a || !empresaId || !acao) return;
+    const quem = a.papel === "contabilista" ? `${a.nome} (contabilista)` : a.quem ?? `${a.nome} (gestor)`;
+    await db.query(`INSERT INTO atividade (empresa_id, quem, papel, acao, em) VALUES ($1,$2,$3,$4,$5)`,
+      [empresaId, quem, a.papel, typeof acao === "function" ? acao(a) : acao, agoraISO()]).catch(() => undefined);
   });
 
   // ═════════════ Lançamentos ═════════════

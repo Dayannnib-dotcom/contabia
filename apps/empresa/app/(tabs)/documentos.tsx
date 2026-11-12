@@ -19,7 +19,7 @@ export default function Documentos() {
     <Ecra>
       <Titulo sub={dados ? `${dados.length} documentos · ${dados.filter((d) => d.estado === "validado").length} validados` : undefined}>Documentos</Titulo>
       <FilaPendente />
-      <Botao titulo="Importar do e-Fatura" variante="secundario" onPress={() => router.push("/importar")} />
+      {sessao!.perfil !== "colaborador" ? <Botao titulo="Importar do e-Fatura" variante="secundario" onPress={() => router.push("/importar")} /> : null}
       <View accessibilityRole="tablist" style={{ flexDirection: "row", backgroundColor: "#E8ECE9", borderRadius: 12, padding: 4, gap: 4 }}>
         {TIPOS.map(([t, n]) => (
           <Pressable key={t} accessibilityRole="tab" accessibilityState={{ selected: t === tipo }} onPress={() => setTipo(t)}

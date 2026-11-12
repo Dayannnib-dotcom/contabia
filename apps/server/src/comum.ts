@@ -34,13 +34,17 @@ export interface Ator {
   papel: Papel;
   id: string;
   nome: string;
+  /** Pessoa que entrou: o gestor (conta principal da empresa) ou um colaborador. */
+  colaboradorId?: string;
+  perfil?: "gestor" | "colaborador";
+  quem?: string;
 }
 
 export function criarTokens(segredo: string) {
   const chave = new TextEncoder().encode(segredo);
   return {
     async emitir(a: Ator): Promise<string> {
-      return new SignJWT({ papel: a.papel, nome: a.nome })
+      return new SignJWT({ papel: a.papel, nome: a.nome, ...(a.colaboradorId ? { colab: a.colaboradorId, perfil: a.perfil, quem: a.quem } : {}) })
         .setProtectedHeader({ alg: "HS256" })
         .setSubject(a.id)
         .setIssuedAt()
@@ -50,7 +54,10 @@ export function criarTokens(segredo: string) {
     async verificar(token: string): Promise<Ator & { emitidoEm: number }> {
       try {
         const { payload } = await jwtVerify(token, chave);
-        return { papel: payload.papel as Papel, id: String(payload.sub), nome: String(payload.nome), emitidoEm: Number(payload.iat ?? 0) };
+        return {
+          papel: payload.papel as Papel, id: String(payload.sub), nome: String(payload.nome), emitidoEm: Number(payload.iat ?? 0),
+          ...(payload.colab ? { colaboradorId: String(payload.colab), perfil: payload.perfil as Ator["perfil"], quem: String(payload.quem ?? "") } : {}),
+        };
       } catch {
         throw new ErroApp("sessao_invalida", "Sessão inválida ou expirada. Entre novamente.", 401);
       }
@@ -93,3 +100,9 @@ export function exigirPapel(a: Ator, papel: Papel) {
 }
 
 export const num = (v: unknown) => Number(v);
+
+/** Ações que só o gestor da empresa (conta principal) pode fazer, nunca um colaborador. */
+export function exigirGestor(a: Ator) {
+  if (a.papel === "empresa" && a.perfil === "colaborador")
+    throw new ErroApp("so_gestor", "Só o gestor da empresa pode fazer isto. Peça-lhe que o faça na app dele.", 403);
+}

@@ -7,7 +7,10 @@ import { ProvedorSessao, cor, useSessao } from "@contabia/ui";
 const URL_API = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
 
 function Navegacao() {
-  const { sessao } = useSessao();
+  const { sessao, pronto } = useSessao();
+  // Esperar pela sessão guardada: senão, ao recarregar a página, os ecrãs protegidos
+  // pareciam não existir e a app voltava sempre ao início.
+  if (!pronto) return null;
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: cor.fundo } }}>
       <Stack.Screen name="index" />

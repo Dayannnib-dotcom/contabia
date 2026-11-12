@@ -11,3 +11,4 @@ export * from "./ativar-avisos";
 export * from "./anexos";
 export * from "./ficheiros";
 export * from "./banco";
+export * from "./atividade";

@@ -58,6 +58,7 @@ export default function LigacaoEcra() {
     if (r === "copiado") setAviso("Dados copiados. Cole-os numa mensagem ao seu contabilista.");
   }
 
+  const gestor = sessao!.perfil !== "colaborador";
   const e = dados?.empresa;
   const ligs = dados?.ligs ?? [];
   const ativas = ligs.filter((l) => l.estado === "ativa");
@@ -72,7 +73,8 @@ export default function LigacaoEcra() {
       <Erro texto={erro ?? erroCarregar} />
       {aviso ? <MensagemLuis texto={aviso} /> : null}
 
-      {recebidos.map((l) => (
+      {!gestor ? <MensagemLuis texto="A ligação ao contabilista é gerida pelo gestor da empresa. Aqui pode ver quem é o contabilista." /> : null}
+      {gestor && recebidos.map((l) => (
         <Cartao key={l.id} destaque>
           <Chip texto="Pedido recebido" tipo="aviso" />
           <Texto forte tamanho={16}>{l.contabilista?.nome}</Texto>
@@ -90,11 +92,11 @@ export default function LigacaoEcra() {
         <Cartao key={l.id}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: cor.menta }} /><Texto forte cor={cor.verdeEscuro}>Ligação ativa</Texto></View>
           <Texto>{l.contabilista?.nome} (n.º OCC {l.contabilista?.numeroOCC}) está ligado. Tudo o que carregar chega-lhe ao segundo, e os pedidos dele aparecem no seu painel.</Texto>
-          <Botao titulo="Revogar acesso" variante="perigo" onPress={() => acao(l, "revogar")} carregando={aTratar === l.id + "revogar"} />
+          {gestor ? <Botao titulo="Revogar acesso" variante="perigo" onPress={() => acao(l, "revogar")} carregando={aTratar === l.id + "revogar"} /> : null}
         </Cartao>
       ))}
 
-      {enviados.map((l) => (
+      {gestor && enviados.map((l) => (
         <Cartao key={l.id}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <View style={{ flex: 1 }}>
@@ -108,7 +110,7 @@ export default function LigacaoEcra() {
         </Cartao>
       ))}
 
-      {!ativas.length ? (
+      {gestor && !ativas.length ? (
         <Cartao>
           <Texto forte tamanho={15}>Opção 1 · Convidar o meu contabilista</Texto>
           <Texto sec tamanho={12}>Escreva o email com que o contabilista entra na Contabia, ou o número dele na Ordem (OCC).</Texto>
@@ -117,7 +119,7 @@ export default function LigacaoEcra() {
         </Cartao>
       ) : null}
 
-      {e && !ativas.length ? (
+      {gestor && e && !ativas.length ? (
         <Cartao>
           <Texto forte tamanho={15}>Opção 2 · O contabilista pede a ligação</Texto>
           <Texto sec tamanho={12}>Partilhe estes dois dados. Ele escreve-os na app dele e o pedido aparece aqui para aceitar.</Texto>

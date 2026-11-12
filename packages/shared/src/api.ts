@@ -5,7 +5,7 @@
  * - Tempo real por WebSocket com recuperação por cursor ao reconectar.
  */
 import type {
-  MotivoAnulacao, Anexo, MovimentoBancario,
+  MotivoAnulacao, Anexo, MovimentoBancario, Colaborador, Atividade,
   ApuramentoIVA, Documento, Empresa, Evento, Lancamento, Ligacao, Pedido, RespostaAssistente,
   ResumoEmpresa, Sessao, Submissao, VerificacaoFecho, Contabilista,
 } from "./tipos.ts";
@@ -133,6 +133,20 @@ export class ApiContabia {
     return this.pedido<{ importados: number; repetidos: number; erros: number; resultados: { numero: string; estado: "importado" | "repetido" | "erro"; mensagem?: string }[] }>(
       "POST", `/v1/empresas/${empresaId}/documentos/importar`, { tipo, linhas: linhas.map(({ nif, nome, numero, atcud, data, base, iva, total }) => ({ nif, nome, numero, atcud, data, base, iva, total })) });
   }
+  // ── Utilizadores da empresa ──
+  colaboradores(empresaId: string) {
+    return this.pedido<Colaborador[]>("GET", `/v1/empresas/${empresaId}/colaboradores`);
+  }
+  adicionarColaborador(empresaId: string, d: { nome: string; email: string; senha: string }) {
+    return this.pedido<Colaborador>("POST", `/v1/empresas/${empresaId}/colaboradores`, d);
+  }
+  ativarColaborador(empresaId: string, colaboradorId: string, ativo: boolean) {
+    return this.pedido<Colaborador>("POST", `/v1/empresas/${empresaId}/colaboradores/${colaboradorId}/${ativo ? "ativar" : "desativar"}`, {});
+  }
+  atividade(empresaId: string) {
+    return this.pedido<Atividade[]>("GET", `/v1/empresas/${empresaId}/atividade`);
+  }
+
   // ── Banco ──
   importarExtrato(empresaId: string, movimentos: LinhaExtrato[]) {
     return this.pedido<{ novos: number; repetidos: number; comSugestao: number }>("POST", `/v1/empresas/${empresaId}/banco/importar`, { movimentos });

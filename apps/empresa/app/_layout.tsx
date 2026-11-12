@@ -7,7 +7,10 @@ import { ProvedorSessao, cor, useSessao } from "@contabia/ui";
 const URL_API = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
 
 function Navegacao() {
-  const { sessao } = useSessao();
+  const { sessao, pronto } = useSessao();
+  // Esperar pela sessão guardada: senão, ao recarregar a página, os ecrãs protegidos
+  // pareciam não existir e a app voltava sempre ao início.
+  if (!pronto) return null;
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: cor.fundo } }}>
       <Stack.Screen name="index" />
@@ -20,6 +23,7 @@ function Navegacao() {
         <Stack.Screen name="ligacao" options={{ headerShown: true, title: "Ligação ao contabilista", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="importar" options={{ headerShown: true, title: "Importar do e-Fatura", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="banco" options={{ headerShown: true, title: "Banco", headerBackTitle: "Voltar" }} />
+        <Stack.Screen name="utilizadores" options={{ headerShown: true, title: "Utilizadores", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="conta" options={{ headerShown: true, title: "Conta e segurança", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="atualizacoes" options={{ headerShown: true, title: "Atualizações fiscais", headerBackTitle: "Voltar" }} />
       </Stack.Protected>

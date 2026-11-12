@@ -216,6 +216,25 @@ const MIGRACOES: string[] = [
      criado_em text NOT NULL
    )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS movimentos_unicos ON movimentos(empresa_id, impressao)`,
+  // Vários utilizadores por empresa (nunca apagados: desativados, para o registo de atividade fazer sentido).
+  `CREATE TABLE IF NOT EXISTS colaboradores (
+     id text PRIMARY KEY,
+     empresa_id text NOT NULL REFERENCES empresas(id),
+     nome text NOT NULL,
+     email text NOT NULL UNIQUE,
+     senha_hash text NOT NULL,
+     ativo boolean NOT NULL DEFAULT true,
+     criado_em text NOT NULL
+   )`,
+  `CREATE TABLE IF NOT EXISTS atividade (
+     seq serial PRIMARY KEY,
+     empresa_id text NOT NULL,
+     quem text NOT NULL,
+     papel text NOT NULL,
+     acao text NOT NULL,
+     em text NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS atividade_empresa ON atividade(empresa_id, seq)`,
   `CREATE TABLE IF NOT EXISTS regras_versoes (
      versao text PRIMARY KEY,
      regras jsonb NOT NULL,

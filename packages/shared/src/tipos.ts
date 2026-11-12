@@ -23,7 +23,14 @@ export interface Sessao {
   papel: Papel;
   id: string;
   nome: string;
+  /** Na empresa: "gestor" (conta principal) ou "colaborador". */
+  perfil?: "gestor" | "colaborador";
+  /** Nome da pessoa que entrou (colaborador). */
+  quem?: string;
 }
+
+export interface Colaborador { id: string; nome: string; email: string; ativo: boolean; criadoEm: string }
+export interface Atividade { quem: string; papel: Papel; acao: string; em: string }
 
 export type TipoDocumento = "compra" | "venda" | "banco" | "pessoal";
 export type EstadoDocumento = "validar" | "validado" | "sem_anexo" | "anulacao_pedida" | "anulado";

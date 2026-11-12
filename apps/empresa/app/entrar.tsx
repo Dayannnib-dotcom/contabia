@@ -25,8 +25,8 @@ export default function Entrar() {
 
   return (
     <Ecra>
-      <Titulo sub="Use o utilizador da empresa que escolheu ao criar a conta.">Bem-vindo de volta</Titulo>
-      <Campo rotulo="Utilizador da empresa" value={utilizador} onChangeText={setUtilizador} autoCapitalize="none" autoCorrect={false} placeholder="ex.: empresa.a" />
+      <Titulo sub="O gestor entra com o utilizador da empresa. Os colaboradores entram com o próprio e-mail.">Bem-vindo de volta</Titulo>
+      <Campo rotulo="Utilizador da empresa ou e-mail" value={utilizador} onChangeText={setUtilizador} autoCapitalize="none" autoCorrect={false} placeholder="ex.: empresa.a ou marta@empresa.pt" />
       <Campo rotulo="Senha" value={senha} onChangeText={setSenha} secureTextEntry />
       <Erro texto={erro} />
       <Botao titulo="Entrar" onPress={enviar} carregando={aEnviar} desativado={!utilizador || senha.length < 8} />

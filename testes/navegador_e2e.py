@@ -209,6 +209,34 @@ with sync_playwright() as p:
         emp.get_by_role("tab", name="Painel").click()
         emp.get_by_text("Pedido do contabilista: Fatura em falta (banco)").wait_for(timeout=15000)
 
+        # ── Vários utilizadores: o gestor adiciona uma colaboradora; ela entra com o próprio e-mail ──
+        emp.get_by_text("Utilizadores e atividade").click()
+        emp.get_by_role("button", name="Adicionar colaborador").click()
+        emp.get_by_label("Nome do colaborador").fill("Marta Sousa")
+        emp.get_by_label("E-mail do colaborador").fill("marta@atlantico.pt")
+        emp.get_by_label("Senha inicial").fill("segredo123")
+        emp.get_by_role("button", name="Adicionar", exact=True).click()
+        emp.get_by_text("já pode entrar na app", exact=False).wait_for(timeout=15000)
+        col = b.new_page(viewport=vp)
+        col.on("pageerror", lambda e: erros.append(f"colaboradora: {e}"))
+        col.goto(BASE + "/empresa/")
+        col.get_by_role("button", name="Entrar").wait_for(timeout=20000)
+        col.get_by_role("button", name="Entrar").click()
+        col.get_by_label("Utilizador da empresa ou e-mail").fill("marta@atlantico.pt")
+        col.get_by_label("Senha").fill("segredo123")
+        col.get_by_role("button", name="Entrar").click()
+        col.get_by_text("Marta Sousa · ", exact=False).wait_for(timeout=15000)
+        assert col.get_by_text("Utilizadores e atividade").count() == 0, "colaboradora não deve gerir utilizadores"
+        assert col.get_by_text("Banco", exact=True).count() == 0, "colaboradora não deve ver o banco"
+        shot(col, "18i_colaboradora")
+        # o registo de atividade mostra quem fez o quê
+        emp.reload()
+        emp.get_by_text("adicionou um utilizador", exact=False).wait_for(timeout=15000)
+        emp.get_by_text("Ana Ferreira (contabilista)", exact=False).first.wait_for()
+        shot(emp, "18j_atividade")
+        col.close()
+        emp.go_back()
+
         # ── Sentido inverso: uma 2.ª empresa convida o contabilista pelo n.º OCC ──
         emp2 = b.new_page(viewport=vp)
         emp2.on("pageerror", lambda e: erros.append(f"empresa2: {e}"))

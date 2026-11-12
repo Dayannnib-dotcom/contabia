@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { euros, motivoLegivel, nomePeriodo, type Lancamento } from "@contabia/shared";
-import { Banco, Botao, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, VerOriginal, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
+import { Banco, Botao, RegistoAtividade, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, VerOriginal, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
 
-type Sec = "revisao" | "banco" | "iva" | "pedidos" | "saft" | "fecho";
-const SECS: [Sec, string][] = [["revisao", "Revisão"], ["banco", "Banco"], ["iva", "IVA"], ["pedidos", "Pedidos"], ["saft", "SAF-T"], ["fecho", "Fecho"]];
+type Sec = "revisao" | "banco" | "iva" | "pedidos" | "saft" | "fecho" | "atividade";
+const SECS: [Sec, string][] = [["revisao", "Revisão"], ["banco", "Banco"], ["iva", "IVA"], ["pedidos", "Pedidos"], ["saft", "SAF-T"], ["fecho", "Fecho"], ["atividade", "Atividade"]];
 
 function mesAnterior(): string {
   const d = new Date();
@@ -46,6 +46,7 @@ export default function EmpresaDetalhe() {
       {sec === "iva" ? <Iva id={id} irPara={setSec} /> : null}
       {sec === "pedidos" ? <Pedidos id={id} /> : null}
       {sec === "saft" ? <Saft id={id} /> : null}
+      {sec === "atividade" ? <RegistoAtividade empresaId={id} /> : null}
       {sec === "fecho" ? <Fecho id={id} irPara={setSec} /> : null}
     </Ecra>
   );
