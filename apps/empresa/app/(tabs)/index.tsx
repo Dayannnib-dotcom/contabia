@@ -1,12 +1,12 @@
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { dataPT, diasAte, nomePeriodo, saudacao } from "@contabia/shared";
-import { Botao, Cartao, Chip, Ecra, Erro, Icone, Linha, MensagemLuis, Numero, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
+import { Botao, Cartao, useAvisosPrazos, Chip, Ecra, Erro, Icone, Linha, MensagemLuis, Numero, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
 
 const MESES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
 export default function Painel() {
-  const { api, sessao, online, sair } = useSessao();
+  const { api, sessao, online } = useSessao();
   const router = useRouter();
   const id = sessao!.id;
   const { dados, erro, recarregar } = useDados(async () => {
@@ -14,6 +14,12 @@ export default function Painel() {
     return { resumo, prazos, pedidos: pedidos.filter((p) => p.estado === "pendente"), ligPendente: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "contabilista"), conviteEnviado: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "empresa"), ligAtiva: ligacoes.find((l) => l.estado === "ativa") };
   }, [id]);
 
+  // Avisos no telemóvel 7 dias, 2 dias e no dia de cada prazo por submeter (funcionam com a app fechada).
+  useAvisosPrazos(dados ? dados.prazos.filter((p) => !p.submetida).map((p) => ({
+    chave: `${p.codigo}:${p.periodo}`, prazo: p.prazo,
+    titulo: p.descricao,
+    corpo: `Luís: termina a ${p.prazo.split("-").reverse().join("/")} (${nomePeriodo(p.periodo)}). Envie já as faturas e documentos que faltam ao seu contabilista.`,
+  })) : null);
   const hoje = new Date().toISOString().slice(0, 10);
   const prox = dados?.prazos.find((p) => !p.submetida);
   const faltas = (dados?.resumo.documentosPorValidar ?? 0) + (dados?.pedidos.length ?? 0) + (dados?.ligPendente ? 1 : 0);
@@ -24,10 +30,7 @@ export default function Painel() {
   return (
     <Ecra>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <Titulo sub={online ? "Sincronizado em tempo real" : "Sem ligação — guardamos e enviamos depois"}>{dados?.resumo.empresa.nome ?? sessao!.nome}</Titulo>
-        <Pressable accessibilityRole="button" accessibilityLabel="Terminar sessão" onPress={sair} style={{ padding: 10 }}>
-          <Icone nome="sair" cor={cor.textoSec} />
-        </Pressable>
+        <Titulo sub={online ? "Sincronizado em tempo real" : "Sem internet — o que já enviou está seguro na nuvem; volte a enviar quando houver rede"}>{dados?.resumo.empresa.nome ?? sessao!.nome}</Titulo>
       </View>
       <MensagemLuis texto={msg} escuro rotulo="Luís · o seu gestor virtual" />
       <Erro texto={erro} />
@@ -66,6 +69,7 @@ export default function Painel() {
 
       <Cartao>
         <Linha esquerda="Ligação ao contabilista" sub={dados?.ligAtiva ? `Ativa · ${dados.ligAtiva.contabilista?.nome}` : "Convide o seu contabilista ou partilhe o utilizador e o NIF"} direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/ligacao")} />
+        <Linha esquerda="Conta e segurança" sub="Os seus dados estão guardados na nuvem" direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/conta")} />
         <Linha esquerda="Atualizações fiscais" sub="Aplicadas automaticamente na data legal" direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/atualizacoes")} />
       </Cartao>
     </Ecra>

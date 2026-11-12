@@ -5,7 +5,7 @@ import { dataPT, euros, type Documento } from "@contabia/shared";
 import { Cartao, Chip, Ecra, Erro, Linha, Texto, Titulo, Vazio, cor, useDados, useSessao } from "@contabia/ui";
 
 const TIPOS: [Documento["tipo"], string][] = [["compra", "Compras"], ["venda", "Vendas"], ["banco", "Bancos"], ["pessoal", "Pessoal"]];
-const ESTADO: Record<Documento["estado"], [string, "erro" | "aviso" | "bom"]> = { validar: ["Validar", "erro"], sem_anexo: ["Sem anexo", "aviso"], validado: ["Validado", "bom"] };
+const ESTADO: Record<Documento["estado"], [string, "erro" | "aviso" | "bom" | "neutro"]> = { validar: ["Validar", "erro"], sem_anexo: ["Sem anexo", "aviso"], validado: ["Validado", "bom"], anulacao_pedida: ["Anulação pedida", "aviso"], anulado: ["Anulado", "neutro"] };
 
 export default function Documentos() {
   const { api, sessao } = useSessao();

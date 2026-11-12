@@ -134,6 +134,23 @@ with sync_playwright() as p:
         emp.get_by_text("Submetida").first.wait_for()
         shot(emp, "18_prazos")
 
+        # ── Erro "sem querer": a empresa pede a anulação, o contabilista decide ──
+        emp.get_by_role("tab", name="Documentos").click()
+        emp.get_by_text("Papelaria Atlântico").first.click()
+        emp.get_by_role("button", name="Este documento tem um erro").click()
+        emp.get_by_role("radio", name="Enviei este documento duas vezes").click()
+        emp.get_by_role("button", name="Continuar").click()
+        shot(emp, "18a_pedir_anulacao")
+        emp.get_by_role("button", name="Sim, pedir anulação").click()
+        emp.get_by_text("Pediu para anular este documento").wait_for()
+        cc.get_by_role("tab", name="Revisão").click()
+        cc.get_by_role("button", name="Aprovar anulação").wait_for(timeout=15000)
+        shot(cc, "18b_cc_anulacao")
+        cc.get_by_role("button", name="Aprovar anulação").click()
+        emp.get_by_text("Este documento foi anulado").wait_for(timeout=15000)
+        shot(emp, "18c_anulado")
+        emp.go_back()
+
         # ── Sentido inverso: uma 2.ª empresa convida o contabilista pelo n.º OCC ──
         emp2 = b.new_page(viewport=vp)
         emp2.on("pageerror", lambda e: erros.append(f"empresa2: {e}"))
@@ -167,6 +184,18 @@ with sync_playwright() as p:
         cc.get_by_role("tab", name="Carteira").click()
         cc.get_by_text("Funchal Digital, Lda.").first.wait_for(timeout=15000)
         shot(cc, "23_cc_carteira_2")
+
+        # ── Sair só a partir de «Conta e segurança», com dupla confirmação ──
+        emp2.go_back()
+        emp2.get_by_text("Conta e segurança").first.click()
+        emp2.get_by_text("Os seus dados estão protegidos").wait_for()
+        emp2.get_by_role("button", name="Sair deste dispositivo").click()
+        shot(emp2, "24_conta_sair")
+        emp2.get_by_role("button", name="Ficar").click()
+        emp2.get_by_role("button", name="Sair deste dispositivo").click()
+        emp2.get_by_role("button", name="Sim, sair").click()
+        emp2.get_by_role("button", name="Entrar").wait_for(timeout=20000)
+        shot(emp2, "25_saiu")
 
 
     except Exception:

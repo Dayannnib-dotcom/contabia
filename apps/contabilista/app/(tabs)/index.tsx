@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
 import { formatarNIF, saudacao } from "@contabia/shared";
-import { Botao, Cartao, Chip, Ecra, Erro, Icone, MensagemLuis, Numero, Texto, Titulo, Vazio, cor, useDados, useSessao } from "@contabia/ui";
+import { AtivarAvisos, Botao, Cartao, useAvisosPrazos, Chip, Ecra, Erro, Icone, MensagemLuis, Numero, Texto, Titulo, Vazio, cor, useDados, useSessao } from "@contabia/ui";
 
 const pl = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
@@ -11,6 +11,23 @@ export default function Carteira() {
   const router = useRouter();
   const { dados, erro } = useDados(() => api.carteira(), [sessao!.id]);
   const { dados: ligs } = useDados(() => api.ligacoes(), [sessao!.id]);
+  // Avisos dos prazos de toda a carteira, agrupados por obrigação e data (ex.: «DP IVA · 3 empresas»).
+  const { dados: prazosCarteira } = useDados(async () => {
+    const lista = await api.carteira();
+    const todos = await Promise.all(lista.map(async (r) => (await api.prazos(r.empresa.id).catch(() => [])).filter((p) => !p.submetida).map((p) => ({ ...p, empresa: r.empresa.nome }))));
+    const grupos = new Map<string, { descricao: string; prazo: string; empresas: string[] }>();
+    for (const p of todos.flat()) {
+      const k = `${p.codigo}:${p.prazo}`;
+      const g = grupos.get(k) ?? { descricao: p.descricao, prazo: p.prazo, empresas: [] };
+      g.empresas.push(p.empresa.replace(/\.$/, ""));
+      grupos.set(k, g);
+    }
+    return [...grupos.entries()].map(([chave, g]) => ({
+      chave, prazo: g.prazo, titulo: g.descricao,
+      corpo: `Luís: termina a ${g.prazo.split("-").reverse().join("/")}. Por submeter: ${g.empresas.length === 1 ? g.empresas[0] : `${g.empresas.length} empresas (${g.empresas.slice(0, 3).join(", ")}${g.empresas.length > 3 ? "…" : ""})`}.`,
+    }));
+  }, [sessao!.id]);
+  useAvisosPrazos(prazosCarteira ?? null);
   const convites = (ligs ?? []).filter((l) => l.estado === "pendente" && l.iniciadaPor === "empresa");
   useEffect(() => { if (dados) definirEmpresas(dados.map((r) => r.empresa.id)); }, [dados, definirEmpresas]);
 
@@ -30,6 +47,7 @@ export default function Carteira() {
         <Titulo sub={online ? "Sincronizado em tempo real" : "A ligar…"}>{saudacao()}, {sessao!.nome.split(" ")[0]}</Titulo>
         <Pressable accessibilityRole="button" accessibilityLabel="Terminar sessão" onPress={sair} style={{ padding: 10 }}><Icone nome="sair" cor={cor.textoSec} /></Pressable>
       </View>
+      <AtivarAvisos avisos={prazosCarteira ?? null} />
       {convites.length ? (
         <MensagemLuis texto={convites.length === 1 ? `A ${convites[0].empresa?.nome?.replace(/\.$/, "")} convidou-o para ser o contabilista dela.` : `Tem ${convites.length} convites de empresas à espera de resposta.`}
           acao={<Botao titulo="Ver convites" variante="menta" onPress={() => router.push("/(tabs)/ligar")} estilo={{ alignSelf: "flex-start", minHeight: 40, marginTop: 6 }} />} />

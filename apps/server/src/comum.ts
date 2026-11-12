@@ -47,10 +47,10 @@ export function criarTokens(segredo: string) {
         .setExpirationTime("30d")
         .sign(chave);
     },
-    async verificar(token: string): Promise<Ator> {
+    async verificar(token: string): Promise<Ator & { emitidoEm: number }> {
       try {
         const { payload } = await jwtVerify(token, chave);
-        return { papel: payload.papel as Papel, id: String(payload.sub), nome: String(payload.nome) };
+        return { papel: payload.papel as Papel, id: String(payload.sub), nome: String(payload.nome), emitidoEm: Number(payload.iat ?? 0) };
       } catch {
         throw new ErroApp("sessao_invalida", "Sessão inválida ou expirada. Entre novamente.", 401);
       }

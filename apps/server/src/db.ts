@@ -132,7 +132,9 @@ const MIGRACOES: string[] = [
      origem text NOT NULL,
      criado_em text NOT NULL
    )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS documentos_unicos ON documentos(empresa_id, terceiro_nif, numero, tipo)`,
+  `DROP INDEX IF EXISTS documentos_unicos`,
+  // Um documento anulado não impede registar de novo o correto; espaços e maiúsculas no n.º não enganam.
+  `CREATE UNIQUE INDEX IF NOT EXISTS documentos_unicos_ativos ON documentos(empresa_id, terceiro_nif, upper(replace(numero, ' ', '')), tipo) WHERE estado <> 'anulado'`,
   `CREATE TABLE IF NOT EXISTS lancamentos (
      id text PRIMARY KEY,
      empresa_id text NOT NULL REFERENCES empresas(id),
@@ -180,6 +182,10 @@ const MIGRACOES: string[] = [
      PRIMARY KEY (empresa_id, nif)
    )`,
   `ALTER TABLE ligacoes ADD COLUMN IF NOT EXISTS iniciada_por text NOT NULL DEFAULT 'contabilista'`,
+  `ALTER TABLE documentos ADD COLUMN IF NOT EXISTS estado_anterior text`,
+  `ALTER TABLE documentos ADD COLUMN IF NOT EXISTS anulacao_motivo text`,
+  `ALTER TABLE documentos ADD COLUMN IF NOT EXISTS anulacao_pedida_por text`,
+  `ALTER TABLE documentos ADD COLUMN IF NOT EXISTS anulacao_em text`,
   `CREATE TABLE IF NOT EXISTS regras_versoes (
      versao text PRIMARY KEY,
      regras jsonb NOT NULL,

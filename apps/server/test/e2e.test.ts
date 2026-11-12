@@ -135,12 +135,11 @@ test("7. fecho de período bloqueia alterações", async () => {
   assert.equal(v.json.podeFechar, true);
   const f = await chamar("POST", `/v1/empresas/${S.empId}/periodos/2026-11/fechar`, S.cc, {});
   assert.equal(f.json.fechado, true);
-  const qr = "A:500000000*B:509999999*C:PT*D:FT*E:N*F:20261112*G:FT 2026/500*H:X-500*I1:PT-MA*I7:10.00*I8:2.20*N:2.20*O:12.20*Q:Ab1C*R:9999";
+  const qr = "A:500000000*B:509999999*C:PT*D:FT*E:N*F:20261110*G:FT 2026/500*H:X-500*I1:PT-MA*I7:10.00*I8:2.20*N:2.20*O:12.20*Q:Ab1C*R:9999";
+  // a empresa já não consegue juntar documentos a um mês fechado
   const d = await chamar("POST", `/v1/empresas/${S.empId}/documentos`, S.emp, { qr });
-  await chamar("POST", `/v1/empresas/${S.empId}/documentos/${d.json.id}/validar`, S.emp, {});
-  const [l] = (await chamar("GET", `/v1/empresas/${S.empId}/lancamentos?estado=proposto`, S.cc)).json;
-  assert.equal(l.confianca, "alta"); // fornecedor já conhecido
-  assert.equal((await chamar("POST", `/v1/empresas/${S.empId}/lancamentos/${l.id}/aprovar`, S.cc, { versao: 1 })).json.codigo, "periodo_fechado");
+  assert.equal(d.status, 409);
+  assert.equal(d.json.codigo, "periodo_fechado");
 });
 
 test("8. SAF-T da contabilidade 1.04_01", async () => {
@@ -185,6 +184,7 @@ test("11. a empresa também convida o contabilista; aceita sempre o outro lado",
   const lista = await chamar("GET", "/v1/ligacoes", c.json.token);
   assert.equal(lista.json[0].empresa.nome, "Empresa C");
   const ok = await chamar("POST", `/v1/ligacoes/${conv.json.id}/aceitar`, c.json.token, { versao: 1 });
+  S.empC = e.json.token; S.empCId = e.json.id; S.ccC = c.json.token;
   assert.equal(ok.json.estado, "ativa");
   assert.equal((await chamar("GET", "/v1/carteira", c.json.token)).json.length, 1);
   // convite repetido com e-mail devolve a ligação já ativa
@@ -230,4 +230,55 @@ test("14. sessão de uma conta que já não existe termina com 401", async () =>
   const r = await chamar("GET", "/v1/auth/eu", e.json.token);
   assert.equal(r.status, 401);
   assert.equal(r.json.codigo, "sessao_invalida");
+});
+
+test("15. a empresa só pede a anulação; o contabilista decide; nada se apaga", async () => {
+  const base = `/v1/empresas/${S.empCId}/documentos`;
+  const doc = { tipo: "compra", terceiroNif: "509999999", terceiroNome: "Fornecedor Y", numero: "FT 2026/77", data: "2026-11-03", base: 100, iva: 23, taxa: 23 };
+  // erros "sem querer"
+  assert.equal((await chamar("POST", base, S.empC, { ...doc, data: "2026-12-01" })).json.codigo, "data_futura");
+  assert.equal((await chamar("POST", base, S.empC, { ...doc, iva: 2.3 })).json.codigo, "iva_incoerente");
+  assert.equal((await chamar("POST", base, S.empC, { ...doc, base: -5, iva: 0 })).json.codigo, "valor_negativo");
+  const d = await chamar("POST", base, S.empC, doc);
+  assert.equal(d.status, 201);
+  // a mesma fatura escrita de outra forma é apanhada como repetida
+  const rep = await chamar("POST", base, S.empC, { ...doc, numero: "ft2026/77" });
+  assert.equal(rep.json.codigo, "documento_duplicado");
+  await chamar("POST", `${base}/${d.json.id}/validar`, S.empC, {});
+  // a empresa pede a anulação
+  const p = await chamar("POST", `${base}/${d.json.id}/anulacao`, S.empC, { motivo: "duplicado" });
+  assert.equal(p.json.estado, "anulacao_pedida");
+  assert.equal(p.json.anulacao.pedidaPor, "empresa");
+  // a empresa não pode aprovar a própria anulação
+  assert.equal((await chamar("POST", `${base}/${d.json.id}/anulacao/aprovar`, S.empC, {})).status, 403);
+  // o contabilista recusa → volta ao estado anterior
+  const r = await chamar("POST", `${base}/${d.json.id}/anulacao/recusar`, S.ccC, {});
+  assert.equal(r.json.estado, "validado");
+  assert.equal(r.json.anulacao, null);
+  // novo pedido, agora aprovado
+  await chamar("POST", `${base}/${d.json.id}/anulacao`, S.empC, { motivo: "valores_errados", detalhe: "valor 1000 em vez de 100" });
+  const ok = await chamar("POST", `${base}/${d.json.id}/anulacao/aprovar`, S.ccC, {});
+  assert.equal(ok.json.estado, "anulado");
+  // o documento continua guardado e o lançamento proposto deixou de contar
+  const lista = (await chamar("GET", base, S.empC)).json;
+  assert.equal(lista.find((x: { id: string }) => x.id === d.json.id).estado, "anulado");
+  const propostos = (await chamar("GET", `/v1/empresas/${S.empCId}/lancamentos?estado=proposto`, S.ccC)).json;
+  assert.equal(propostos.length, 0);
+  // depois de anulado, a fatura correta já pode ser registada
+  assert.equal((await chamar("POST", base, S.empC, { ...doc, base: 1000, iva: 230 })).status, 201);
+  // não existe nenhuma forma de apagar documentos pela API
+  assert.equal((await chamar("DELETE", `${base}/${d.json.id}`, S.empC)).status, 404);
+});
+
+test("16. sessão deslizante: quem usa a app recebe um token renovado", async () => {
+  const { SignJWT } = await import("jose");
+  const antigo = await new SignJWT({ papel: "empresa", nome: "Empresa C" }).setProtectedHeader({ alg: "HS256" })
+    .setSubject(S.empCId).setIssuedAt(Math.floor(Date.now() / 1000) - 10 * 86400).setExpirationTime("20d").sign(new TextEncoder().encode("teste"));
+  const r = await app.inject({ method: "GET", url: "/v1/auth/eu", headers: { authorization: `Bearer ${antigo}` } });
+  assert.equal(r.statusCode, 200);
+  const novo = r.headers["x-contabia-token"];
+  assert.ok(typeof novo === "string" && novo !== antigo);
+  const r2 = await app.inject({ method: "GET", url: "/v1/auth/eu", headers: { authorization: `Bearer ${novo}` } });
+  assert.equal(r2.statusCode, 200);
+  assert.equal(r2.headers["x-contabia-token"], undefined);
 });

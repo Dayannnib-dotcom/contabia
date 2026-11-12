@@ -22,6 +22,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      ["expo-notifications", { "color": "#0B6E5B" }],
       ["expo-camera", { "cameraPermission": "A Contabia usa a câmara para ler o código QR das faturas." }],
       ["expo-local-authentication", { "faceIDPermission": "A Contabia usa o Face ID para confirmar ligações ao seu contabilista." }]
     ],

@@ -6,3 +6,5 @@ export * from "./entrada";
 export * from "./icones";
 export * from "./partilhar";
 export * from "./biometria";
+export * from "./avisos";
+export * from "./ativar-avisos";

@@ -26,7 +26,7 @@ export interface Sessao {
 }
 
 export type TipoDocumento = "compra" | "venda" | "banco" | "pessoal";
-export type EstadoDocumento = "validar" | "validado" | "sem_anexo";
+export type EstadoDocumento = "validar" | "validado" | "sem_anexo" | "anulacao_pedida" | "anulado";
 
 export interface Documento {
   id: string;
@@ -48,6 +48,8 @@ export interface Documento {
   ivaDedutivel: boolean;
   origem: "qr" | "manual" | "efatura";
   criadoEm: string;
+  /** Preenchido quando alguém pediu ou fez a anulação. Nada se apaga: fica no histórico 10 anos. */
+  anulacao?: { motivo: string; pedidaPor: "empresa" | "contabilista"; em: string } | null;
 }
 
 export interface LinhaLancamento {
@@ -150,4 +152,19 @@ export interface RespostaAssistente {
   resposta: string;
   fontes: string[];
   encaminharParaContabilista: boolean;
+}
+
+export type MotivoAnulacao = "duplicado" | "valores_errados" | "nao_e_da_empresa" | "pessoal" | "outro";
+export const MOTIVOS_ANULACAO: Record<MotivoAnulacao, string> = {
+  duplicado: "Enviei este documento duas vezes",
+  valores_errados: "Os valores ou a data estão errados",
+  nao_e_da_empresa: "Não é uma despesa ou venda da empresa",
+  pessoal: "É uma despesa pessoal",
+  outro: "Outro motivo",
+};
+/** Texto legível de um motivo guardado ("duplicado" ou "valores_errados: detalhe"). */
+export function motivoLegivel(m: string): string {
+  const [chave, ...resto] = m.split(": ");
+  const base = MOTIVOS_ANULACAO[chave as MotivoAnulacao] ?? chave;
+  return resto.length ? `${base} — ${resto.join(": ")}` : base;
 }

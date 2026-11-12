@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 import { dataPT, diasAte, nomePeriodo } from "@contabia/shared";
-import { Cartao, Chip, Ecra, Erro, Linha, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
+import { AtivarAvisos, Cartao, Chip, Ecra, Erro, Linha, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
 
 const MES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
@@ -11,6 +11,7 @@ export default function Prazos() {
   return (
     <Ecra>
       <Titulo sub="Calculado para o seu regime e região; atualizado automaticamente quando a lei muda.">Prazos fiscais</Titulo>
+      <AtivarAvisos avisos={dados ? dados.filter((p) => !p.submetida).map((p) => ({ chave: `${p.codigo}:${p.periodo}`, prazo: p.prazo, titulo: p.descricao, corpo: `Luís: termina a ${p.prazo.split("-").reverse().join("/")} (${nomePeriodo(p.periodo)}). Envie já os documentos que faltam.` })) : null} />
       <Erro texto={erro} />
       <Cartao estilo={{ paddingVertical: 4 }}>
         {(dados ?? []).map((p, i) => {

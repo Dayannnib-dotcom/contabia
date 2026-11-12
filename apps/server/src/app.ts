@@ -39,11 +39,11 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   const hojeISO = () => agora().toISOString().slice(0, 10);
   const tentativasLigacao = new Map<string, number[]>();
 
-  await app.register(cors, { origin: true });
+  await app.register(cors, { origin: true, exposedHeaders: ["x-contabia-token"] });
   await app.register(websocket);
 
   // ── Sessão ──
-  app.addHook("onRequest", async (req) => {
+  app.addHook("onRequest", async (req, reply) => {
     const h = req.headers.authorization;
     const q = (req.query as { token?: string } | undefined)?.token;
     const token = h?.startsWith("Bearer ") ? h.slice(7) : q;
@@ -51,7 +51,9 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const a = await tokens.verificar(token);
     const [existe] = await db.query(a.papel === "empresa" ? `SELECT 1 FROM empresas WHERE id = $1` : `SELECT 1 FROM contabilistas WHERE id = $1`, [a.id]);
     if (!existe) throw new ErroApp("sessao_invalida", "A sua sessão terminou. Entre novamente.", 401);
-    (req as FastifyRequest & { ator?: Ator }).ator = a;
+    (req as FastifyRequest & { ator?: Ator }).ator = { papel: a.papel, id: a.id, nome: a.nome };
+    // Sessão deslizante: quem usa a app pelo menos uma vez por mês nunca é posto fora.
+    if (h && Date.now() / 1000 - a.emitidoEm > 24 * 3600) reply.header("x-contabia-token", await tokens.emitir(a));
   });
 
   // ── Idempotência: o mesmo pedido reenviado devolve a mesma resposta ──
@@ -278,12 +280,13 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   });
 
   // ═════════════ Documentos ═════════════
-  type LinhaDoc = { id: string; empresa_id: string; tipo: string; terceiro_nif: string; terceiro_nome: string; numero: string; atcud: string; data: string; base: string; iva: string; total: string; taxa: string; espaco_fiscal: string; estado: string; conta_sugerida: string; categoria: string; iva_dedutivel: boolean; origem: string; criado_em: string };
+  type LinhaDoc = { id: string; empresa_id: string; tipo: string; terceiro_nif: string; terceiro_nome: string; numero: string; atcud: string; data: string; base: string; iva: string; total: string; taxa: string; espaco_fiscal: string; estado: string; conta_sugerida: string; categoria: string; iva_dedutivel: boolean; origem: string; criado_em: string; estado_anterior?: string | null; anulacao_motivo?: string | null; anulacao_pedida_por?: string | null; anulacao_em?: string | null };
   const docDe = (d: LinhaDoc): Documento => ({
     id: d.id, empresaId: d.empresa_id, tipo: d.tipo as Documento["tipo"], terceiroNif: d.terceiro_nif, terceiroNome: d.terceiro_nome, numero: d.numero,
     atcud: d.atcud, data: d.data, base: Number(d.base), iva: Number(d.iva), total: Number(d.total), taxa: Number(d.taxa), espacoFiscal: d.espaco_fiscal,
     estado: d.estado as Documento["estado"], contaSugerida: d.conta_sugerida, categoria: d.categoria, ivaDedutivel: d.iva_dedutivel,
     origem: d.origem as Documento["origem"], criadoEm: d.criado_em,
+    anulacao: d.anulacao_motivo ? { motivo: d.anulacao_motivo, pedidaPor: d.anulacao_pedida_por as "empresa" | "contabilista", em: d.anulacao_em ?? "" } : null,
   });
 
   app.get("/v1/empresas/:id/documentos", async (req) => {
@@ -329,6 +332,19 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
       if (m.terceiroNif && !validarNIF(m.terceiroNif)) throw new ErroApp("nif_invalido", "O NIF do fornecedor/cliente não é válido.");
       d = { ...m, atcud: m.atcud ?? "", total: Math.round((m.base + m.iva) * 100) / 100, espacoFiscal: empresa.regiao, origem: "manual" };
     }
+    // Erros "sem querer" mais comuns: data errada, período já fechado, a mesma fatura duas vezes.
+    const hoje = hojeISO();
+    if (d.data > hoje) throw new ErroApp("data_futura", `A data ${d.data.split("-").reverse().join("/")} ainda não chegou. Confirme a data da fatura.`);
+    if (d.data < "2000-01-01") throw new ErroApp("data_invalida", "A data do documento não parece correta.");
+    if (await periodoFechado(id, d.data.slice(0, 7)))
+      throw new ErroApp("periodo_fechado", `O mês ${d.data.slice(5, 7)}/${d.data.slice(0, 4)} já foi fechado pelo contabilista. Fale com ele antes de juntar documentos a esse mês.`, 409);
+    if (d.base < 0 || d.iva < 0) throw new ErroApp("valor_negativo", "Os valores não podem ser negativos. Para devoluções, registe a nota de crédito.");
+    if (d.origem === "manual" && d.taxa >= 0 && Math.abs(d.iva - (d.base * d.taxa) / 100) > Math.max(0.05, d.base * 0.005))
+      throw new ErroApp("iva_incoerente", `O IVA (${d.iva.toFixed(2)} €) não corresponde a ${d.taxa}% de ${d.base.toFixed(2)} €. Confirme os valores.`);
+    const [repetido] = await db.query<LinhaDoc>(
+      `SELECT * FROM documentos WHERE empresa_id = $1 AND terceiro_nif = $2 AND tipo = $3 AND upper(replace(numero, ' ', '')) = upper(replace($4, ' ', '')) AND estado <> 'anulado'`,
+      [id, d.terceiroNif, d.tipo, d.numero]);
+    if (repetido) throw new ErroApp("documento_duplicado", `Este documento já foi registado a ${repetido.criado_em.slice(0, 10).split("-").reverse().join("/")} (${repetido.numero}). Não é preciso enviá-lo outra vez.`, 409);
     const cl = await classificar(db, id, d.tipo, d.terceiroNif, `${d.terceiroNome} ${String(corpo.descricao ?? "")}`);
     const novo: Documento = { ...d, id: novoId(), empresaId: id, estado: "validar", contaSugerida: cl.conta, categoria: cl.categoria, ivaDedutivel: cl.ivaDedutivel, criadoEm: agoraISO() };
     await db.query(
@@ -350,6 +366,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const b = z.object({ contaSugerida: z.string().regex(/^\d{2,8}$/).optional(), ivaDedutivel: z.boolean().optional(), terceiroNome: z.string().optional() }).parse(req.body ?? {});
     const [d0] = await db.query<LinhaDoc>(`SELECT * FROM documentos WHERE id = $1 AND empresa_id = $2`, [doc, id]);
     if (!d0) throw new ErroApp("nao_encontrado", "Documento não encontrado.", 404);
+    if (d0.estado === "anulado" || d0.estado === "anulacao_pedida") throw new ErroApp("documento_anulado", "Este documento está anulado ou com anulação pedida.", 409);
     const [d1] = await db.query<LinhaDoc>(
       `UPDATE documentos SET estado = 'validado', conta_sugerida = COALESCE($1, conta_sugerida), iva_dedutivel = COALESCE($2, iva_dedutivel), terceiro_nome = COALESCE($3, terceiro_nome) WHERE id = $4 RETURNING *`,
       [b.contaSugerida ?? null, b.ivaDedutivel ?? null, b.terceiroNome ?? null, doc]);
@@ -366,6 +383,75 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     }
     await publicar(db, hub, id, "documento.validado", a.papel, { documentoId: doc });
     return d;
+  });
+
+  // ═════════════ Anulação de documentos ═════════════
+  // Nada é apagado: a lei obriga a guardar documentos e registos 10 anos (CIRC, art. 123.º, n.º 4).
+  // A empresa só PEDE a anulação; quem decide é o Contabilista Certificado.
+  const MOTIVOS = ["duplicado", "valores_errados", "nao_e_da_empresa", "pessoal", "outro"] as const;
+  async function docDaEmpresa(id: string, doc: string) {
+    const [d] = await db.query<LinhaDoc>(`SELECT * FROM documentos WHERE id = $1 AND empresa_id = $2`, [doc, id]);
+    if (!d) throw new ErroApp("nao_encontrado", "Documento não encontrado.", 404);
+    return d;
+  }
+  async function concretizarAnulacao(id: string, d: LinhaDoc, motivo: string, por: "empresa" | "contabilista") {
+    const lancs = await db.query<LinhaLanc>(`SELECT * FROM lancamentos WHERE documento_id = $1 AND estado IN ('proposto','lancado')`, [d.id]);
+    const hoje = hojeISO();
+    for (const l of lancs) {
+      if (l.estado === "proposto") {
+        await db.query(`UPDATE lancamentos SET estado = 'estornado', versao = versao + 1 WHERE id = $1`, [l.id]);
+        continue;
+      }
+      // Já lançado: o original fica e faz-se um estorno com data de hoje (o período original pode estar fechado).
+      if (await periodoFechado(id, hoje.slice(0, 7))) throw new ErroApp("periodo_fechado", "O período atual está fechado; reabra-o para anular este documento.", 409);
+      await db.query(`UPDATE lancamentos SET estado = 'estornado', versao = versao + 1 WHERE id = $1`, [l.id]);
+      const inversas = l.linhas.map((x) => ({ ...x, debito: x.credito, credito: x.debito, descricao: `Anulação: ${x.descricao}` }));
+      await db.query(`INSERT INTO lancamentos (id, empresa_id, documento_id, diario, data, periodo, descricao, linhas, estado, confianca, versao, criado_em) VALUES ($1,$2,NULL,$3,$4,$5,$6,$7::jsonb,'lancado','alta',1,$8)`,
+        [novoId(), id, l.diario, hoje, hoje.slice(0, 7), `Anulação de ${l.descricao}`, JSON.stringify(inversas), agoraISO()]);
+    }
+    const [r] = await db.query<LinhaDoc>(
+      `UPDATE documentos SET estado = 'anulado', estado_anterior = COALESCE(estado_anterior, estado), anulacao_motivo = $1, anulacao_pedida_por = COALESCE(anulacao_pedida_por, $2), anulacao_em = $3 WHERE id = $4 RETURNING *`,
+      [motivo, por, agoraISO(), d.id]);
+    await publicar(db, hub, id, "documento.anulado", "contabilista", { documentoId: d.id, numero: d.numero });
+    return docDe(r);
+  }
+
+  app.post("/v1/empresas/:id/documentos/:doc/anulacao", async (req) => {
+    const a = ator(req);
+    const { id, doc } = params(req);
+    await exigirAcesso(db, a, id);
+    const b = z.object({ motivo: z.enum(MOTIVOS), detalhe: z.string().max(300).optional() }).parse(req.body ?? {});
+    const d = await docDaEmpresa(id, doc);
+    if (d.estado === "anulado") throw new ErroApp("ja_anulado", "Este documento já está anulado.", 409);
+    const motivo = b.detalhe?.trim() ? `${b.motivo}: ${b.detalhe.trim()}` : b.motivo;
+    if (a.papel === "contabilista") return concretizarAnulacao(id, d, motivo, "contabilista");
+    if (d.estado === "anulacao_pedida") return docDe(d);
+    const [r] = await db.query<LinhaDoc>(
+      `UPDATE documentos SET estado = 'anulacao_pedida', estado_anterior = $1, anulacao_motivo = $2, anulacao_pedida_por = 'empresa', anulacao_em = $3 WHERE id = $4 RETURNING *`,
+      [d.estado, motivo, agoraISO(), doc]);
+    await publicar(db, hub, id, "documento.anulacao_pedida", "empresa", { documentoId: doc, numero: d.numero, motivo });
+    return docDe(r);
+  });
+  app.post("/v1/empresas/:id/documentos/:doc/anulacao/aprovar", async (req) => {
+    const a = ator(req);
+    const { id, doc } = params(req);
+    exigirPapel(a, "contabilista");
+    await exigirAcesso(db, a, id, "lancamentos.escrever");
+    const d = await docDaEmpresa(id, doc);
+    if (d.estado !== "anulacao_pedida") throw new ErroApp("estado_invalido", "Não há pedido de anulação para este documento.", 409);
+    return concretizarAnulacao(id, d, d.anulacao_motivo ?? "outro", "empresa");
+  });
+  app.post("/v1/empresas/:id/documentos/:doc/anulacao/recusar", async (req) => {
+    const a = ator(req);
+    const { id, doc } = params(req);
+    exigirPapel(a, "contabilista");
+    await exigirAcesso(db, a, id);
+    const d = await docDaEmpresa(id, doc);
+    if (d.estado !== "anulacao_pedida") throw new ErroApp("estado_invalido", "Não há pedido de anulação para este documento.", 409);
+    const [r] = await db.query<LinhaDoc>(
+      `UPDATE documentos SET estado = COALESCE(estado_anterior, 'validar'), estado_anterior = NULL, anulacao_motivo = NULL, anulacao_pedida_por = NULL, anulacao_em = NULL WHERE id = $1 RETURNING *`, [doc]);
+    await publicar(db, hub, id, "documento.anulacao_recusada", "contabilista", { documentoId: doc, numero: d.numero });
+    return docDe(r);
   });
 
   // ═════════════ Lançamentos ═════════════

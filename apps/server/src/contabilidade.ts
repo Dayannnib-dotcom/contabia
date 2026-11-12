@@ -220,7 +220,7 @@ export async function gerarSAFT(db: Db, empresa: Empresa, ano: number): Promise<
     [empresa.id, `${ano}-%`],
   );
   const terceiros = await db.query<{ tipo: string; terceiro_nif: string; terceiro_nome: string }>(
-    `SELECT DISTINCT tipo, terceiro_nif, terceiro_nome FROM documentos WHERE empresa_id = $1 AND data LIKE $2`,
+    `SELECT DISTINCT tipo, terceiro_nif, terceiro_nome FROM documentos WHERE empresa_id = $1 AND data LIKE $2 AND estado <> 'anulado'`,
     [empresa.id, `${ano}-%`],
   );
   const avisos: string[] = [];

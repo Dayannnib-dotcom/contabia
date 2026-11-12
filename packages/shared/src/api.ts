@@ -5,6 +5,7 @@
  * - Tempo real por WebSocket com recuperação por cursor ao reconectar.
  */
 import type {
+  MotivoAnulacao,
   ApuramentoIVA, Documento, Empresa, Evento, Lancamento, Ligacao, Pedido, RespostaAssistente,
   ResumoEmpresa, Sessao, Submissao, VerificacaoFecho, Contabilista,
 } from "./tipos.ts";
@@ -25,6 +26,8 @@ export class ApiContabia {
   token: string | null = null;
   /** Chamado quando o servidor diz que a sessão já não é válida (ex.: conta apagada). */
   aoSessaoInvalida: (() => void) | null = null;
+  /** O servidor renovou a sessão: a app guarda o novo token. */
+  aoTokenNovo: ((token: string) => void) | null = null;
 
   constructor(public base: string, private esperar = (ms: number) => new Promise((r) => setTimeout(r, ms))) {}
 
@@ -41,6 +44,8 @@ export class ApiContabia {
           },
           body: corpo === undefined ? undefined : JSON.stringify(corpo),
         });
+        const novo = r.headers.get("x-contabia-token");
+        if (novo && this.token) { this.token = novo; this.aoTokenNovo?.(novo); }
         const texto = await r.text();
         let json: { codigo?: string; mensagem?: string } | null = null;
         try {
@@ -120,6 +125,16 @@ export class ApiContabia {
   }
   criarDocumento(empresaId: string, d: Partial<Documento>) {
     return this.pedido<Documento>("POST", `/v1/empresas/${empresaId}/documentos`, d);
+  }
+  /** Empresa: pede a anulação (o contabilista decide). Contabilista: anula logo. Nada é apagado. */
+  pedirAnulacao(empresaId: string, id: string, motivo: MotivoAnulacao, detalhe?: string) {
+    return this.pedido<Documento>("POST", `/v1/empresas/${empresaId}/documentos/${id}/anulacao`, { motivo, ...(detalhe ? { detalhe } : {}) });
+  }
+  aprovarAnulacao(empresaId: string, id: string) {
+    return this.pedido<Documento>("POST", `/v1/empresas/${empresaId}/documentos/${id}/anulacao/aprovar`, {});
+  }
+  recusarAnulacao(empresaId: string, id: string) {
+    return this.pedido<Documento>("POST", `/v1/empresas/${empresaId}/documentos/${id}/anulacao/recusar`, {});
   }
   validarDocumento(empresaId: string, id: string, alteracoes: { contaSugerida?: string; ivaDedutivel?: boolean; terceiroNome?: string } = {}) {
     return this.pedido<Documento>("POST", `/v1/empresas/${empresaId}/documentos/${id}/validar`, alteracoes);

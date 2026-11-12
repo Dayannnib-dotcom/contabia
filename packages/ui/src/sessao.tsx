@@ -2,6 +2,7 @@
  * Sessão partilhada pelas duas apps: guarda o token no cofre do telemóvel,
  * cria o cliente da API e mantém o tempo real ligado.
  */
+import { cancelarAvisos } from "./avisos";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
@@ -83,6 +84,7 @@ export function ProvedorSessao({ children, urlApi, chave = "contabia.sessao" }: 
 
   const sair = useCallback(async () => {
     tr.current?.parar();
+    await cancelarAvisos().catch(() => undefined);
     api.token = null;
     await guardar.escrever(null);
     setSessao(null);
@@ -93,6 +95,14 @@ export function ProvedorSessao({ children, urlApi, chave = "contabia.sessao" }: 
     api.aoSessaoInvalida = () => { void sair(); };
     return () => { api.aoSessaoInvalida = null; };
   }, [api, sair]);
+
+  // Sessão renovada pelo servidor: guarda o novo token para a sessão não expirar.
+  useEffect(() => {
+    api.aoTokenNovo = (token) => {
+      guardar.ler().then((v) => { if (v) void guardar.escrever(JSON.stringify({ ...(JSON.parse(v) as Sessao), token })); });
+    };
+    return () => { api.aoTokenNovo = null; };
+  }, [api, guardar]);
 
   const definirEmpresas = useCallback((ids: string[]) => {
     const novas = ids.filter((i) => !empresas.current.includes(i));

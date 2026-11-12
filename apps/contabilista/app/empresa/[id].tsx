@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useNavigation } from "expo-router";
-import { euros, nomePeriodo, type Lancamento } from "@contabia/shared";
+import { euros, motivoLegivel, nomePeriodo, type Lancamento } from "@contabia/shared";
 import { Botao, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
 
 type Sec = "revisao" | "iva" | "pedidos" | "saft" | "fecho";
@@ -50,6 +50,51 @@ export default function EmpresaDetalhe() {
   );
 }
 
+/** Pedidos de anulação feitos pela empresa: só o contabilista decide. */
+function Anulacoes({ id, aoMudar }: { id: string; aoMudar: () => void }) {
+  const { api } = useSessao();
+  const { dados, recarregar } = useDados(async () => (await api.documentos(id)).filter((d) => d.estado === "anulacao_pedida"), [id]);
+  const [aTratar, setATratar] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  if (!dados?.length) return null;
+  async function decidir(docId: string, aprovar: boolean) {
+    setATratar(docId + aprovar);
+    setErro(null);
+    try {
+      if (aprovar) await api.aprovarAnulacao(id, docId); else await api.recusarAnulacao(id, docId);
+      await recarregar();
+      aoMudar();
+    } catch (e) {
+      setErro((e as Error).message);
+    } finally {
+      setATratar(null);
+    }
+  }
+  return (
+    <View style={{ gap: 10 }}>
+      <Texto forte tamanho={16}>Pedidos de anulação ({dados.length})</Texto>
+      <Erro texto={erro} />
+      {dados.map((d) => (
+        <Cartao key={d.id} destaque>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Texto forte>{d.numero} · {d.terceiroNome}</Texto>
+              <Texto sec tamanho={12}>{d.data.split("-").reverse().join("/")} · {euros(d.total)}</Texto>
+            </View>
+            <Chip texto="Anulação pedida" tipo="aviso" />
+          </View>
+          {d.anulacao ? <Texto>Motivo da empresa: {motivoLegivel(d.anulacao.motivo)}</Texto> : null}
+          <Texto sec tamanho={12}>Ao aprovar, o documento deixa de contar e os lançamentos são estornados com data de hoje. O documento fica guardado.</Texto>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <Botao titulo="Manter documento" variante="secundario" onPress={() => decidir(d.id, false)} carregando={aTratar === d.id + "false"} estilo={{ flex: 1 }} />
+            <Botao titulo="Aprovar anulação" variante="perigo" onPress={() => decidir(d.id, true)} carregando={aTratar === d.id + "true"} estilo={{ flex: 1 }} />
+          </View>
+        </Cartao>
+      ))}
+    </View>
+  );
+}
+
 function Revisao({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
   const { api } = useSessao();
   const { dados, recarregar } = useDados(() => api.lancamentos(id, "proposto"), [id]);
@@ -72,9 +117,10 @@ function Revisao({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
   }
 
   if (!dados) return <Texto sec>A carregar…</Texto>;
-  if (!dados.length) return <MensagemLuis texto="Todos os lançamentos desta empresa estão revistos." acao={<Botao titulo="Seguir para o IVA" variante="menta" onPress={() => irPara("iva")} estilo={{ alignSelf: "flex-start", minHeight: 40 }} />} />;
+  if (!dados.length) return <View style={{ gap: 12 }}><Anulacoes id={id} aoMudar={recarregar} /><MensagemLuis texto="Todos os lançamentos desta empresa estão revistos." acao={<Botao titulo="Seguir para o IVA" variante="menta" onPress={() => irPara("iva")} estilo={{ alignSelf: "flex-start", minHeight: 40 }} />} /></View>;
   return (
     <View style={{ gap: 12 }}>
+      <Anulacoes id={id} aoMudar={recarregar} />
       <Texto sec>Propostos pela IA a partir dos documentos validados pela empresa. Nada é lançado sem a sua aprovação.</Texto>
       <Botao titulo="Aprovar todos com confiança alta" onPress={async () => { const r = await api.aprovarConfiancaAlta(id); setErro(r.aprovados ? null : "Não há lançamentos com confiança alta."); recarregar(); }} />
       <Erro texto={erro} />
