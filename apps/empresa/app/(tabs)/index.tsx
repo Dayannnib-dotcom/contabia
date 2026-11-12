@@ -1,8 +1,8 @@
 import { FilaPendente } from "../../components/FilaPendente";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { dataPT, diasAte, nomePeriodo, saudacao } from "@contabia/shared";
-import { Botao, Cartao, useAvisosPrazos, Chip, Ecra, Erro, Icone, Linha, MensagemLuis, Numero, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
+import { dataPT, diasAte, euros, nomePeriodo, saudacao } from "@contabia/shared";
+import { Botao, Cartao, GraficoMensal, useAvisosPrazos, Chip, Ecra, Erro, Icone, Linha, MensagemLuis, Numero, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
 
 const MESES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
@@ -12,8 +12,8 @@ export default function Painel() {
   const id = sessao!.id;
   const gestor = sessao!.perfil !== "colaborador";
   const { dados, erro, recarregar } = useDados(async () => {
-    const [resumo, prazos, pedidos, ligacoes] = await Promise.all([api.resumo(id), api.prazos(id), api.pedidos(id), api.ligacoes()]);
-    return { resumo, prazos, pedidos: pedidos.filter((p) => p.estado === "pendente"), ligPendente: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "contabilista"), conviteEnviado: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "empresa"), ligAtiva: ligacoes.find((l) => l.estado === "ativa") };
+    const [resumo, prazos, pedidos, ligacoes, docs] = await Promise.all([api.resumo(id), api.prazos(id), api.pedidos(id), api.ligacoes(), api.documentos(id)]);
+    return { resumo, docs, prazos, pedidos: pedidos.filter((p) => p.estado === "pendente"), ligPendente: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "contabilista"), conviteEnviado: ligacoes.find((l) => l.estado === "pendente" && l.iniciadaPor === "empresa"), ligAtiva: ligacoes.find((l) => l.estado === "ativa") };
   }, [id]);
 
   // Avisos no telemóvel 7 dias, 2 dias e no dia de cada prazo por submeter (funcionam com a app fechada).
@@ -48,6 +48,28 @@ export default function Painel() {
             <Texto forte>{prox.descricao}</Texto>
             <Texto tamanho={12} cor={cor.ambarTexto}>{nomePeriodo(prox.periodo)} · faltam {diasAte(hoje, prox.prazo)} dias</Texto>
           </View>
+        </Cartao>
+      ) : null}
+
+      {dados?.docs.length ? (
+        <Cartao>
+          <Texto forte tamanho={15}>Os seus números</Texto>
+          <GraficoMensal docs={dados.docs} />
+          {(() => {
+            // IVA estimado do período em curso: IVA das vendas − IVA dedutível das compras
+            const agora = new Date();
+            const trimestral = dados.resumo.empresa.regimeIVA === "trimestral";
+            const m0 = trimestral ? Math.floor(agora.getMonth() / 3) * 3 : agora.getMonth();
+            const meses = (trimestral ? [m0, m0 + 1, m0 + 2] : [m0]).map((m) => `${agora.getFullYear()}-${String(m + 1).padStart(2, "0")}`);
+            const doPeriodo = dados.docs.filter((d) => meses.includes(d.data.slice(0, 7)) && d.estado !== "anulado" && d.estado !== "anulacao_pedida");
+            const iva = doPeriodo.reduce((s2, d) => s2 + (d.tipo === "venda" ? d.iva : d.tipo === "compra" && d.ivaDedutivel ? -d.iva : 0), 0);
+            return (
+              <View style={{ borderTopWidth: 1, borderTopColor: cor.linha, paddingTop: 10, gap: 2 }}>
+                <Texto sec tamanho={12}>IVA estimado {trimestral ? "deste trimestre" : "deste mês"} (com o que já registou)</Texto>
+                <Texto forte tamanho={20}>{iva >= 0 ? `${euros(iva)} a pagar` : `${euros(-iva)} a recuperar`}</Texto>
+              </View>
+            );
+          })()}
         </Cartao>
       ) : null}
 

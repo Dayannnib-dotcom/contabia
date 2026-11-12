@@ -12,3 +12,4 @@ export * from "./anexos";
 export * from "./ficheiros";
 export * from "./banco";
 export * from "./atividade";
+export * from "./grafico";

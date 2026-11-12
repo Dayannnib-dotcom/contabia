@@ -187,6 +187,15 @@ with sync_playwright() as p:
         emp.get_by_text("Importei 1 fatura", exact=False).wait_for(timeout=15000)
         shot(emp, "18f_efatura_feito")
         emp.get_by_role("button", name="Ver documentos").click()
+        # pesquisa e filtros
+        emp.get_by_label("Pesquisar").fill("combust")
+        emp.get_by_text("Combustíveis do Funchal SA").first.wait_for()
+        assert emp.get_by_text("FT 2026/419", exact=False).count() == 0 or not emp.get_by_text("FT 2026/419", exact=False).first.is_visible()
+        shot(emp, "18f2_pesquisa")
+        emp.get_by_label("Pesquisar").fill("")
+        emp.get_by_role("button", name="Anulados · 1").click()
+        emp.get_by_text("Anulado", exact=True).first.wait_for()
+        emp.get_by_role("button", name="Todos · ", exact=False).click()
 
         # ── Banco: o contabilista importa o extrato; a app liga o pagamento à fatura e explica porquê ──
         extrato = ("Conta;0035 0001 000123456789\nTitular;ATLANTICO SERVICOS LDA\n\n"
@@ -208,6 +217,9 @@ with sync_playwright() as p:
         shot(cc, "18h_cc_banco_feito")
         emp.get_by_role("tab", name="Painel").click()
         emp.get_by_text("Pedido do contabilista: Fatura em falta (banco)").wait_for(timeout=15000)
+        emp.get_by_text("Os seus números").wait_for()
+        emp.get_by_text("IVA estimado", exact=False).wait_for()
+        shot(emp, "18h2_painel_grafico")
 
         # ── Vários utilizadores: o gestor adiciona uma colaboradora; ela entra com o próprio e-mail ──
         emp.get_by_text("Utilizadores e atividade").click()
