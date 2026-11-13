@@ -3,7 +3,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { Regras } from "../../components/Regras";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { euros, motivoLegivel, nomePeriodo, type Lancamento } from "@contabia/shared";
-import { Apoios, EspacoServicosVista, RespostaRapida, Banco, Botao, RegistoAtividade, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, VerOriginal, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
+import { Apoios, EspacoServicosVista, useTempoTrabalho, RespostaRapida, Banco, Botao, RegistoAtividade, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, VerOriginal, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
 
 type Sec = "servicos" | "revisao" | "banco" | "regras" | "iva" | "pedidos" | "saft" | "fecho" | "atividade" | "apoios";
 const SECS: [Sec, string][] = [["revisao", "Revisão"], ["servicos", "Serviços e horas"], ["banco", "Banco"], ["regras", "Regras"], ["iva", "IVA"], ["pedidos", "Pedidos"], ["saft", "SAF-T"], ["fecho", "Fecho"], ["apoios", "Apoios UE"], ["atividade", "Atividade"]];
@@ -21,6 +21,8 @@ export default function EmpresaDetalhe() {
   const nav = useNavigation();
   const [sec, setSec] = useState<Sec>(secInicial ?? "revisao");
   const [contactar, setContactar] = useState(false);
+  // tempo de trabalho nesta empresa, medido por tarefa (só enquanto o contabilista está ativo)
+  const marcar = useTempoTrabalho(id, sec);
   const { dados: resumo } = useDados(async () => {
     const r = await api.resumo(id);
     nav.setOptions({ title: r.empresa.nome });
@@ -28,7 +30,7 @@ export default function EmpresaDetalhe() {
   }, [id]);
 
   return (
-    <Ecra>
+    <Ecra aoInteragir={marcar}>
       <Titulo sub={resumo ? `NIF ${resumo.empresa.nif} · IVA ${resumo.empresa.regimeIVA}` : undefined}>{resumo?.empresa.nome ?? "…"}</Titulo>
       {resumo ? (
         contactar ? (

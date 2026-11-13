@@ -1004,6 +1004,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const consulta = req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS";
     if (consulta && !CONSULTAS_REGISTADAS.has(chave)) return;
     if (rota.startsWith("/v1/whatsapp/webhook")) return; // registado com mais contexto em aoWhatsApp
+    if (chave === "POST /v1/empresas/:id/tempo" && reply.statusCode < 400) return; // medição de tempo: fica somada em tempo_trabalho, não é uma ação
     const corpo = req.body as Record<string, unknown> | undefined;
     const base = { rota: chave, ip: req.ip, agente: String(req.headers["user-agent"] ?? "") || null };
     const p = (req.params ?? {}) as Record<string, string>;
@@ -1051,7 +1052,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   });
 
   // ═════════════ Espaço de serviços e horas do contabilista ═════════════
-  rotasServicos(app, db, agora);
+  rotasServicos(app, db, agora, { aoPartilhar: async (empresaId, r) => { await auto?.relatorioTempo(empresaId, r); } });
 
   // ═════════════ Regras por fornecedor (do contabilista) ═════════════
   type LinhaRegra = { nif: string; nome: string; conta: string; iva_dedutivel: boolean; auto_lancar: boolean; criada_em: string };

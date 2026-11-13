@@ -7,8 +7,8 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
-  NOME_MODALIDADE, NOME_SERVICO, datasPrevistas, hojeLisboa, horasDecimais, resumirServicos,
-  type EspacoServicos, type LinhaHorasCarteira, type PlanoServicos, type Servico,
+  CATEGORIAS_TEMPO, NOME_MODALIDADE, NOME_SERVICO, NOME_TAREFA, datasPrevistas, hojeLisboa, horasDecimais, minutosInvestidos, resumirServicos, valorDoMes,
+  type CategoriaTempo, type EspacoServicos, type Honorarios, type LinhaHorasCarteira, type PlanoServicos, type RelatorioTempo, type Servico, type TempoApp,
 } from "@contabia/shared";
 import type { Db } from "./db.ts";
 import { ErroApp, ator, exigirAcesso, exigirPapel, novoId, type Ator } from "./comum.ts";
@@ -35,7 +35,12 @@ const MODALIDADES = ["presencial", "videochamada", "telefone"] as const;
 const zMes = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Mês inválido (AAAA-MM).");
 const zData = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida.");
 
-export function rotasServicos(app: FastifyInstance, db: Db, agora: () => Date) {
+export interface ExtrasServicos {
+  /** Avisar a empresa (push + e-mail) de que há um relatório de tempo novo. */
+  aoPartilhar?: (empresaId: string, r: RelatorioTempo) => Promise<void>;
+}
+
+export function rotasServicos(app: FastifyInstance, db: Db, agora: () => Date, extras: ExtrasServicos = {}) {
   const agoraISO = () => agora().toISOString();
   const hoje = () => hojeLisboa(agora());
   const p = (req: FastifyRequest) => req.params as Record<string, string>;
@@ -54,11 +59,33 @@ export function rotasServicos(app: FastifyInstance, db: Db, agora: () => Date) {
     if (!datasPrevistas(pl, h.slice(0, 7)).includes(h)) return false;
     return !servicos.some((s) => s.tipo === "reuniao" && s.data === h && s.estado !== "anulado");
   }
-  async function espaco(empresaId: string, mes: string): Promise<EspacoServicos> {
+  async function tempoApp(empresaId: string, mes: string): Promise<TempoApp> {
+    const rs = await db.query<{ categoria: string; s: number }>(
+      `SELECT categoria, sum(segundos)::int AS s FROM tempo_trabalho WHERE empresa_id = $1 AND dia LIKE $2 GROUP BY categoria`, [empresaId, `${mes}-%`]);
+    const porCategoria = CATEGORIAS_TEMPO.map((c) => ({ categoria: c, segundos: Number(rs.find((r) => r.categoria === c)?.s ?? 0) })).filter((x) => x.segundos > 0);
+    return { segundos: porCategoria.reduce((n, x) => n + x.segundos, 0), porCategoria };
+  }
+  async function honorarios(empresaId: string): Promise<Honorarios | null> {
+    const [r] = await db.query<{ avenca_mensal: string | null; tarifa_hora: string | null }>(`SELECT avenca_mensal, tarifa_hora FROM honorarios WHERE empresa_id = $1`, [empresaId]);
+    return r ? { avencaMensal: r.avenca_mensal == null ? null : Number(r.avenca_mensal), tarifaHora: r.tarifa_hora == null ? null : Number(r.tarifa_hora) } : null;
+  }
+  async function relatorios(empresaId: string): Promise<RelatorioTempo[]> {
+    const rs = await db.query<{ id: string; mes: string; dados: unknown; nota: string | null; partilhado_por: string; partilhado_em: string }>(
+      `SELECT id, mes, dados, nota, partilhado_por, partilhado_em FROM relatorios_tempo WHERE empresa_id = $1 ORDER BY partilhado_em DESC LIMIT 36`, [empresaId]);
+    return rs.map((r) => ({ ...(typeof r.dados === "string" ? JSON.parse(r.dados) : r.dados) as Omit<RelatorioTempo, "id" | "mes" | "nota" | "partilhadoPor" | "partilhadoEm">,
+      id: r.id, mes: r.mes, nota: r.nota, partilhadoPor: r.partilhado_por, partilhadoEm: r.partilhado_em }));
+  }
+  async function espaco(empresaId: string, mes: string, a?: Ator): Promise<EspacoServicos> {
     const [pl, servicos] = await Promise.all([plano(empresaId), doMes(empresaId, mes)]);
     const h = hoje();
     const deHoje = mes === h.slice(0, 7) ? servicos : await doMes(empresaId, h.slice(0, 7));
-    return { mes, hoje: h, plano: pl, servicos, resumo: resumirServicos(servicos, pl, mes, h), reuniaoDeHojePorRegistar: porRegistarHoje(pl, deHoje) };
+    const resumo = resumirServicos(servicos, pl, mes, h);
+    const cc = a?.papel === "contabilista";
+    const t = cc ? await tempoApp(empresaId, mes) : null;
+    return {
+      mes, hoje: h, plano: pl, servicos, resumo, reuniaoDeHojePorRegistar: porRegistarHoje(pl, deHoje),
+      tempo: { tempoApp: t, honorarios: cc ? await honorarios(empresaId) : null, minutosInvestidos: cc ? minutosInvestidos(resumo, t) : null, relatorios: await relatorios(empresaId) },
+    };
   }
   async function umServico(empresaId: string, sid: string) {
     const [r] = await db.query<LinhaServico>(`SELECT * FROM servicos WHERE id = $1 AND empresa_id = $2`, [sid, empresaId]);
@@ -76,7 +103,63 @@ export function rotasServicos(app: FastifyInstance, db: Db, agora: () => Date) {
   app.get("/v1/empresas/:id/servicos", async (req) => {
     await exigirAcesso(db, ator(req), p(req).id);
     const q = z.object({ mes: zMes.optional() }).parse(req.query);
-    return espaco(p(req).id, q.mes ?? hoje().slice(0, 7));
+    return espaco(p(req).id, q.mes ?? hoje().slice(0, 7), ator(req));
+  });
+
+  // ───── Tempo de trabalho medido na app (sinal de presença do ecrã da empresa) ─────
+  const ultimoSinal = new Map<string, number>();
+  app.post("/v1/empresas/:id/tempo", async (req) => {
+    const a = await exigirCC(req);
+    const b = z.object({ categoria: z.enum(CATEGORIAS_TEMPO as [CategoriaTempo, ...CategoriaTempo[]]), segundos: z.number().int().min(1).max(600) }).parse(req.body);
+    const agoraMs = agora().getTime();
+    const ultimo = ultimoSinal.get(a.id);
+    // nunca conta mais do que o tempo real que passou (vários separadores ou dispositivos não somam)
+    const permitido = Math.min(b.segundos, 120, ultimo === undefined ? 120 : Math.max(0, Math.round((agoraMs - ultimo) / 1000) + 5));
+    ultimoSinal.set(a.id, agoraMs);
+    if (permitido <= 0) return { contados: 0 };
+    // durante uma reunião cronometrada desta empresa, o tempo já conta na reunião
+    if (b.categoria === "servicos") {
+      const [r] = await db.query(`SELECT 1 FROM servicos WHERE empresa_id = $1 AND contabilista_id = $2 AND estado = 'a_decorrer'`, [p(req).id, a.id]);
+      if (r) return { contados: 0 };
+    }
+    await db.query(
+      `INSERT INTO tempo_trabalho (empresa_id, contabilista_id, dia, categoria, segundos, atualizado_em) VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (empresa_id, contabilista_id, dia, categoria) DO UPDATE SET segundos = tempo_trabalho.segundos + $5, atualizado_em = $6`,
+      [p(req).id, a.id, hoje(), b.categoria, permitido, agoraISO()]);
+    return { contados: permitido };
+  });
+
+  /** Valores opcionais da empresa (avença e/ou €/hora). Vazio = sem valor. */
+  app.put("/v1/empresas/:id/honorarios", async (req) => {
+    const a = await exigirCC(req);
+    const v = z.number().min(0).max(1_000_000).nullable();
+    const b = z.object({ avencaMensal: v, tarifaHora: v }).parse(req.body);
+    await db.query(
+      `INSERT INTO honorarios (empresa_id, contabilista_id, avenca_mensal, tarifa_hora, atualizado_em) VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (empresa_id) DO UPDATE SET contabilista_id = $2, avenca_mensal = $3, tarifa_hora = $4, atualizado_em = $5`,
+      [p(req).id, a.id, b.avencaMensal, b.tarifaHora, agoraISO()]);
+    return honorarios(p(req).id);
+  });
+
+  /** O contabilista partilha com a empresa o relatório de tempo do mês (sem valores). */
+  app.post("/v1/empresas/:id/relatorios-tempo", async (req, reply) => {
+    const a = await exigirCC(req);
+    const b = z.object({ mes: zMes, nota: z.string().trim().max(1000).optional() }).parse(req.body);
+    if (b.mes > hoje().slice(0, 7)) throw new ErroApp("mes_futuro", "Só se partilham meses já começados.");
+    const esp = await espaco(p(req).id, b.mes, a);
+    const t = esp.tempo.tempoApp!;
+    const dados = {
+      reunioes: { feitas: esp.resumo.reunioes.feitas, previstas: esp.resumo.reunioes.previstas, minutos: esp.resumo.reunioes.minutos },
+      servicos: esp.resumo.porTipo, tempoApp: t.porCategoria, minutosInvestidos: esp.tempo.minutosInvestidos!,
+    };
+    if (!dados.minutosInvestidos) throw new ErroApp("sem_tempo", "Ainda não há tempo registado neste mês para partilhar.");
+    const id = novoId();
+    const em = agoraISO();
+    await db.query(`INSERT INTO relatorios_tempo (id, empresa_id, contabilista_id, mes, dados, nota, partilhado_por, partilhado_em) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8)`,
+      [id, p(req).id, a.id, b.mes, JSON.stringify(dados), b.nota || null, nomeCC(a), em]);
+    const r: RelatorioTempo = { id, mes: b.mes, nota: b.nota || null, partilhadoPor: nomeCC(a), partilhadoEm: em, ...dados };
+    await extras.aoPartilhar?.(p(req).id, r).catch(() => undefined);
+    return reply.code(201).send(r);
   });
 
   /** Registo à mão (depois da reunião ou de outro serviço). */
@@ -180,32 +263,44 @@ export function rotasServicos(app: FastifyInstance, db: Db, agora: () => Date) {
     const emps = await db.query<{ id: string; nome: string }>(
       `SELECT e.id, e.nome FROM ligacoes l JOIN empresas e ON e.id = l.empresa_id WHERE l.contabilista_id = $1 AND l.estado = 'ativa' ORDER BY e.nome`, [a.id]);
     const linhas: LinhaHorasCarteira[] = await Promise.all(emps.map(async (e) => {
-      const esp = await espaco(e.id, mes);
+      const esp = await espaco(e.id, mes, a);
       const aDecorrer = esp.servicos.find((s) => s.estado === "a_decorrer") ?? null;
-      return { empresa: e, resumo: esp.resumo, plano: esp.plano, reuniaoDeHojePorRegistar: esp.reuniaoDeHojePorRegistar, aDecorrer };
+      const v = valorDoMes(esp.tempo.honorarios, esp.resumo, esp.tempo.tempoApp);
+      return { empresa: e, resumo: esp.resumo, plano: esp.plano, reuniaoDeHojePorRegistar: esp.reuniaoDeHojePorRegistar, aDecorrer,
+        tempoApp: esp.tempo.tempoApp!, honorarios: esp.tempo.honorarios, minutosInvestidos: esp.tempo.minutosInvestidos!, ...v };
     }));
     const total = linhas.reduce((t, l) => ({
       minutos: t.minutos + l.resumo.minutosTotal, faturaveis: t.faturaveis + l.resumo.minutosFaturaveis,
       reunioes: t.reunioes + l.resumo.reunioes.feitas, previstas: t.previstas + l.resumo.reunioes.previstas, minutosReunioes: t.minutosReunioes + l.resumo.reunioes.minutos,
-    }), { minutos: 0, faturaveis: 0, reunioes: 0, previstas: 0, minutosReunioes: 0 });
+      minutosApp: t.minutosApp + Math.round(l.tempoApp.segundos / 60), investidos: t.investidos + l.minutosInvestidos, valor: l.valor == null ? t.valor : (t.valor ?? 0) + l.valor,
+    }), { minutos: 0, faturaveis: 0, reunioes: 0, previstas: 0, minutosReunioes: 0, minutosApp: 0, investidos: 0, valor: null as number | null });
     return { mes, hoje: hoje(), empresas: linhas, total };
   });
 
   /** Exportação para Excel (ponto e vírgula, UTF-8 com BOM): uma empresa, ou toda a carteira. */
+  /** Linhas de «trabalho na app» (só nas exportações do contabilista). */
+  async function linhasApp(where: string, v: unknown[]) {
+    const rs = await db.query<{ empresa_nome: string; categoria: string; s: number }>(
+      `SELECT e.nome AS empresa_nome, t.categoria, sum(t.segundos)::int AS s FROM tempo_trabalho t JOIN empresas e ON e.id = t.empresa_id WHERE ${where} GROUP BY e.nome, t.categoria ORDER BY e.nome, t.categoria`, v);
+    return rs.map((r) => ({ empresa_nome: r.empresa_nome, data: "", tipo: "app", titulo: NOME_TAREFA[r.categoria as CategoriaTempo] ?? r.categoria, modalidade: null,
+      minutos: Math.round(Number(r.s) / 60), faturavel: false, estado: "automatico", motivo_anulacao: null, notas: null, registado_por: "Medido pela app" })) as unknown as (LinhaServico & { empresa_nome: string })[];
+  }
   const csv = (rs: (LinhaServico & { empresa_nome: string })[]) => {
     const c = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const cab = ["Empresa", "Data", "Serviço", "Descrição", "Modalidade", "Minutos", "Horas", "Faturável", "Estado", "Notas", "Registado por"];
-    const est = { registado: "Registado", anulado: "Anulado", a_decorrer: "A decorrer" } as Record<string, string>;
-    return "﻿" + [cab.join(";"), ...rs.map((r) => [r.empresa_nome, r.data.split("-").reverse().join("/"), NOME_SERVICO[r.tipo as Servico["tipo"]], r.titulo,
+    const est = { registado: "Registado", anulado: "Anulado", a_decorrer: "A decorrer", automatico: "Medido automaticamente" } as Record<string, string>;
+    return "﻿" + [cab.join(";"), ...rs.map((r) => [r.empresa_nome, r.data ? r.data.split("-").reverse().join("/") : "mês", r.tipo === "app" ? "Trabalho na app" : NOME_SERVICO[r.tipo as Servico["tipo"]], r.titulo,
       r.modalidade ? NOME_MODALIDADE[r.modalidade as keyof typeof NOME_MODALIDADE] : "", r.minutos ?? "", r.minutos ? horasDecimais(Number(r.minutos)) : "",
       r.faturavel ? "Sim" : "Não", est[r.estado] + (r.motivo_anulacao ? ` (${r.motivo_anulacao})` : ""), r.notas, r.registado_por].map(c).join(";"))].join("\r\n");
   };
   app.get("/v1/empresas/:id/servicos/exportar", async (req) => {
-    await exigirAcesso(db, ator(req), p(req).id);
+    const a = ator(req);
+    await exigirAcesso(db, a, p(req).id);
     const mes = zMes.parse((req.query as { mes?: string }).mes ?? hoje().slice(0, 7));
     const rs = await db.query<LinhaServico & { empresa_nome: string }>(
       `SELECT s.*, e.nome AS empresa_nome FROM servicos s JOIN empresas e ON e.id = s.empresa_id WHERE s.empresa_id = $1 AND s.data LIKE $2 ORDER BY s.data, s.criado_em`, [p(req).id, `${mes}-%`]);
-    return { nome: `servicos-${mes}.csv`, csv: csv(rs) };
+    const app_ = a.papel === "contabilista" ? await linhasApp(`t.empresa_id = $1 AND t.dia LIKE $2`, [p(req).id, `${mes}-%`]) : [];
+    return { nome: `servicos-${mes}.csv`, csv: csv([...rs, ...app_]) };
   });
   app.get("/v1/contabilista/servicos/exportar", async (req) => {
     const a = ator(req);
@@ -214,7 +309,8 @@ export function rotasServicos(app: FastifyInstance, db: Db, agora: () => Date) {
     const rs = await db.query<LinhaServico & { empresa_nome: string }>(
       `SELECT s.*, e.nome AS empresa_nome FROM servicos s JOIN empresas e ON e.id = s.empresa_id
        WHERE s.contabilista_id = $1 AND s.data LIKE $2 ORDER BY e.nome, s.data, s.criado_em`, [a.id, `${mes}-%`]);
-    return { nome: `horas-carteira-${mes}.csv`, csv: csv(rs) };
+    const app_ = await linhasApp(`t.contabilista_id = $1 AND t.dia LIKE $2`, [a.id, `${mes}-%`]);
+    return { nome: `horas-carteira-${mes}.csv`, csv: csv([...rs, ...app_]) };
   });
 }
 
@@ -225,5 +321,7 @@ export const ACOES_SERVICOS: Record<string, string> = {
   "PUT /v1/empresas/:id/servicos/:sid": "corrigiu um serviço registado",
   "POST /v1/empresas/:id/servicos/:sid/anular": "anulou um serviço registado",
   "PUT /v1/empresas/:id/plano-servicos": "definiu o plano de reuniões",
+  "PUT /v1/empresas/:id/honorarios": "definiu os valores da empresa (avença/€ por hora)",
+  "POST /v1/empresas/:id/relatorios-tempo": "partilhou o relatório de tempo do mês com a empresa",
   "GET /v1/empresas/:id/servicos/exportar": "exportou os serviços do mês",
 };

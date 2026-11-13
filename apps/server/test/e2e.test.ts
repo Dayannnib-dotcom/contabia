@@ -965,3 +965,78 @@ test("30. espaço de serviços: contador de horas de reunião, plano semanal, an
   for (const a of ["definiu o plano de reuniões", "iniciou o cronómetro de uma reunião/serviço", "terminou o cronómetro e registou o tempo", "registou um serviço prestado", "corrigiu um serviço registado", "anulou um serviço registado", "exportou os serviços do mês"])
     assert.ok(ativ.includes(a), `falta no registo: ${a}`);
 });
+
+test("31. tempo investido: medido na app, valor opcional, relatório partilhado com a empresa", async () => {
+  const e = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "empresa.tempo", nif: "509999735", nome: "Empresa Tempo, Lda.", senha: "segredo123", regiao: "PT", regimeIVA: "mensal", email: "gestao@empresatempo.pt" });
+  assert.equal(e.status, 201, JSON.stringify(e.json));
+  const id = e.json.id; const emp = e.json.token;
+  const cc = (await chamar("POST", "/v1/auth/contabilistas", undefined, { email: "tempo.cc@exemplo.pt", nome: "Teresa CC", numeroOCC: "88888", senha: "segredo123" })).json.token;
+  const p = await chamar("POST", "/v1/ligacoes", cc, { utilizador: "empresa.tempo", nif: "509999735" });
+  await chamar("POST", `/v1/ligacoes/${p.json.id}/aceitar`, emp, { versao: 1 });
+  const base = `/v1/empresas/${id}`;
+
+  // a app mede o tempo de trabalho: só o contabilista, e nunca mais do que o tempo real que passou
+  assert.equal((await chamar("POST", `${base}/tempo`, emp, { categoria: "revisao", segundos: 60 })).status, 403);
+  assert.equal((await chamar("POST", `${base}/tempo`, cc, { categoria: "inventada", segundos: 60 })).status, 400);
+  try {
+    assert.equal((await chamar("POST", `${base}/tempo`, cc, { categoria: "revisao", segundos: 60 })).json.contados, 60);
+    assert.equal((await chamar("POST", `${base}/tempo`, cc, { categoria: "revisao", segundos: 60 })).json.contados, 5, "dois separadores ao mesmo tempo não somam");
+    relogio = new Date(INICIO.getTime() + 60_000);
+    assert.equal((await chamar("POST", `${base}/tempo`, cc, { categoria: "iva", segundos: 60 })).json.contados, 60);
+    relogio = new Date(INICIO.getTime() + 61 * 60_000); // depois de uma pausa longa, no máximo 2 minutos por sinal
+    assert.equal((await chamar("POST", `${base}/tempo`, cc, { categoria: "revisao", segundos: 600 })).json.contados, 120);
+    // durante uma reunião cronometrada, o ecrã de serviços não conta a dobrar
+    const r = await chamar("POST", `${base}/servicos/iniciar`, cc, {});
+    relogio = new Date(INICIO.getTime() + 62 * 60_000);
+    assert.equal((await chamar("POST", `${base}/tempo`, cc, { categoria: "servicos", segundos: 60 })).json.contados, 0);
+    relogio = new Date(INICIO.getTime() + 121 * 60_000);
+    await chamar("POST", `${base}/servicos/${r.json.id}/terminar`, cc, {});
+  } finally { relogio = INICIO; }
+
+  let esp = (await chamar("GET", `${base}/servicos?mes=2026-11`, cc)).json;
+  assert.equal(esp.tempo.tempoApp.segundos, 245);
+  assert.deepEqual(esp.tempo.tempoApp.porCategoria.map((x: { categoria: string }) => x.categoria), ["revisao", "iva"]);
+  assert.equal(esp.tempo.minutosInvestidos, 60 + 4, "60 min de reunião + 4 min de trabalho na app");
+  assert.equal(esp.tempo.honorarios, null, "o valor é opcional e fica para depois");
+
+  // valor opcional: avença 150 € → valor real por hora
+  assert.equal((await chamar("PUT", `${base}/honorarios`, emp, { avencaMensal: 150, tarifaHora: null })).status, 403);
+  assert.deepEqual((await chamar("PUT", `${base}/honorarios`, cc, { avencaMensal: 150, tarifaHora: null })).json, { avencaMensal: 150, tarifaHora: null });
+  const cart = (await chamar("GET", "/v1/contabilista/servicos?mes=2026-11", cc)).json;
+  const l = cart.empresas.find((x: { empresa: { id: string } }) => x.empresa.id === id);
+  assert.equal(l.valor, 150);
+  assert.equal(l.valorHoraReal, Math.round((150 / (64 / 60)) * 100) / 100);
+  assert.equal(cart.total.investidos, 64);
+
+  // a empresa não vê o tempo medido nem os valores…
+  esp = (await chamar("GET", `${base}/servicos?mes=2026-11`, emp)).json;
+  assert.equal(esp.tempo.tempoApp, null);
+  assert.equal(esp.tempo.honorarios, null);
+  assert.equal(esp.tempo.relatorios.length, 0);
+  // …até o contabilista partilhar o relatório do mês (sem valores), com aviso e e-mail
+  assert.equal((await chamar("POST", `${base}/relatorios-tempo`, cc, { mes: "2026-12" })).json.codigo, "mes_futuro");
+  assert.equal((await chamar("POST", `${base}/relatorios-tempo`, emp, { mes: "2026-11" })).status, 403);
+  const antes = emails.length;
+  const rel = await chamar("POST", `${base}/relatorios-tempo`, cc, { mes: "2026-11", nota: "Mês com fecho do trimestre." });
+  assert.equal(rel.status, 201, JSON.stringify(rel.json));
+  esp = (await chamar("GET", `${base}/servicos?mes=2026-11`, emp)).json;
+  const visto = esp.tempo.relatorios[0];
+  assert.equal(visto.minutosInvestidos, 64);
+  assert.equal(visto.nota, "Mês com fecho do trimestre.");
+  assert.equal(visto.reunioes.feitas, 1);
+  assert.ok(!JSON.stringify(visto).includes("150"), "o relatório não leva valores");
+  const mail = emails.slice(antes).find((m) => m.para === "gestao@empresatempo.pt");
+  assert.ok(mail && mail.assunto === "Relatório de tempo de novembro de 2026", JSON.stringify(emails.slice(antes).map((m) => m.assunto)));
+  assert.ok(mail!.texto.includes("1 h 4 min"));
+
+  // exportação do contabilista inclui o trabalho medido na app; a da empresa não
+  const xc = (await chamar("GET", "/v1/contabilista/servicos/exportar?mes=2026-11", cc)).json.csv as string;
+  assert.ok(xc.includes("Trabalho na app") && xc.includes("Revisão de lançamentos") && xc.includes("Medido automaticamente"));
+  assert.ok(!(await chamar("GET", `${base}/servicos/exportar?mes=2026-11`, emp)).json.csv.includes("Trabalho na app"));
+
+  // registo: valores e partilha ficam; os sinais de tempo não enchem o registo
+  const ativ = (await chamar("GET", `${base}/atividade`, emp)).json.map((a: { acao: string }) => a.acao);
+  assert.ok(ativ.includes("definiu os valores da empresa (avença/€ por hora)"));
+  assert.ok(ativ.includes("partilhou o relatório de tempo do mês com a empresa"));
+  assert.ok(!ativ.some((a: string) => a.includes("/tempo")));
+});

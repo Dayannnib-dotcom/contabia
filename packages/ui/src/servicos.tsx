@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
-  DIAS_SEMANA, NOME_MODALIDADE, NOME_SERVICO, datasPrevistas, horasLegiveis, mudarMes, nomeMes,
-  type EspacoServicos, type Modalidade, type PlanoServicos, type Servico, type TipoServico,
+  DIAS_SEMANA, NOME_MODALIDADE, NOME_SERVICO, NOME_TAREFA, datasPrevistas, euros, horasLegiveis, mudarMes, nomeMes, valorDoMes,
+  type EspacoServicos, type RelatorioTempo, type Modalidade, type PlanoServicos, type Servico, type TipoServico,
 } from "@contabia/shared";
 import { Botao, Campo, Cartao, Chip, Erro, Linha, MensagemLuis, Numero, Texto, Vazio } from "./componentes";
 import { entregarFicheiro } from "./partilhar";
@@ -94,6 +94,8 @@ export function EspacoServicosVista({ empresaId, papel }: { empresaId: string; p
           {r.minutosTotal !== r.minutosFaturaveis ? <Texto sec tamanho={11}>de {horasLegiveis(r.minutosTotal)}</Texto> : null}
         </Cartao>
       </View>
+      {cc ? <TempoInvestido dados={dados} /> : null}
+      {cc ? <Valores empresaId={empresaId} dados={dados} aoMudar={recarregar} /> : null}
       {cc && atual ? <Contador empresaId={empresaId} dados={dados} aDecorrer={aDecorrer} aoMudar={recarregar} /> : null}
       {!cc && aDecorrer ? (
         <Cartao estilo={{ backgroundColor: cor.tinta, borderColor: cor.tinta }}>
@@ -116,6 +118,8 @@ export function EspacoServicosVista({ empresaId, papel }: { empresaId: string; p
         {dados.servicos.length === 0 ? <Vazio texto={cc ? "Ainda sem serviços neste mês. Use o cronómetro numa reunião ou registe o tempo depois." : "Ainda sem serviços registados neste mês."} /> : null}
         {dados.servicos.map((s) => <LinhaServico key={s.id} s={s} empresaId={empresaId} cc={cc} aoMudar={recarregar} />)}
       </Cartao>
+      {cc ? <PartilharRelatorio empresaId={empresaId} mes={m} jaPartilhado={dados.tempo.relatorios.some((x) => x.mes === m)} aoMudar={recarregar} /> : null}
+      <Relatorios lista={dados.tempo.relatorios} cc={cc} />
       <Texto sec tamanho={12}>{cc
         ? "Nada se apaga: um registo errado anula-se com motivo e fica visível. A empresa vê este espaço (só leitura). Os honorários de contabilidade são acordados e faturados à parte."
         : "Registo feito pelo seu contabilista. Nada se apaga: correções e anulações ficam visíveis e no registo de atividade."}</Texto>
@@ -305,6 +309,158 @@ function LinhaServico({ s, empresaId, cc, aoMudar }: { s: Servico; empresaId: st
           </View>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+const mins = (seg: number) => Math.round(seg / 60);
+
+/** Barra simples de proporção (tarefa ÷ total). */
+function Barra({ rotulo, minutos, total, corBarra = cor.verde }: { rotulo: string; minutos: number; total: number; corBarra?: string }) {
+  const pct = total > 0 ? Math.max(2, Math.round((minutos / total) * 100)) : 0;
+  return (
+    <View style={{ gap: 4 }} accessible accessibilityLabel={`${rotulo}: ${horasLegiveis(minutos)}`}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+        <Texto tamanho={13} estilo={{ flex: 1 }}>{rotulo}</Texto>
+        <Texto tamanho={13} forte>{horasLegiveis(minutos)}</Texto>
+      </View>
+      <View style={{ height: 6, borderRadius: 3, backgroundColor: cor.linha }}>
+        <View style={{ width: `${pct}%`, height: 6, borderRadius: 3, backgroundColor: corBarra }} />
+      </View>
+    </View>
+  );
+}
+
+/** Todo o tempo investido nesta empresa no mês: reuniões + outros serviços + trabalho medido na app. */
+function TempoInvestido({ dados }: { dados: EspacoServicos }) {
+  const t = dados.tempo.tempoApp;
+  const total = dados.tempo.minutosInvestidos ?? 0;
+  const reun = dados.resumo.reunioes.minutos;
+  const outros = dados.resumo.minutosTotal - reun;
+  const app = mins(t?.segundos ?? 0);
+  return (
+    <Cartao>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
+        <Texto forte tamanho={16}>Tempo investido nesta empresa</Texto>
+        <Numero tamanho={20}>{horasLegiveis(total)}</Numero>
+      </View>
+      {total === 0 ? <Texto sec tamanho={13}>Ainda sem tempo neste mês. O trabalho que fizer nesta empresa na app é medido sozinho, por tarefa; as reuniões e outros serviços somam-se aqui.</Texto> : (
+        <View style={{ gap: 10 }}>
+          {reun ? <Barra rotulo="Reuniões" minutos={reun} total={total} corBarra={cor.tinta} /> : null}
+          {outros ? <Barra rotulo="Outros serviços registados" minutos={outros} total={total} corBarra={cor.tinta2} /> : null}
+          {t?.porCategoria.map((c) => <Barra key={c.categoria} rotulo={`App · ${NOME_TAREFA[c.categoria]}`} minutos={mins(c.segundos)} total={total} />)}
+          <Texto sec tamanho={12}>{`Trabalho na app: ${horasLegiveis(app)}, medido só enquanto está ativo neste ecrã (pára ao fim de 3 min sem tocar).`}</Texto>
+        </View>
+      )}
+    </Cartao>
+  );
+}
+
+/** «150», «37,50», «1.200,00» ou «37.5» → número; vazio → null. */
+const lerEuros = (t: string) => { let x = t.trim().replace(/\s|€/g, ""); if (x.includes(",")) x = x.replace(/\./g, "").replace(",", "."); return x === "" ? null : Number(x); };
+const mostrarEuros = (n: number | null | undefined) => (n == null ? "" : String(n).replace(".", ","));
+
+/** Valor (opcional): avença e/ou €/hora. Mostra o valor real de cada hora investida. Nunca aparece à empresa. */
+function Valores({ empresaId, dados, aoMudar }: { empresaId: string; dados: EspacoServicos; aoMudar: () => void }) {
+  const { api } = useSessao();
+  const h = dados.tempo.honorarios;
+  const [editar, setEditar] = useState(false);
+  const [avenca, setAvenca] = useState(mostrarEuros(h?.avencaMensal));
+  const [tarifa, setTarifa] = useState(mostrarEuros(h?.tarifaHora));
+  const [aGuardar, setAGuardar] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const v = valorDoMes(h, dados.resumo, dados.tempo.tempoApp);
+  const a = lerEuros(avenca), t = lerEuros(tarifa);
+  const ok = (a === null || (Number.isFinite(a) && a >= 0)) && (t === null || (Number.isFinite(t) && t >= 0));
+  if (!editar) {
+    return (
+      <Cartao>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Texto forte>Valor <Texto sec tamanho={12}>(opcional · só você vê)</Texto></Texto>
+            {v.valor == null ? <Texto sec tamanho={13}>Sem valor definido. Pode indicar a avença ou o valor por hora quando quiser.</Texto> : (
+              <>
+                <Texto tamanho={13}>{[h?.avencaMensal != null ? `Avença ${euros(h.avencaMensal)}/mês` : null, h?.tarifaHora != null ? `${euros(h.tarifaHora)}/hora faturável` : null].filter(Boolean).join(" + ")}</Texto>
+                <Texto tamanho={13}>Valor do mês: <Texto forte tamanho={13}>{euros(v.valor)}</Texto>{v.valorHoraReal != null ? <> · valor real por hora investida: <Texto forte tamanho={13}>{euros(v.valorHoraReal)}</Texto></> : " · o valor real por hora aparece a partir de 1 h investida no mês"}</Texto>
+              </>
+            )}
+          </View>
+          <Botao titulo={h ? "Alterar" : "Definir"} variante="secundario" estilo={{ minHeight: 38 }} onPress={() => setEditar(true)} />
+        </View>
+      </Cartao>
+    );
+  }
+  return (
+    <Cartao>
+      <Texto forte tamanho={16}>Valor desta empresa</Texto>
+      <Texto sec tamanho={12}>Preencha um, os dois ou nenhum. Deixar vazio = sem valor. A empresa nunca vê estes números.</Texto>
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <View style={{ flex: 1 }}><Campo rotulo="Avença mensal (€)" value={avenca} onChangeText={setAvenca} placeholder="ex.: 150" keyboardType="decimal-pad" /></View>
+        <View style={{ flex: 1 }}><Campo rotulo="Valor por hora faturável (€)" value={tarifa} onChangeText={setTarifa} placeholder="ex.: 40" keyboardType="decimal-pad" /></View>
+      </View>
+      <Erro texto={erro ?? (!ok ? "Use só números (ex.: 150 ou 37,50)." : null)} />
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <Botao titulo="Cancelar" variante="secundario" estilo={{ flex: 1 }} onPress={() => setEditar(false)} />
+        <Botao titulo="Guardar valor" estilo={{ flex: 2 }} carregando={aGuardar} desativado={!ok}
+          onPress={async () => { setAGuardar(true); setErro(null); try { await api.definirHonorarios(empresaId, { avencaMensal: a, tarifaHora: t }); setEditar(false); aoMudar(); } catch (e) { setErro((e as Error).message); } finally { setAGuardar(false); } }} />
+      </View>
+    </Cartao>
+  );
+}
+
+function PartilharRelatorio({ empresaId, mes, jaPartilhado, aoMudar }: { empresaId: string; mes: string; jaPartilhado: boolean; aoMudar: () => void }) {
+  const { api } = useSessao();
+  const [aberto, setAberto] = useState(false);
+  const [nota, setNota] = useState("");
+  const [aEnviar, setAEnviar] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [feito, setFeito] = useState(false);
+  if (feito) return <MensagemLuis texto="Relatório partilhado. A empresa recebeu o aviso na app e por e-mail." />;
+  if (!aberto) return <Botao titulo={`${jaPartilhado ? "Partilhar de novo" : "Partilhar"} o relatório de ${nomeMes(mes).split(" de ")[0]} com a empresa`} variante="secundario" onPress={() => setAberto(true)} />;
+  return (
+    <Cartao>
+      <Texto forte tamanho={16}>Partilhar relatório de {nomeMes(mes)}</Texto>
+      <Texto sec tamanho={13}>A empresa passa a ver o tempo dedicado a ela: reuniões, serviços e o trabalho por tarefa. Os valores nunca são partilhados. Recebe um aviso na app e um e-mail.</Texto>
+      <Campo rotulo="Nota para a empresa (opcional)" value={nota} onChangeText={setNota} placeholder="ex.: mês com fecho do trimestre" multiline />
+      <Erro texto={erro} />
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <Botao titulo="Cancelar" variante="secundario" estilo={{ flex: 1 }} onPress={() => setAberto(false)} />
+        <Botao titulo="Partilhar relatório" estilo={{ flex: 2 }} carregando={aEnviar}
+          onPress={async () => { setAEnviar(true); setErro(null); try { await api.partilharRelatorioTempo(empresaId, mes, nota || undefined); setFeito(true); aoMudar(); } catch (e) { setErro((e as Error).message); } finally { setAEnviar(false); } }} />
+      </View>
+    </Cartao>
+  );
+}
+
+/** Relatórios de tempo partilhados pelo contabilista (o que a empresa vê). */
+function Relatorios({ lista, cc }: { lista: RelatorioTempo[]; cc: boolean }) {
+  const [aberto, setAberto] = useState<string | null>(lista[0]?.id ?? null);
+  if (!lista.length) return null;
+  return (
+    <View style={{ gap: 8 }}>
+      <Texto forte tamanho={16}>{cc ? "Relatórios partilhados com a empresa" : "Relatórios do seu contabilista"}</Texto>
+      {lista.map((r) => {
+        const on = aberto === r.id;
+        return (
+          <Cartao key={r.id} onPress={() => setAberto(on ? null : r.id)}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Texto forte>{nomeMes(r.mes).replace(/^./, (c) => c.toUpperCase())}</Texto>
+                <Texto sec tamanho={12}>Partilhado a {dataPT(r.partilhadoEm.slice(0, 10))} por {r.partilhadoPor.replace(/ \(contabilista\)$/, "")}</Texto>
+              </View>
+              <Numero tamanho={18}>{horasLegiveis(r.minutosInvestidos)}</Numero>
+            </View>
+            {on ? (
+              <View style={{ gap: 10 }}>
+                {r.nota ? <Texto tamanho={13}>«{r.nota}»</Texto> : null}
+                {r.reunioes.minutos ? <Barra rotulo={`Reuniões (${r.reunioes.feitas}${r.reunioes.previstas ? ` de ${r.reunioes.previstas} previstas` : ""})`} minutos={r.reunioes.minutos} total={r.minutosInvestidos} corBarra={cor.tinta} /> : null}
+                {r.servicos.filter((x) => x.tipo !== "reuniao").map((x) => <Barra key={x.tipo} rotulo={`${NOME_SERVICO[x.tipo]} (${x.quantidade})`} minutos={x.minutos} total={r.minutosInvestidos} corBarra={cor.tinta2} />)}
+                {r.tempoApp.map((c) => <Barra key={c.categoria} rotulo={NOME_TAREFA[c.categoria]} minutos={mins(c.segundos)} total={r.minutosInvestidos} />)}
+              </View>
+            ) : <Texto sec tamanho={12}>Toque para ver o detalhe por tarefa</Texto>}
+          </Cartao>
+        );
+      })}
     </View>
   );
 }

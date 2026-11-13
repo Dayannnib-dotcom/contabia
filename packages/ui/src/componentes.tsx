@@ -7,10 +7,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { cor, espaco, letra, raio } from "./tema";
 import { Luis } from "./marca";
 
-export function Ecra({ children, rolar = true, estilo }: { children: ReactNode; rolar?: boolean; estilo?: StyleProp<ViewStyle> }) {
+/** `aoInteragir`: chamado a cada toque ou deslocação (serve para medir o tempo ativo). */
+export function Ecra({ children, rolar = true, estilo, aoInteragir }: { children: ReactNode; rolar?: boolean; estilo?: StyleProp<ViewStyle>; aoInteragir?: () => void }) {
   return (
-    <SafeAreaView style={[s.ecra, estilo]} edges={["top", "left", "right"]}>
-      {rolar ? <ScrollView contentContainerStyle={s.conteudo} keyboardShouldPersistTaps="handled">{children}</ScrollView> : <View style={[s.conteudo, { flex: 1 }]}>{children}</View>}
+    <SafeAreaView style={[s.ecra, estilo]} edges={["top", "left", "right"]} onTouchStart={aoInteragir}>
+      {rolar ? <ScrollView contentContainerStyle={s.conteudo} keyboardShouldPersistTaps="handled" onScroll={aoInteragir} scrollEventThrottle={2000}>{children}</ScrollView> : <View style={[s.conteudo, { flex: 1 }]}>{children}</View>}
     </SafeAreaView>
   );
 }

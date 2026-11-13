@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { horasLegiveis, mudarMes, nomeMes } from "@contabia/shared";
+import { euros, horasLegiveis, mudarMes, nomeMes, sugestoesTempo } from "@contabia/shared";
 import { Botao, Cartao, Chip, Cronometro, Ecra, Erro, Icone, MensagemLuis, Numero, Texto, Titulo, Vazio, cor, descreverPlano, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
 
 /** Contador de horas da carteira: reuniões feitas vs. previstas e horas por empresa, mês a mês. */
@@ -16,6 +16,10 @@ export default function Horas() {
   const atual = !!dados && dados.mes === dados.hoje.slice(0, 7);
   const aDecorrer = dados?.empresas.filter((l) => l.aDecorrer) ?? [];
   const hoje = atual ? dados!.empresas.filter((l) => l.reuniaoDeHojePorRegistar) : [];
+  const dicas = dados ? sugestoesTempo(dados.empresas.map((l) => ({
+    nome: l.empresa.nome, minutosInvestidos: l.minutosInvestidos, tempoApp: l.tempoApp, valorHoraReal: l.valorHoraReal, honorarios: l.honorarios,
+    reunioesEmFalta: atual ? l.resumo.reunioes.previstasAteHoje - l.resumo.reunioes.feitas : 0,
+  }))) : [];
 
   return (
     <Ecra>
@@ -40,10 +44,13 @@ export default function Horas() {
               acao={<Botao titulo="Abrir e registar" variante="menta" estilo={{ alignSelf: "flex-start", minHeight: 40, marginTop: 6 }} onPress={() => abrir(hoje[0].empresa.id)} />} />
           ) : null}
           <View style={{ flexDirection: "row", gap: 10 }}>
-            <Cartao estilo={{ flex: 1, gap: 2 }}><Texto sec tamanho={12}>Horas de reunião</Texto><Numero tamanho={20}>{horasLegiveis(dados.total.minutosReunioes)}</Numero></Cartao>
-            <Cartao estilo={{ flex: 1, gap: 2 }}><Texto sec tamanho={12}>Reuniões</Texto><Numero tamanho={20}>{dados.total.previstas ? `${dados.total.reunioes}/${dados.total.previstas}` : dados.total.reunioes}</Numero></Cartao>
-            <Cartao estilo={{ flex: 1, gap: 2 }}><Texto sec tamanho={12}>Total faturável</Texto><Numero tamanho={20}>{horasLegiveis(dados.total.faturaveis)}</Numero></Cartao>
+            <Cartao estilo={{ flex: 1, gap: 2 }}><Texto sec tamanho={12}>Tempo investido</Texto><Numero tamanho={20}>{horasLegiveis(dados.total.investidos)}</Numero><Texto sec tamanho={11}>{horasLegiveis(dados.total.minutosApp)} na app</Texto></Cartao>
+            <Cartao estilo={{ flex: 1, gap: 2 }}><Texto sec tamanho={12}>Reuniões</Texto><Numero tamanho={20}>{dados.total.previstas ? `${dados.total.reunioes}/${dados.total.previstas}` : dados.total.reunioes}</Numero><Texto sec tamanho={11}>{horasLegiveis(dados.total.minutosReunioes)}</Texto></Cartao>
+            {dados.total.valor != null
+              ? <Cartao estilo={{ flex: 1, gap: 2 }}><Texto sec tamanho={12}>Valor do mês</Texto><Numero tamanho={20}>{euros(dados.total.valor)}</Numero><Texto sec tamanho={11}>empresas com valor definido</Texto></Cartao>
+              : <Cartao estilo={{ flex: 1, gap: 2 }}><Texto sec tamanho={12}>Total faturável</Texto><Numero tamanho={20}>{horasLegiveis(dados.total.faturaveis)}</Numero></Cartao>}
           </View>
+          {dicas.length ? <MensagemLuis escuro rotulo="Luís · onde vai o seu tempo" texto={dicas.join("\n\n")} /> : null}
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <Texto forte tamanho={16}>Por empresa</Texto>
             <Botao titulo="Exportar (Excel)" variante="secundario" estilo={{ minHeight: 38 }}
@@ -53,6 +60,7 @@ export default function Horas() {
           {dados.empresas.map((l) => {
             const r = l.resumo.reunioes;
             const emFalta = atual ? r.previstasAteHoje - r.feitas : r.previstas - r.feitas;
+            const pct = dados.total.investidos ? Math.round((l.minutosInvestidos / dados.total.investidos) * 100) : 0;
             return (
               <Cartao key={l.empresa.id} onPress={() => abrir(l.empresa.id)}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -63,6 +71,9 @@ export default function Horas() {
                   <Icone nome="seguir" cor={cor.textoSec} />
                 </View>
                 <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+                  <Chip texto={`Investido ${horasLegiveis(l.minutosInvestidos)}${pct ? ` · ${pct}%` : ""}`} tipo={l.minutosInvestidos ? "bom" : "neutro"} />
+                  {l.tempoApp.segundos >= 60 ? <Chip texto={`Na app · ${horasLegiveis(Math.round(l.tempoApp.segundos / 60))}`} /> : null}
+                  {l.valorHoraReal != null ? <Chip texto={`${euros(l.valorHoraReal)}/h real`} tipo="neutro" /> : null}
                   <Chip texto={`${r.previstas ? `${r.feitas}/${r.previstas}` : r.feitas} reuniões · ${horasLegiveis(r.minutos)}`} tipo={r.previstas && emFalta > 0 ? "aviso" : r.feitas ? "bom" : "neutro"} />
                   {l.resumo.minutosTotal > r.minutos ? <Chip texto={`Outros serviços · ${horasLegiveis(l.resumo.minutosTotal - r.minutos)}`} /> : null}
                   {r.previstas && emFalta > 0 ? <Chip texto={`${emFalta} por registar`} tipo="aviso" /> : null}

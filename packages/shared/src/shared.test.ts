@@ -164,3 +164,25 @@ test("serviços: reuniões previstas pelo plano e horas do mês", async () => {
   assert.equal(mudarMes("2026-01", -1), "2025-12");
   assert.equal(hojeLisboa(new Date("2026-07-31T23:30:00Z")), "2026-08-01", "no verão, Lisboa está uma hora à frente");
 });
+
+test("tempo investido: valor real por hora e sugestões do Luís", async () => {
+  const { valorDoMes, minutosInvestidos, sugestoesTempo } = await import("./servicos.ts");
+  const r = { mes: "2026-11", reunioes: { feitas: 2, previstas: 8, previstasAteHoje: 3, minutos: 120 }, porTipo: [], minutosTotal: 180, minutosFaturaveis: 120 };
+  const t = { segundos: 3 * 3600, porCategoria: [{ categoria: "revisao" as const, segundos: 2 * 3600 }, { categoria: "iva" as const, segundos: 3600 }] };
+  assert.equal(minutosInvestidos(r, t), 360);
+  assert.deepEqual(valorDoMes(null, r, t), { valor: null, valorHoraReal: null });
+  assert.deepEqual(valorDoMes({ avencaMensal: null, tarifaHora: null }, r, t), { valor: null, valorHoraReal: null });
+  // avença 150 € + 2 h faturáveis × 40 € = 230 € por 6 h investidas → 38,33 €/h
+  assert.deepEqual(valorDoMes({ avencaMensal: 150, tarifaHora: 40 }, r, t), { valor: 230, valorHoraReal: 38.33 });
+  assert.equal(valorDoMes({ avencaMensal: 150, tarifaHora: null }, { ...r, minutosTotal: 1, minutosFaturaveis: 0 }, null).valorHoraReal, null, "menos de 1 h: sem valor por hora");
+  const s = sugestoesTempo([
+    { nome: "Alfa, Lda.", minutosInvestidos: 360, tempoApp: t, valorHoraReal: 20, honorarios: { avencaMensal: 120, tarifaHora: null }, reunioesEmFalta: 1 },
+    { nome: "Beta, Lda.", minutosInvestidos: 60, tempoApp: null, valorHoraReal: 80, honorarios: { avencaMensal: 80, tarifaHora: null }, reunioesEmFalta: 0 },
+  ]);
+  assert.ok(s[0].startsWith("A Alfa, Lda ocupou 86% do seu tempo"), s[0]);
+  assert.ok(s.some((x) => x.includes("rende 20 €/h, bem abaixo da média")), s.join("|"));
+  assert.ok(s.some((x) => x.includes("revisão de lançamentos levou 2 h") && x.includes("lançamento automático")), s.join("|"));
+  assert.ok(s.some((x) => x === "Falta registar 1 reunião do plano até hoje."));
+  const semValor = sugestoesTempo([{ nome: "Gama", minutosInvestidos: 30, tempoApp: null, valorHoraReal: null, honorarios: null, reunioesEmFalta: 0 }]);
+  assert.ok(semValor.some((x) => x.startsWith("Quando quiser, indique a avença")));
+});

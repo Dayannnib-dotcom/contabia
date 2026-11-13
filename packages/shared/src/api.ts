@@ -14,7 +14,7 @@ import type { LinhaEfatura } from "./efatura.ts";
 import type { LinhaExtrato } from "./extrato.ts";
 import type { Notificacao } from "./respostas.ts";
 import type { ApoioCompativel, Dimensao, PedidoEstudo, PerfilApoios } from "./apoios.ts";
-import type { EspacoServicos, LinhaHorasCarteira, Modalidade, PlanoServicos, Servico, TipoServico } from "./servicos.ts";
+import type { CategoriaTempo, EspacoServicos, Honorarios, LinhaHorasCarteira, Modalidade, PlanoServicos, RelatorioTempo, Servico, TipoServico } from "./servicos.ts";
 
 export class ErroApi extends Error {
   constructor(public codigo: string, mensagem: string, public status: number) {
@@ -229,8 +229,18 @@ export class ApiContabia {
   exportarServicos(empresaId: string, mes: string) {
     return this.pedido<{ nome: string; csv: string }>("GET", `/v1/empresas/${empresaId}/servicos/exportar?mes=${mes}`);
   }
+  /** Sinal de trabalho na app (tempo ativo no ecrã da empresa). Sem reenvios: se falhar, perde-se só esse bocado. */
+  registarTempo(empresaId: string, categoria: CategoriaTempo, segundos: number) {
+    return this.pedido<{ contados: number }>("POST", `/v1/empresas/${empresaId}/tempo`, { categoria, segundos }, 1);
+  }
+  definirHonorarios(empresaId: string, h: Honorarios) {
+    return this.pedido<Honorarios | null>("PUT", `/v1/empresas/${empresaId}/honorarios`, h);
+  }
+  partilharRelatorioTempo(empresaId: string, mes: string, nota?: string) {
+    return this.pedido<RelatorioTempo>("POST", `/v1/empresas/${empresaId}/relatorios-tempo`, nota ? { mes, nota } : { mes });
+  }
   horasCarteira(mes?: string) {
-    return this.pedido<{ mes: string; hoje: string; empresas: LinhaHorasCarteira[]; total: { minutos: number; faturaveis: number; reunioes: number; previstas: number; minutosReunioes: number } }>("GET", `/v1/contabilista/servicos${mes ? `?mes=${mes}` : ""}`);
+    return this.pedido<{ mes: string; hoje: string; empresas: LinhaHorasCarteira[]; total: { minutos: number; faturaveis: number; reunioes: number; previstas: number; minutosReunioes: number; minutosApp: number; investidos: number; valor: number | null } }>("GET", `/v1/contabilista/servicos${mes ? `?mes=${mes}` : ""}`);
   }
   exportarHorasCarteira(mes: string) {
     return this.pedido<{ nome: string; csv: string }>("GET", `/v1/contabilista/servicos/exportar?mes=${mes}`);

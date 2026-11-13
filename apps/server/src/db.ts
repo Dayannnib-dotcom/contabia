@@ -395,7 +395,37 @@ const MIGRACOES: string[] = [
      ativo boolean NOT NULL DEFAULT true,
      atualizado_em text NOT NULL
    )`,
-  ...["servicos", "planos_servicos"].flatMap((t) => [
+  // Tempo de trabalho medido na app (por empresa, contabilista, dia e tarefa)
+  `CREATE TABLE IF NOT EXISTS tempo_trabalho (
+     empresa_id text NOT NULL REFERENCES empresas(id),
+     contabilista_id text NOT NULL,
+     dia text NOT NULL,
+     categoria text NOT NULL,
+     segundos integer NOT NULL DEFAULT 0,
+     atualizado_em text NOT NULL,
+     PRIMARY KEY (empresa_id, contabilista_id, dia, categoria)
+   )`,
+  // Valores opcionais (avença e/ou €/hora), só para o contabilista
+  `CREATE TABLE IF NOT EXISTS honorarios (
+     empresa_id text PRIMARY KEY REFERENCES empresas(id),
+     contabilista_id text NOT NULL,
+     avenca_mensal numeric,
+     tarifa_hora numeric,
+     atualizado_em text NOT NULL
+   )`,
+  // Relatórios de tempo partilhados com a empresa (fotografia do mês)
+  `CREATE TABLE IF NOT EXISTS relatorios_tempo (
+     id text PRIMARY KEY,
+     empresa_id text NOT NULL REFERENCES empresas(id),
+     contabilista_id text NOT NULL,
+     mes text NOT NULL,
+     dados jsonb NOT NULL,
+     nota text,
+     partilhado_por text NOT NULL,
+     partilhado_em text NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS relatorios_tempo_empresa ON relatorios_tempo(empresa_id, mes)`,
+  ...["servicos", "planos_servicos", "tempo_trabalho", "honorarios", "relatorios_tempo"].flatMap((t) => [
     `DROP TRIGGER IF EXISTS ${t}_sem_apagar ON ${t}`,
     `CREATE TRIGGER ${t}_sem_apagar BEFORE DELETE ON ${t} FOR EACH ROW EXECUTE FUNCTION contabia_sem_apagar()`,
   ]),

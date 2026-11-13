@@ -227,6 +227,21 @@ ${botao ? `<p style="margin:20px 0 6px"><a href="${esc(botao.url)}" style="backg
     ], { texto: "Abrir a Contabia", url: `${url}/empresa/` });
     return enviarUmaVez(`boasvindas:empresa:${empresaId}`, e.email, "Bem-vinda à Contabia — 3 passos para começar", m);
   }
+  /** O contabilista partilhou o relatório de tempo do mês: aviso na app e e-mail ao gestor. */
+  async function relatorioTempo(empresaId: string, r: { id: string; mes: string; partilhadoPor: string; minutosInvestidos: number; reunioes: { feitas: number; minutos: number }; nota: string | null }) {
+    const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+    const nomeMes = `${MESES[Number(r.mes.slice(5, 7)) - 1]} de ${r.mes.slice(0, 4)}`;
+    const h = (m: number) => (Math.floor(m / 60) ? `${Math.floor(m / 60)} h ${m % 60 ? `${m % 60} min` : ""}`.trim() : `${m} min`);
+    await c.avisar({ empresaId }, "Relatório de tempo do seu contabilista", `${nomeMes}: ${h(r.minutosInvestidos)} dedicados à sua empresa.`, { ecra: "servicos" }).catch(() => undefined);
+    const [e] = await db.query<{ nome: string; email: string | null }>(`SELECT nome, email FROM empresas WHERE id = $1`, [empresaId]);
+    if (!e?.email) return false;
+    const m = moldura(`O tempo dedicado à ${e.nome.replace(/\.$/, "")} em ${nomeMes}`, [
+      `${esc(r.partilhadoPor.replace(/ \(contabilista\)$/, ""))} partilhou consigo o relatório do mês: <b>${h(r.minutosInvestidos)}</b> de trabalho na sua contabilidade, incluindo ${r.reunioes.feitas === 1 ? "1 reunião" : `${r.reunioes.feitas} reuniões`} (${h(r.reunioes.minutos)}).`,
+      ...(r.nota ? [`Nota do seu contabilista: «${esc(r.nota)}»`] : []),
+      "O detalhe por tarefa está na app, em Serviços e reuniões.",
+    ], { texto: "Ver o relatório", url: `${url}/empresa/servicos` });
+    return enviarUmaVez(`relatorio-tempo:${r.id}`, e.email, `Relatório de tempo de ${nomeMes}`, m);
+  }
   async function boasVindasContabilista(id: string) {
     const [cc] = await db.query<{ nome: string; email: string }>(`SELECT nome, email FROM contabilistas WHERE id = $1`, [id]);
     if (!cc) return false;
@@ -330,5 +345,5 @@ ${botao ? `<p style="margin:20px 0 6px"><a href="${esc(botao.url)}" style="backg
     return r;
   }
 
-  return { aoWhatsApp, emitir, aoEvento, avisarConvite, lista, marcarLidas, contagem, boasVindasEmpresa, boasVindasContabilista, rotinaDiaria, validarSair };
+  return { relatorioTempo, aoWhatsApp, emitir, aoEvento, avisarConvite, lista, marcarLidas, contagem, boasVindasEmpresa, boasVindasContabilista, rotinaDiaria, validarSair };
 }
