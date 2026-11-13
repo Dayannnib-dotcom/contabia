@@ -63,7 +63,7 @@ export async function classificar(db: Db, empresaId: string, tipo: Documento["ti
   if (tipo === "venda") return { conta: "72", categoria: "Prestações de serviços", ivaDedutivel: false, confianca: "alta" };
   // 1.º a regra do contabilista para este fornecedor (manda sempre)
   const [regra] = await db.query<{ conta: string; iva_dedutivel: boolean; auto_lancar: boolean }>(
-    `SELECT conta, iva_dedutivel, auto_lancar FROM regras_fornecedor WHERE empresa_id = $1 AND nif = $2`, [empresaId, nif]);
+    `SELECT conta, iva_dedutivel, auto_lancar FROM regras_fornecedor WHERE empresa_id = $1 AND nif = $2 AND removida_em IS NULL`, [empresaId, nif]);
   if (regra) return { conta: regra.conta, categoria: PLANO_SNC[regra.conta] ?? "Regra do contabilista", ivaDedutivel: regra.iva_dedutivel, confianca: "alta", regra: { autoLancar: regra.auto_lancar } };
   const [hist] = await db.query<{ conta: string; usos: number }>(
     `SELECT conta, usos FROM fornecedor_contas WHERE empresa_id = $1 AND nif = $2`, [empresaId, nif],

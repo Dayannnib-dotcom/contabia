@@ -24,6 +24,7 @@ import { sugerir, type DocConc } from "./conciliacao.ts";
 import { criarPush, enviarExpo, type EnviarPush } from "./push.ts";
 import { criarAutomacoes, type EnviarWebhook } from "./automacoes.ts";
 import { criarWhatsApp, type CfgWhatsApp } from "./whatsapp.ts";
+import { criarRegisto, mascararEmail } from "./registo.ts";
 import { criarEnvioEmail, emailPedidoEstudo, emailRecuperacao, type EnviarEmail } from "./email.ts";
 import { randomBytes } from "node:crypto";
 
@@ -64,10 +65,11 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   const push = criarPush(db, cfg.enviarPush ?? enviarExpo);
   const agora = cfg.agora ?? (() => new Date());
   const hojeISO = () => agora().toISOString().slice(0, 10);
+  const registo = criarRegisto(db, agora);
   const wa = criarWhatsApp(db, cfg.whatsapp ?? {
     token: process.env.WHATSAPP_TOKEN, numeroId: process.env.WHATSAPP_NUMERO_ID,
     segredoApp: process.env.WHATSAPP_APP_SEGREDO, tokenVerificar: process.env.WHATSAPP_VERIFICAR,
-  }, agora);
+  }, agora, (empresaId, acao, detalhe) => registo.registar({ empresaId, quem: "Contabia (automático)", papel: "sistema", acao, rota: "whatsapp", detalhe }));
   // As automações precisam do catálogo de apoios e do envio de e-mail, definidos mais abaixo: ficam ligadas no fim.
   let auto: ReturnType<typeof criarAutomacoes> | null = null;
   hub.aoPublicar = (e, cc) => {
@@ -243,7 +245,14 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
 
 
   // ── Recuperar a senha por e-mail ──
-  const enviarEmail = cfg.enviarEmail ?? criarEnvioEmail();
+  const envioBase = cfg.enviarEmail ?? criarEnvioEmail();
+  /** Cada e-mail que a Contabia envia fica no registo (endereço mascarado, só o assunto). */
+  const enviarEmail: EnviarEmail = async (m) => {
+    const ok = await envioBase(m);
+    await registo.registar({ quem: "Contabia (automático)", papel: "sistema", acao: ok ? "enviou um e-mail" : "tentou enviar um e-mail sem sucesso",
+      rota: "e-mail", detalhe: { para: mascararEmail(m.para), assunto: m.assunto } }).catch(() => undefined);
+    return ok;
+  };
   // endereço das ligações nos e-mails: o configurado, ou o próprio endereço por onde o pedido chegou
   const urlPublicoDe = (req: FastifyRequest) => (cfg.urlPublico ?? process.env.URL_PUBLICO ?? `${req.protocol}://${req.host}`).replace(/\/$/, "");
   const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
@@ -586,7 +595,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     if (d0.estado === "anulado" || d0.estado === "anulacao_pedida") throw new ErroApp("documento_anulado", "Este documento está anulado ou com anulação pedida.", 409);
     // a regra do contabilista para este fornecedor manda sobre a escolha da empresa
     const [regra] = d0.tipo === "venda" ? [] : await db.query<{ conta: string; iva_dedutivel: boolean; auto_lancar: boolean }>(
-      `SELECT conta, iva_dedutivel, auto_lancar FROM regras_fornecedor WHERE empresa_id = $1 AND nif = $2`, [id, d0.terceiro_nif]);
+      `SELECT conta, iva_dedutivel, auto_lancar FROM regras_fornecedor WHERE empresa_id = $1 AND nif = $2 AND removida_em IS NULL`, [id, d0.terceiro_nif]);
     const [d1] = await db.query<LinhaDoc>(
       `UPDATE documentos SET estado = 'validado', conta_sugerida = COALESCE($1, conta_sugerida), iva_dedutivel = COALESCE($2, iva_dedutivel), terceiro_nome = COALESCE($3, terceiro_nome) WHERE id = $4 RETURNING *`,
       [regra?.conta ?? b.contaSugerida ?? null, regra?.iva_dedutivel ?? b.ivaDedutivel ?? null, b.terceiroNome ?? null, doc]);
@@ -891,8 +900,22 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const id = params(req).id;
     await exigirAcesso(db, a, id);
     exigirGestor(a);
+    await registo.pronto();
     const r = await db.query<{ quem: string; papel: string; acao: string; em: string }>(`SELECT quem, papel, acao, em FROM atividade WHERE empresa_id = $1 ORDER BY seq DESC LIMIT 200`, [id]);
     return r.map((x): Atividade => ({ quem: x.quem, papel: x.papel as Atividade["papel"], acao: x.acao, em: x.em }));
+  });
+  /** Registo completo da empresa em CSV (Excel), com o detalhe e a impressão digital de cada entrada. */
+  app.get("/v1/empresas/:id/atividade.csv", async (req, reply) => {
+    const a = ator(req);
+    const id = params(req).id;
+    await exigirAcesso(db, a, id);
+    exigirGestor(a);
+    await registo.pronto();
+    const rs = await db.query<{ seq: number; em: string; quem: string; papel: string; acao: string; detalhe: string | null; ip: string | null; hash: string | null }>(
+      `SELECT seq, em, quem, papel, acao, detalhe, ip, hash FROM atividade WHERE empresa_id = $1 ORDER BY seq`, [id]);
+    const c = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const linhas = ["N.º;Data e hora (UTC);Quem;Papel;Ação;Detalhe;Endereço;Impressão digital", ...rs.map((r) => [r.seq, r.em, r.quem, r.papel, r.acao, r.detalhe, r.ip, r.hash].map(c).join(";"))];
+    return reply.type("text/csv; charset=utf-8").header("content-disposition", `attachment; filename="registo-atividade-${id}.csv"`).send("\uFEFF" + linhas.join("\r\n"));
   });
 
   /** O que cada pedido bem-sucedido significa, em português, para o registo de atividade. */
@@ -925,16 +948,103 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     "POST /v1/empresas/:id/colaboradores/:cid/ativar": "reativou um utilizador",
     "PUT /v1/empresas/:id/perfil-apoios": "atualizou o CAE e a dimensão da empresa",
     "POST /v1/empresas/:id/estudos": "pediu um estudo de viabilidade económica",
+    "DELETE /v1/ligacoes/:id": "revogou a ligação entre empresa e contabilista",
+    "POST /v1/ligacoes": "pediu uma ligação entre empresa e contabilista",
+    "POST /v1/ligacoes/:id/aceitar": "aceitou a ligação entre empresa e contabilista",
+    "POST /v1/ligacoes/:id/recusar": "recusou a ligação entre empresa e contabilista",
+    "POST /v1/empresas/:id/assistente": "fez uma pergunta ao Luís",
+    "POST /v1/empresas/:id/iva/:periodo/ficheiro": "gerou o ficheiro da declaração periódica de IVA",
+    "PUT /v1/empresas/:id/contacto": "atualizou o contacto da empresa",
+    "PUT /v1/empresas/:id/preferencias-email": "mudou as preferências de e-mail",
+    "PUT /v1/empresas/:id/whatsapp": (a) => "mudou o consentimento para lembretes por WhatsApp",
+    "PUT /v1/auth/email": "atualizou o e-mail da conta",
+    "PUT /v1/contabilista/preferencias": "mudou as preferências do resumo diário",
+    "POST /v1/contabilista/avisos/lidas": "marcou avisos como lidos",
+    "POST /v1/dispositivos": "ativou as notificações num dispositivo",
+    "POST /v1/dispositivos/remover": "desligou as notificações num dispositivo",
+    "POST /v1/auth/empresas": "criou a conta da empresa",
+    "POST /v1/auth/contabilistas": "criou a conta de contabilista",
+    "POST /v1/auth/sessoes": "entrou na conta",
+    "POST /v1/auth/recuperar": "pediu para recuperar a senha",
+    "POST /v1/auth/redefinir": "definiu uma nova senha",
+    "POST /v1/estudos/site": "pediu um estudo de viabilidade pelo site",
+    "POST /v1/lista-espera": "inscreveu-se na lista de espera das apps",
+    "POST /v1/admin/apoios": "publicou uma versão do catálogo de apoios",
+    "POST /v1/admin/regras": "publicou uma versão das regras fiscais",
+    "POST /v1/admin/avisos-prazos": "correu a rotina diária de avisos",
+    "POST /v1/admin/estudos/:eid/estado": "mudou o estado de um pedido de estudo",
+    // consultas que também ficam registadas: ver originais e exportar
+    "GET /v1/empresas/:id/documentos/:doc/anexos/:aid": "abriu o original de um documento",
+    "GET /v1/empresas/:id/atividade.csv": "exportou o registo de atividade",
   };
+  /** Rotas GET que, por mexerem em originais ou exportações, ficam registadas. */
+  const CONSULTAS_REGISTADAS = new Set(["GET /v1/empresas/:id/documentos/:doc/anexos/:aid", "GET /v1/empresas/:id/atividade.csv"]);
+
+  // o id criado num registo de conta vem na resposta: guarda-se para o registo
+  app.addHook("onSend", async (req, reply, payload) => {
+    const r = req.routeOptions.url;
+    if ((r === "/v1/auth/empresas" || r === "/v1/auth/contabilistas" || r === "/v1/auth/sessoes") && reply.statusCode < 300 && typeof payload === "string") {
+      try { (req as FastifyRequest & { novaConta?: { id: string; papel: string; nome: string } }).novaConta = JSON.parse(payload); } catch { /* não é JSON */ }
+    }
+    return payload;
+  });
+
+  /**
+   * Regista TUDO o que altera dados (e as consultas sensíveis acima), com detalhe sem segredos,
+   * endereço e dispositivo. Também as tentativas de entrada falhadas.
+   */
   app.addHook("onResponse", async (req, reply) => {
-    if (req.method === "GET" || reply.statusCode >= 400 || (req as FastifyRequest & { repetido?: boolean }).repetido) return;
+    if ((req as FastifyRequest & { repetido?: boolean }).repetido) return;
+    const rota = req.routeOptions.url;
+    if (!rota) return;
+    const chave = `${req.method} ${rota}`;
+    const consulta = req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS";
+    if (consulta && !CONSULTAS_REGISTADAS.has(chave)) return;
+    if (rota.startsWith("/v1/whatsapp/webhook")) return; // registado com mais contexto em aoWhatsApp
+    const corpo = req.body as Record<string, unknown> | undefined;
+    const base = { rota: chave, ip: req.ip, agente: String(req.headers["user-agent"] ?? "") || null };
+    const p = (req.params ?? {}) as Record<string, string>;
+    const detalhe = (x: unknown) => {
+      const { id: _id, ...outros } = p;
+      const d: Record<string, unknown> = {};
+      if (Object.keys(outros).length) d.ids = outros;
+      if (x !== undefined && x !== null && !(typeof x === "object" && !Buffer.isBuffer(x) && !Object.keys(x as object).length)) d.dados = x;
+      if (reply.statusCode >= 400) d.resultado = reply.statusCode;
+      return Object.keys(d).length ? d : undefined;
+    };
+
+    // entradas falhadas e pedidos recusados por segurança
+    if (reply.statusCode >= 400) {
+      if (chave === "POST /v1/auth/sessoes" && (reply.statusCode === 401 || reply.statusCode === 429 || reply.statusCode === 403)) {
+        await registo.registar({ ...base, quem: ((i) => (i.includes("@") ? mascararEmail(i)! : i))(String((corpo as { identificador?: string })?.identificador ?? "desconhecido")), papel: String((corpo as { papel?: string })?.papel ?? "visitante"),
+          acao: reply.statusCode === 429 ? "foi bloqueado por excesso de tentativas de entrada" : "tentou entrar sem sucesso", detalhe: detalhe(undefined) });
+      } else if (reply.statusCode === 403 && (req as FastifyRequest & { ator?: Ator }).ator) {
+        const a = (req as FastifyRequest & { ator?: Ator }).ator!;
+        await registo.registar({ ...base, empresaId: rota.startsWith("/v1/empresas/:id") ? p.id : null, contaId: a.colaboradorId ?? a.id, quem: a.quem ?? a.nome, papel: a.papel,
+          acao: "tentou uma ação sem permissão", detalhe: detalhe(undefined) });
+      }
+      return;
+    }
+
     const a = (req as FastifyRequest & { ator?: Ator }).ator;
-    const empresaId = (req.params as { id?: string } | undefined)?.id;
-    const acao = ACOES[`${req.method} ${req.routeOptions.url}`];
-    if (!a || !empresaId || !acao) return;
-    const quem = a.papel === "contabilista" ? `${a.nome} (contabilista)` : a.quem ?? `${a.nome} (gestor)`;
-    await db.query(`INSERT INTO atividade (empresa_id, quem, papel, acao, em) VALUES ($1,$2,$3,$4,$5)`,
-      [empresaId, quem, a.papel, typeof acao === "function" ? acao(a) : acao, agoraISO()]).catch(() => undefined);
+    const nova = (req as FastifyRequest & { novaConta?: { id: string; papel: string; nome: string } }).novaConta;
+    const texto = ACOES[chave];
+    const acao = typeof texto === "function" ? (a ? texto(a) : "") : texto ?? `${req.method} ${rota}`;
+    let empresaId: string | null = rota.startsWith("/v1/empresas/:id") ? p.id ?? null : a?.papel === "empresa" ? a.id : null;
+    let contaId: string | null = a ? a.colaboradorId ?? a.id : null;
+    let quem: string;
+    let papel: string;
+    if (a) {
+      quem = a.papel === "contabilista" ? `${a.nome} (contabilista)` : a.quem ?? `${a.nome} (gestor)`;
+      papel = a.papel;
+    } else if (rota.startsWith("/v1/admin/")) {
+      quem = "Administração Contabia"; papel = "admin";
+    } else if (nova?.id) {
+      quem = nova.nome ?? "nova conta"; papel = nova.papel ?? "visitante"; contaId = nova.id; if (nova.papel === "empresa") empresaId = nova.id;
+    } else {
+      quem = (corpo as { email?: string; identificador?: string })?.email ? String(mascararEmail(String((corpo as { email: string }).email))) : "visitante"; papel = "visitante";
+    }
+    await registo.registar({ ...base, empresaId, contaId, quem, papel, acao, detalhe: detalhe(Buffer.isBuffer(corpo) ? corpo : corpo) });
   });
 
   // ═════════════ Regras por fornecedor (do contabilista) ═════════════
@@ -943,7 +1053,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   app.get("/v1/empresas/:id/regras-fornecedor", async (req) => {
     const id = params(req).id;
     await exigirAcesso(db, ator(req), id);
-    return (await db.query<LinhaRegra>(`SELECT * FROM regras_fornecedor WHERE empresa_id = $1 ORDER BY nome`, [id])).map(regraDe);
+    return (await db.query<LinhaRegra>(`SELECT * FROM regras_fornecedor WHERE empresa_id = $1 AND removida_em IS NULL ORDER BY nome`, [id])).map(regraDe);
   });
   app.put("/v1/empresas/:id/regras-fornecedor/:nif", async (req) => {
     const a = ator(req);
@@ -955,7 +1065,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     if (!/^6|^2|^3|^4/.test(b.conta)) throw new ErroApp("conta_invalida", "Use uma conta de gastos (6x), de ativo (4x/3x) ou de terceiros (2x).");
     const [r] = await db.query<LinhaRegra>(
       `INSERT INTO regras_fornecedor (empresa_id, nif, nome, conta, iva_dedutivel, auto_lancar, criada_em) VALUES ($1,$2,$3,$4,$5,$6,$7)
-       ON CONFLICT (empresa_id, nif) DO UPDATE SET nome = $3, conta = $4, iva_dedutivel = $5, auto_lancar = $6 RETURNING *`,
+       ON CONFLICT (empresa_id, nif) DO UPDATE SET nome = $3, conta = $4, iva_dedutivel = $5, auto_lancar = $6, removida_em = NULL RETURNING *`,
       [id, nif, b.nome, b.conta, b.ivaDedutivel, b.autoLancar, agoraISO()]);
     // aplica já aos documentos deste fornecedor que ainda estão por validar
     await db.query(`UPDATE documentos SET conta_sugerida = $1, categoria = $2, iva_dedutivel = $3 WHERE empresa_id = $4 AND terceiro_nif = $5 AND estado IN ('validar','sem_anexo') AND tipo <> 'venda'`,
@@ -968,7 +1078,8 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const { id, nif } = params(req);
     exigirPapel(a, "contabilista");
     await exigirAcesso(db, a, id, "lancamentos.escrever");
-    await db.query(`DELETE FROM regras_fornecedor WHERE empresa_id = $1 AND nif = $2`, [id, nif]);
+    // não se apaga: fica desativada, com data, e o registo guarda quem o fez
+    await db.query(`UPDATE regras_fornecedor SET removida_em = $3 WHERE empresa_id = $1 AND nif = $2 AND removida_em IS NULL`, [id, nif, agoraISO()]);
     return { ok: true };
   });
 
@@ -1046,6 +1157,24 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   const exigirAdmin = (req: FastifyRequest) => {
     if (!cfg.tokenAdmin || req.headers["x-admin-token"] !== cfg.tokenAdmin) throw new ErroApp("sem_permissao", "Acesso reservado.", 403);
   };
+  /** Registo completo (todas as empresas e contas), mais recente primeiro. Filtros: empresa, conta, antes (seq). */
+  app.get("/v1/admin/registo", async (req) => {
+    exigirAdmin(req);
+    await registo.pronto();
+    const q = z.object({ empresa: z.string().optional(), conta: z.string().optional(), antes: z.coerce.number().int().optional(), limite: z.coerce.number().int().min(1).max(1000).default(200) }).parse(req.query);
+    const cond: string[] = []; const v: unknown[] = [];
+    if (q.empresa) { v.push(q.empresa); cond.push(`empresa_id = $${v.length}`); }
+    if (q.conta) { v.push(q.conta); cond.push(`conta_id = $${v.length}`); }
+    if (q.antes) { v.push(q.antes); cond.push(`seq < $${v.length}`); }
+    v.push(q.limite);
+    const rs = await db.query<Record<string, unknown>>(`SELECT seq, em, empresa_id, conta_id, quem, papel, acao, rota, detalhe, ip, agente, hash FROM atividade ${cond.length ? "WHERE " + cond.join(" AND ") : ""} ORDER BY seq DESC LIMIT $${v.length}`, v);
+    return rs.map((r) => ({ ...r, detalhe: typeof r.detalhe === "string" ? (() => { try { return JSON.parse(r.detalhe as string); } catch { return r.detalhe; } })() : r.detalhe }));
+  });
+  /** Confirma que ninguém alterou nem apagou entradas (cadeia de impressões digitais). */
+  app.get("/v1/admin/registo/verificar", async (req) => {
+    exigirAdmin(req);
+    return registo.verificar();
+  });
   /** Lista de pedidos para a equipa que faz os estudos. */
   app.get("/v1/admin/estudos", async (req) => {
     exigirAdmin(req);
@@ -1144,7 +1273,10 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     enviarWebhook: cfg.enviarWebhook, catalogo: catalogoAtual, agora, lembreteWhatsApp: wa.lembrete,
   });
   const A = auto;
-  wa.rotas(app, (empresaId, texto) => A.aoWhatsApp(empresaId, texto));
+  wa.rotas(app, async (empresaId, texto) => {
+    await registo.registar({ empresaId, quem: "Cliente (WhatsApp)", papel: "empresa", acao: "enviou uma mensagem por WhatsApp", rota: "whatsapp", detalhe: { texto } });
+    await A.aoWhatsApp(empresaId, texto);
+  });
   /** Consentimento expresso da empresa para lembretes por WhatsApp (só o gestor; exige telemóvel). */
   app.put("/v1/empresas/:id/whatsapp", async (req) => {
     const a = ator(req);

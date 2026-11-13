@@ -236,7 +236,9 @@ test("13. revogar corta também o tempo real do contabilista", async () => {
 test("14. sessão de uma conta que já não existe termina com 401", async () => {
   const e = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "empresa.f", nif: "509999964", nome: "Empresa F", senha: "segredo123", regiao: "PT", regimeIVA: "mensal" });
   assert.equal(e.status, 201, JSON.stringify(e.json));
-  await db.query(`DELETE FROM empresas WHERE id = $1`, [e.json.id]);
+  // a base de dados recusa apagar empresas; para simular a conta desaparecida, desliga-se a proteção só neste teste
+  await db.query(`ALTER TABLE empresas DISABLE TRIGGER empresas_sem_apagar`);
+  try { await db.query(`DELETE FROM empresas WHERE id = $1`, [e.json.id]); } finally { await db.query(`ALTER TABLE empresas ENABLE TRIGGER empresas_sem_apagar`); }
   const r = await chamar("GET", "/v1/auth/eu", e.json.token);
   assert.equal(r.status, 401);
   assert.equal(r.json.codigo, "sessao_invalida");
@@ -395,8 +397,9 @@ test("20. vários utilizadores: o gestor adiciona e desativa; o colaborador faz 
   assert.equal((await chamar("GET", `/v1/empresas/${id}/colaboradores`, marta)).status, 403);
   // o registo diz quem fez o quê
   const reg = (await chamar("GET", `/v1/empresas/${id}/atividade`, S.empC)).json;
-  assert.equal(reg[0].quem, "Marta Sousa");
-  assert.equal(reg[0].acao, "registou um documento");
+  assert.ok(reg.some((x: { quem: string; acao: string }) => x.quem === "Marta Sousa" && x.acao === "registou um documento"));
+  // e também o que ela tentou fazer sem permissão
+  assert.ok(reg.some((x: { quem: string; acao: string }) => x.quem === "Marta Sousa" && x.acao === "tentou uma ação sem permissão"));
   assert.ok(reg.some((x: { acao: string }) => x.acao === "adicionou um utilizador"));
   assert.ok(reg.some((x: { quem: string }) => x.quem === "Rui CC (contabilista)"));
   // o gestor desativa: a sessão da Marta acaba logo, em todos os dispositivos
@@ -803,4 +806,77 @@ test("28. descarregar a app: lojas por configuração e lista de espera", async 
   assert.equal(adm[0].plataforma, "ambos");
   process.env.URL_APP_STORE = "https://apps.apple.com/app/id000";
   try { assert.equal((await chamar("GET", "/v1/site/lojas")).json.ios, "https://apps.apple.com/app/id000"); } finally { delete process.env.URL_APP_STORE; }
+});
+
+test("29. registo completo: tudo fica, com detalhe e origem, sem segredos, e nada se apaga", async () => {
+  const UA = { "user-agent": "ContabiaTeste/1.0" };
+  const e = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "empresa.reg", nif: "509999719", nome: "Empresa Registo, Lda.", senha: "segredo123", regiao: "PT", regimeIVA: "mensal" }, UA);
+  assert.equal(e.status, 201, JSON.stringify(e.json));
+  const id = e.json.id; const tok = e.json.token;
+  const c = await chamar("POST", "/v1/auth/contabilistas", undefined, { email: "reg.cc@exemplo.pt", nome: "Rita CC", numeroOCC: "55555", senha: "segredo123" });
+  await chamar("POST", "/v1/auth/sessoes", undefined, { papel: "empresa", identificador: "empresa.reg", senha: "senha-errada-1" }, UA);
+  await chamar("POST", "/v1/auth/sessoes", undefined, { papel: "empresa", identificador: "empresa.reg", senha: "segredo123" }, UA);
+  await chamar("PUT", `/v1/empresas/${id}/contacto`, tok, { telefone: "+351 912 345 678", contactoNome: "Joana" }, UA);
+  const p = await chamar("POST", "/v1/ligacoes", c.json.token, { utilizador: "empresa.reg", nif: "509999719" });
+  await chamar("POST", `/v1/ligacoes/${p.json.id}/aceitar`, tok, { versao: 1 });
+  const d = await chamar("POST", `/v1/empresas/${id}/documentos`, tok, { tipo: "compra", terceiroNif: "500000000", terceiroNome: "Papelaria", numero: "FT R/1", data: "2026-11-06", base: 10, iva: 2.3, taxa: 23 }, UA);
+  assert.equal(d.status, 201);
+  // regra de fornecedor: "remover" desativa, não apaga
+  const url = `/v1/empresas/${id}/regras-fornecedor/500000000`;
+  assert.equal((await chamar("PUT", url, c.json.token, { nome: "Papelaria", conta: "6268", ivaDedutivel: true })).status, 200);
+  assert.ok((await chamar("DELETE", url, c.json.token)).status < 300);
+  assert.equal((await chamar("GET", `/v1/empresas/${id}/regras-fornecedor`, c.json.token)).json.length, 0);
+  const [guardada] = await db.query<{ removida_em: string | null }>(`SELECT removida_em FROM regras_fornecedor WHERE empresa_id = $1 AND nif = '500000000'`, [id]);
+  assert.ok(guardada?.removida_em, "a regra continua na base de dados, marcada como removida");
+  assert.equal((await chamar("PUT", url, c.json.token, { nome: "Papelaria", conta: "6268", ivaDedutivel: true })).status, 200);
+  assert.equal((await chamar("GET", `/v1/empresas/${id}/regras-fornecedor`, c.json.token)).json.length, 1, "voltar a definir reativa");
+
+  // o registo administrativo tem tudo: criação de conta, entradas (boas e falhadas), contacto, ligação, documento, regra
+  assert.equal((await chamar("GET", "/v1/admin/registo")).status, 403);
+  const adm = (await chamar("GET", `/v1/admin/registo?limite=1000`, undefined, undefined, { "x-admin-token": "admin" })).json as { acao: string; quem: string; empresa_id: string | null; rota: string; ip: string | null; agente: string | null; detalhe: unknown; hash: string }[];
+  const acoes = adm.map((x) => x.acao);
+  for (const esperado of ["criou a conta da empresa", "tentou entrar sem sucesso", "entrou na conta", "atualizou o contacto da empresa", "pediu uma ligação entre empresa e contabilista",
+    "aceitou a ligação entre empresa e contabilista", "registou um documento", "enviou um e-mail"]) assert.ok(acoes.includes(esperado), `falta no registo: ${esperado}`);
+  const criada = adm.find((x) => x.acao === "criou a conta da empresa" && x.empresa_id === id)!;
+  assert.ok(criada, "criação ligada à empresa");
+  assert.equal(criada.agente, "ContabiaTeste/1.0");
+  assert.ok(criada.ip, "guarda o endereço");
+  assert.ok(/^[0-9a-f]{64}$/.test(criada.hash));
+  const falhada = adm.find((x) => x.acao === "tentou entrar sem sucesso" && x.quem === "empresa.reg")!;
+  assert.ok(falhada);
+  const tudo = JSON.stringify(adm);
+  assert.ok(!tudo.includes("segredo123") && !tudo.includes("senha-errada-1"), "nenhuma senha no registo");
+  assert.ok(!tudo.includes("reg.cc@exemplo.pt"), "e-mails aparecem mascarados nos envios");
+  const doc = adm.find((x) => x.acao === "registou um documento" && x.empresa_id === id)! as { detalhe: { dados?: { numero?: string } } };
+  assert.equal(doc.detalhe.dados?.numero, "FT R/1", "guarda o detalhe do que foi feito");
+  assert.ok(adm.some((x) => x.rota === `DELETE /v1/empresas/:id/regras-fornecedor/:nif` && x.empresa_id === id), "a remoção da regra fica registada");
+
+  // a empresa exporta o seu registo (e a exportação também fica registada)
+  const csv = await app.inject({ method: "GET", url: `/v1/empresas/${id}/atividade.csv`, headers: { authorization: `Bearer ${tok}` } });
+  assert.equal(csv.statusCode, 200);
+  assert.ok(csv.body.includes("registou um documento") && csv.body.includes("Impressão digital"));
+  assert.ok((await chamar("GET", `/v1/empresas/${id}/atividade`, tok)).json.some((x: { acao: string }) => x.acao === "exportou o registo de atividade"));
+
+  // a base de dados recusa alterar ou apagar o registo, e apagar dados de negócio
+  await assert.rejects(db.query(`UPDATE atividade SET acao = 'nada' WHERE empresa_id = $1`, [id]));
+  await assert.rejects(db.query(`DELETE FROM atividade WHERE empresa_id = $1`, [id]));
+  await assert.rejects(db.query(`DELETE FROM documentos WHERE id = $1`, [d.json.id]));
+  await assert.rejects(db.query(`DELETE FROM empresas WHERE id = $1`, [id]));
+  await assert.rejects(db.query(`DELETE FROM regras_fornecedor WHERE empresa_id = $1`, [id]));
+
+  // a cadeia está íntegra; se alguém forçar uma alteração (sem o gatilho), a verificação mostra onde
+  const v1 = (await chamar("GET", "/v1/admin/registo/verificar", undefined, undefined, { "x-admin-token": "admin" })).json;
+  assert.equal(v1.integro, true, JSON.stringify(v1));
+  assert.ok(v1.verificadas > 10);
+  await db.query(`ALTER TABLE atividade DISABLE TRIGGER atividade_imutavel`);
+  try {
+    await db.query(`UPDATE atividade SET acao = 'adulterado' WHERE seq = (SELECT max(seq) FROM atividade WHERE empresa_id = $1 AND acao = 'registou um documento')`, [id]);
+    const v2 = (await chamar("GET", "/v1/admin/registo/verificar", undefined, undefined, { "x-admin-token": "admin" })).json;
+    assert.equal(v2.integro, false);
+    assert.ok(v2.problema);
+  } finally {
+    await db.query(`UPDATE atividade SET acao = 'registou um documento' WHERE acao = 'adulterado'`);
+    await db.query(`ALTER TABLE atividade ENABLE TRIGGER atividade_imutavel`);
+  }
+  assert.equal((await chamar("GET", "/v1/admin/registo/verificar", undefined, undefined, { "x-admin-token": "admin" })).json.integro, true);
 });

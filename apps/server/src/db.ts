@@ -330,6 +330,29 @@ const MIGRACOES: string[] = [
   `ALTER TABLE contabilistas ADD COLUMN IF NOT EXISTS resumo_diario boolean NOT NULL DEFAULT true`,
   // WhatsApp: consentimento expresso da empresa para lembretes automáticos (data em que o deu)
   `ALTER TABLE empresas ADD COLUMN IF NOT EXISTS whatsapp_consentimento_em text`,
+  // Registo de atividade completo, encadeado e só de acrescentar
+  `ALTER TABLE atividade ALTER COLUMN empresa_id DROP NOT NULL`,
+  `ALTER TABLE atividade ADD COLUMN IF NOT EXISTS conta_id text`,
+  `ALTER TABLE atividade ADD COLUMN IF NOT EXISTS rota text`,
+  `ALTER TABLE atividade ADD COLUMN IF NOT EXISTS detalhe text`,
+  `ALTER TABLE atividade ADD COLUMN IF NOT EXISTS ip text`,
+  `ALTER TABLE atividade ADD COLUMN IF NOT EXISTS agente text`,
+  `ALTER TABLE atividade ADD COLUMN IF NOT EXISTS hash_anterior text`,
+  `ALTER TABLE atividade ADD COLUMN IF NOT EXISTS hash text`,
+  `CREATE INDEX IF NOT EXISTS atividade_conta ON atividade(conta_id, seq)`,
+  `CREATE OR REPLACE FUNCTION contabia_registo_imutavel() RETURNS trigger LANGUAGE plpgsql AS $$
+   BEGIN RAISE EXCEPTION 'O registo de atividade é só de acrescentar: não pode ser alterado nem apagado.'; END $$`,
+  `DROP TRIGGER IF EXISTS atividade_imutavel ON atividade`,
+  `CREATE TRIGGER atividade_imutavel BEFORE UPDATE OR DELETE ON atividade FOR EACH ROW EXECUTE FUNCTION contabia_registo_imutavel()`,
+  // Nada de negócio se apaga: a base de dados recusa DELETE nestas tabelas
+  `CREATE OR REPLACE FUNCTION contabia_sem_apagar() RETURNS trigger LANGUAGE plpgsql AS $$
+   BEGIN RAISE EXCEPTION 'Na Contabia não se apagam dados (%). Use anulação, desativação ou revogação.', TG_TABLE_NAME; END $$`,
+  ...["empresas", "contabilistas", "colaboradores", "documentos", "anexos", "movimentos", "pedidos", "submissoes", "ligacoes", "pedidos_estudo", "regras_fornecedor"].flatMap((t) => [
+    `DROP TRIGGER IF EXISTS ${t}_sem_apagar ON ${t}`,
+    `CREATE TRIGGER ${t}_sem_apagar BEFORE DELETE ON ${t} FOR EACH ROW EXECUTE FUNCTION contabia_sem_apagar()`,
+  ]),
+  // Regras de fornecedor: «remover» passa a desativar, com data
+  `ALTER TABLE regras_fornecedor ADD COLUMN IF NOT EXISTS removida_em text`,
   // Lista de espera das apps nas lojas (site)
   `CREATE TABLE IF NOT EXISTS lista_espera (
      email text PRIMARY KEY,
@@ -338,6 +361,8 @@ const MIGRACOES: string[] = [
      criado_em text NOT NULL,
      avisado_em text
    )`,
+  `DROP TRIGGER IF EXISTS lista_espera_sem_apagar ON lista_espera`,
+  `CREATE TRIGGER lista_espera_sem_apagar BEFORE DELETE ON lista_espera FOR EACH ROW EXECUTE FUNCTION contabia_sem_apagar()`,
 ];
 
 async function migrar(db: Db) {

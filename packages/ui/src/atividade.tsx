@@ -16,6 +16,8 @@ export function RegistoAtividade({ empresaId }: { empresaId: string }) {
   if (!dados) return <Texto sec>A carregar…</Texto>;
   if (!dados.length) return <Vazio texto="Ainda sem atividade. Tudo o que for feito nesta empresa aparece aqui, com quem e quando." />;
   return (
+    <View style={{ gap: 8 }}>
+    <Texto sec tamanho={12}>Registo permanente: nada do que se faz na Contabia se apaga — cada ação fica aqui, com quem e quando, e não pode ser alterada.</Texto>
     <Cartao estilo={{ paddingVertical: 6 }}>
       {dados.map((a, i) => (
         <View key={i} style={{ flexDirection: "row", gap: 10, paddingVertical: 8, borderBottomWidth: i < dados.length - 1 ? 1 : 0, borderBottomColor: cor.linha }}>
@@ -24,5 +26,6 @@ export function RegistoAtividade({ empresaId }: { empresaId: string }) {
         </View>
       ))}
     </Cartao>
+    </View>
   );
 }

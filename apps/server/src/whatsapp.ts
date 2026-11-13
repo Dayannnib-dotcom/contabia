@@ -39,7 +39,8 @@ export const MODELOS_WHATSAPP = {
 
 const PALAVRAS_PARAR = /^\s*(parar|stop|sair|cancelar)\s*[.!]?\s*$/i;
 
-export function criarWhatsApp(db: Db, c: CfgWhatsApp, agora: () => Date) {
+export function criarWhatsApp(db: Db, c: CfgWhatsApp, agora: () => Date, registar?: (empresaId: string | null, acao: string, detalhe: unknown) => Promise<void>) {
+  const reg = (e: string | null, a: string, d: unknown) => (registar ? registar(e, a, d).catch(() => undefined) : Promise.resolve());
   const ativo = !!(c.token && c.numeroId);
   const enviarReal: EnviarWhatsApp = async (m) => {
     const corpo = m.tipo === "modelo"
@@ -60,7 +61,9 @@ export function criarWhatsApp(db: Db, c: CfgWhatsApp, agora: () => Date) {
     if (!para || !e?.whatsapp_consentimento_em) return false;
     const [novo] = await db.query(`INSERT INTO emails_enviados (chave, em) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING chave`, [`wa:${chave}`, agora().toISOString()]);
     if (!novo) return false;
-    return enviar({ para, tipo: "modelo", modelo: MODELOS_WHATSAPP[modelo].nome, idioma: "pt_PT", parametros }).catch(() => false);
+    const ok = await enviar({ para, tipo: "modelo", modelo: MODELOS_WHATSAPP[modelo].nome, idioma: "pt_PT", parametros }).catch(() => false);
+    await reg(empresaId, ok ? "enviou um lembrete por WhatsApp" : "tentou enviar um lembrete por WhatsApp sem sucesso", { modelo: MODELOS_WHATSAPP[modelo].nome, parametros });
+    return ok;
   }
 
   /** Rotas do webhook da Meta: verificação (GET) e mensagens recebidas (POST, assinadas). */
@@ -88,7 +91,10 @@ export function criarWhatsApp(db: Db, c: CfgWhatsApp, agora: () => Date) {
           const texto = m.type === "text" ? (m.text?.body ?? "") : `[${m.type ?? "mensagem"}]`;
           const emps = (await db.query<{ id: string; telefone: string | null }>(`SELECT id, telefone FROM empresas WHERE telefone IS NOT NULL`)).filter((e) => telefoneInternacional(e.telefone) === de);
           if (PARAR(texto)) {
-            for (const e of emps) await db.query(`UPDATE empresas SET whatsapp_consentimento_em = NULL WHERE id = $1`, [e.id]);
+            for (const e of emps) {
+              await db.query(`UPDATE empresas SET whatsapp_consentimento_em = NULL WHERE id = $1`, [e.id]);
+              await reg(e.id, "retirou o consentimento para WhatsApp (respondeu PARAR)", { texto });
+            }
             await enviar({ para: de, tipo: "texto", texto: "Feito: não voltará a receber lembretes da Contabia por WhatsApp. Pode reativá-los na app, em Conta." }).catch(() => false);
             continue;
           }
