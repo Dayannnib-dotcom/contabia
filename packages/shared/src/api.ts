@@ -182,6 +182,9 @@ export class ApiContabia {
   definirContacto(empresaId: string, p: { telefone?: string | null; contactoNome?: string | null }) {
     return this.pedido<Empresa>("PUT", `/v1/empresas/${empresaId}/contacto`, p);
   }
+  lembretesWhatsApp(empresaId: string, ativo: boolean) {
+    return this.pedido<Empresa>("PUT", `/v1/empresas/${empresaId}/whatsapp`, { ativo });
+  }
   preferenciasEmail(empresaId: string, dicas: boolean) {
     return this.pedido<{ dicas: boolean }>("PUT", `/v1/empresas/${empresaId}/preferencias-email`, { dicas });
   }

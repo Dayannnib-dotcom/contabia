@@ -34,6 +34,8 @@ export interface CfgAutomacoes {
   automacaoSegredo?: string;
   enviarWebhook?: EnviarWebhook;
   catalogo: () => Promise<Catalogo>;
+  /** Lembrete por WhatsApp (número oficial), se configurado e com consentimento. */
+  lembreteWhatsApp?: (chave: string, empresaId: string, modelo: "lembrete_prazo" | "pedido_documento", parametros: string[]) => Promise<boolean>;
   agora: () => Date;
 }
 
@@ -141,6 +143,16 @@ export function criarAutomacoes(c: CfgAutomacoes) {
           break;
       }
     }
+  }
+
+  /** Mensagem do cliente recebida no número de WhatsApp da Contabia → aviso urgente para o contabilista. */
+  async function aoWhatsApp(empresaId: string, texto: string) {
+    const emp = await empresaDe(empresaId);
+    if (!emp) return;
+    void emitir("whatsapp.recebido", empresaId, { texto }).catch(() => false);
+    for (const cc of await ccsDe(empresaId))
+      await notificar({ contabilistaId: cc, empresaId, tipo: "whatsapp.recebido", chave: `wa:${empresaId}:${agoraISO()}`, urgencia: "alta",
+        titulo: `${emp.nome} respondeu no WhatsApp`, corpo: `«${texto.slice(0, 200)}»`, resposta: { id: "resposta_pergunta", contexto: { empresa: emp.nome, pergunta: texto } } });
   }
 
   /** Convite de uma empresa a um contabilista (ainda sem ligação ativa). */
@@ -289,6 +301,9 @@ ${botao ? `<p style="margin:20px 0 6px"><a href="${esc(botao.url)}" style="backg
             "Em <b>Ligação</b>, escreva o e-mail ou o n.º OCC dele. Ele recebe o convite e aceita num toque.",
           ], { texto: "Ligar o contabilista", url: `${url}/empresa/ligacao` }, sair))) r.emails++;
         }
+        // lembretes de prazos por WhatsApp (só com consentimento; o envio verifica-o)
+        if (c.lembreteWhatsApp) for (const o of prazos.filter((x) => x.dias === 7 || x.dias === 2))
+          await c.lembreteWhatsApp(`prazo:${e.id}:${o.codigo}:${o.periodo}:${o.dias}`, e.id, "lembrete_prazo", [e.nome, o.descricao, dataPT(o.prazo)]).catch(() => false);
         // avisos de prazos por e-mail (serviço: sem opção de cancelar, como os do banco)
         for (const o of prazos.filter((x) => x.dias === 7 || x.dias === 2)) {
           if (await enviarUmaVez(`prazo:${e.id}:${o.codigo}:${o.periodo}:${o.dias}`, e.email, `Faltam ${o.dias} dias · ${o.descricao}`, moldura(`${o.descricao}: faltam ${o.dias} dias`, [
@@ -315,5 +330,5 @@ ${botao ? `<p style="margin:20px 0 6px"><a href="${esc(botao.url)}" style="backg
     return r;
   }
 
-  return { emitir, aoEvento, avisarConvite, lista, marcarLidas, contagem, boasVindasEmpresa, boasVindasContabilista, rotinaDiaria, validarSair };
+  return { aoWhatsApp, emitir, aoEvento, avisarConvite, lista, marcarLidas, contagem, boasVindasEmpresa, boasVindasContabilista, rotinaDiaria, validarSair };
 }

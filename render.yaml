@@ -34,3 +34,11 @@ services:
         sync: false
       - key: AUTOMACAO_SEGREDO
         sync: false
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_NUMERO_ID
+        sync: false
+      - key: WHATSAPP_APP_SEGREDO
+        sync: false
+      - key: WHATSAPP_VERIFICAR
+        sync: false

@@ -15,6 +15,7 @@ const enviados: MensagemPush[] = [];
 const naoRegistados = new Set<string>();
 const emails: { para: string; assunto: string; texto: string; html?: string }[] = [];
 const webhooks: { url: string; corpo: string; cab: Record<string, string> }[] = [];
+const whats: { para: string; tipo: string; modelo?: string; parametros?: string[]; texto?: string }[] = [];
 const enviarFalso = async (m: MensagemPush[]) => { enviados.push(...m); return m.map((x) => (naoRegistados.has(x.to) ? { status: "error" as const, details: { error: "DeviceNotRegistered" } } : { status: "ok" as const })); };
 
 async function chamar(metodo: string, caminho: string, token?: string, corpo?: unknown, extra: Record<string, string> = {}) {
@@ -30,7 +31,8 @@ async function chamar(metodo: string, caminho: string, token?: string, corpo?: u
 before(async () => {
   db = await abrirDb(process.env.TEST_DATABASE_URL);
   ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => new Date("2026-11-11T10:00:00Z"), enviarPush: enviarFalso, enviarEmail: async (e) => { emails.push(e); return true; }, urlPublico: "https://contabia-eu.onrender.com", emailEstudos: "estudos@contabia.test", catalogoBase: CATALOGO_TESTE,
-    automacaoUrl: "https://hooks.test/contabia", automacaoSegredo: "segredo-ap", enviarWebhook: async (u, corpo, cab) => { webhooks.push({ url: u, corpo, cab }); return true; } }));
+    automacaoUrl: "https://hooks.test/contabia", automacaoSegredo: "segredo-ap", enviarWebhook: async (u, corpo, cab) => { webhooks.push({ url: u, corpo, cab }); return true; },
+    whatsapp: { segredoApp: "wa-seg", tokenVerificar: "wa-ver", enviar: async (m) => { whats.push(m as never); return true; } } }));
   url = await app.listen({ port: 0, host: "127.0.0.1" });
 });
 after(async () => {
@@ -728,4 +730,62 @@ test("26. centro de avisos do contabilista, respostas rápidas, e-mails automát
 
   // os eventos da app também seguem para o Activepieces
   assert.ok(webhooks.some((w) => w.cab["x-contabia-evento"] === "documento.anulacao_pedida"));
+});
+
+test("27. WhatsApp Business (número oficial): consentimento, lembretes, respostas do cliente e PARAR", async () => {
+  const { createHmac } = await import("node:crypto");
+  const espera = () => new Promise((r) => setTimeout(r, 60));
+  const emp = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "ondas.lda", nif: "509999816", nome: "Ondas, Lda.", senha: "segredo123", regiao: "PT-MA", regimeIVA: "mensal" });
+  const cc = await chamar("POST", "/v1/auth/contabilistas", undefined, { email: "pedro@gabinete.pt", nome: "Pedro Nunes", numeroOCC: "88123", senha: "segredo123" });
+  const conv = await chamar("POST", "/v1/ligacoes", emp.json.token, { contabilista: "pedro@gabinete.pt" });
+  await chamar("POST", `/v1/ligacoes/${conv.json.id}/aceitar`, cc.json.token, { versao: conv.json.versao });
+  // consentimento: só com telemóvel; só a própria empresa o pode dar
+  assert.equal((await chamar("PUT", `/v1/empresas/${emp.json.id}/whatsapp`, emp.json.token, { ativo: true })).json.codigo, "sem_telefone");
+  await chamar("PUT", `/v1/empresas/${emp.json.id}/contacto`, emp.json.token, { telefone: "+351 966 111 222", contactoNome: "Carla Sousa" });
+  assert.equal((await chamar("PUT", `/v1/empresas/${emp.json.id}/whatsapp`, cc.json.token, { ativo: true })).status, 403);
+  // sem consentimento, um pedido do contabilista não gera WhatsApp
+  whats.length = 0;
+  await chamar("POST", `/v1/empresas/${emp.json.id}/pedidos`, cc.json.token, { tipo: "Extrato bancário", detalhe: "outubro" });
+  await espera();
+  assert.equal(whats.length, 0);
+  assert.equal((await chamar("PUT", `/v1/empresas/${emp.json.id}/whatsapp`, emp.json.token, { ativo: true })).json.whatsappLembretes, true);
+  await chamar("POST", `/v1/empresas/${emp.json.id}/pedidos`, cc.json.token, { tipo: "Fatura em falta", detalhe: "EDP" });
+  await espera();
+  assert.equal(whats.length, 1);
+  assert.deepEqual(whats[0], { para: "351966111222", tipo: "modelo", modelo: "contabia_pedido_documento", idioma: "pt_PT", parametros: ["Carla", "Fatura em falta (EDP)"] });
+  // mudar de número retira o consentimento
+  await chamar("PUT", `/v1/empresas/${emp.json.id}/contacto`, emp.json.token, { telefone: "966 999 000" });
+  assert.equal((await chamar("GET", "/v1/auth/eu", emp.json.token)).json.empresa.whatsappLembretes, false);
+  await chamar("PUT", `/v1/empresas/${emp.json.id}/contacto`, emp.json.token, { telefone: "+351 966 111 222" });
+  await chamar("PUT", `/v1/empresas/${emp.json.id}/whatsapp`, emp.json.token, { ativo: true });
+
+  // verificação do webhook pela Meta
+  const v = await app.inject({ method: "GET", url: "/v1/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=wa-ver&hub.challenge=123" });
+  assert.equal(v.body, "123");
+  assert.equal((await app.inject({ method: "GET", url: "/v1/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=errado&hub.challenge=1" })).statusCode, 403);
+  // mensagem do cliente: assinatura obrigatória; vira aviso urgente para o contabilista
+  const msg = (texto: string) => JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ from: "351966111222", type: "text", text: { body: texto } }] } }] }] });
+  const assinar = (c: string) => "sha256=" + createHmac("sha256", "wa-seg").update(c).digest("hex");
+  const c1 = msg("Já enviei a fatura da EDP, pode confirmar?");
+  assert.equal((await app.inject({ method: "POST", url: "/v1/whatsapp/webhook", payload: c1, headers: { "content-type": "application/json", "x-hub-signature-256": "sha256=00" } })).statusCode, 401);
+  assert.equal((await app.inject({ method: "POST", url: "/v1/whatsapp/webhook", payload: c1, headers: { "content-type": "application/json", "x-hub-signature-256": assinar(c1) } })).statusCode, 200);
+  await espera();
+  const av = (await chamar("GET", "/v1/contabilista/avisos", cc.json.token)).json.avisos;
+  const w = av.find((a: { tipo: string }) => a.tipo === "whatsapp.recebido");
+  assert.ok(w);
+  assert.equal(w.urgencia, "alta");
+  assert.equal(w.titulo, "Ondas, Lda. respondeu no WhatsApp");
+  assert.match(w.corpo, /EDP/);
+  assert.equal(w.resposta.id, "resposta_pergunta");
+  // PARAR retira o consentimento e confirma
+  whats.length = 0;
+  const c2 = msg("PARAR");
+  await app.inject({ method: "POST", url: "/v1/whatsapp/webhook", payload: c2, headers: { "content-type": "application/json", "x-hub-signature-256": assinar(c2) } });
+  assert.equal(whats[0].tipo, "texto");
+  assert.equal((await chamar("GET", "/v1/auth/eu", emp.json.token)).json.empresa.whatsappLembretes, false);
+  await chamar("POST", `/v1/empresas/${emp.json.id}/pedidos`, cc.json.token, { tipo: "Recibo", detalhe: "renda" });
+  await espera();
+  assert.equal(whats.length, 1, "depois de PARAR, não sai mais nenhum lembrete");
+  // o resto da API continua a ler JSON normalmente (o leitor cru só existe no webhook)
+  assert.equal((await chamar("GET", "/v1/contabilista/avisos/contagem", cc.json.token)).status, 200);
 });

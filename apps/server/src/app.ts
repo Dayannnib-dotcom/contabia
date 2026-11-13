@@ -23,6 +23,7 @@ import { perguntar } from "./assistente.ts";
 import { sugerir, type DocConc } from "./conciliacao.ts";
 import { criarPush, enviarExpo, type EnviarPush } from "./push.ts";
 import { criarAutomacoes, type EnviarWebhook } from "./automacoes.ts";
+import { criarWhatsApp, type CfgWhatsApp } from "./whatsapp.ts";
 import { criarEnvioEmail, emailPedidoEstudo, emailRecuperacao, type EnviarEmail } from "./email.ts";
 import { randomBytes } from "node:crypto";
 
@@ -47,6 +48,8 @@ export interface Config {
   automacaoUrl?: string;
   automacaoSegredo?: string;
   enviarWebhook?: EnviarWebhook;
+  /** WhatsApp Business Platform (número oficial da Contabia). Por omissão, lê WHATSAPP_* do ambiente. */
+  whatsapp?: CfgWhatsApp;
   /** Verificar os prazos e enviar avisos todos os dias às 9h de Lisboa. */
   agendarAvisosPrazos?: boolean;
 }
@@ -61,6 +64,10 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   const push = criarPush(db, cfg.enviarPush ?? enviarExpo);
   const agora = cfg.agora ?? (() => new Date());
   const hojeISO = () => agora().toISOString().slice(0, 10);
+  const wa = criarWhatsApp(db, cfg.whatsapp ?? {
+    token: process.env.WHATSAPP_TOKEN, numeroId: process.env.WHATSAPP_NUMERO_ID,
+    segredoApp: process.env.WHATSAPP_APP_SEGREDO, tokenVerificar: process.env.WHATSAPP_VERIFICAR,
+  }, agora);
   // As automações precisam do catálogo de apoios e do envio de e-mail, definidos mais abaixo: ficam ligadas no fim.
   let auto: ReturnType<typeof criarAutomacoes> | null = null;
   hub.aoPublicar = (e, cc) => {
@@ -68,6 +75,13 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     if (!auto) return;
     void auto.aoEvento(e).catch((x) => console.warn("[avisos]", x));
     if (e.tipo === "ligacao.pedida" && (e.dados as { iniciadaPor?: string }).iniciadaPor === "empresa" && cc) void auto.avisarConvite(cc, e.empresaId).catch(() => undefined);
+    if (e.tipo === "pedido.criado") {
+      const d = e.dados as { pedidoId?: string; tipo?: string; detalhe?: string };
+      void (async () => {
+        const [x] = await db.query<{ nome: string; contacto_nome: string | null }>(`SELECT nome, contacto_nome FROM empresas WHERE id = $1`, [e.empresaId]);
+        if (x) await wa.lembrete(`pedido:${d.pedidoId}`, e.empresaId, "pedido_documento", [x.contacto_nome?.split(" ")[0] ?? x.nome, `${d.tipo ?? "um documento"}${d.detalhe ? ` (${d.detalhe})` : ""}`]);
+      })().catch(() => undefined);
+    }
   };
   const tentativasLigacao = new Map<string, number[]>();
 
@@ -127,12 +141,12 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
 
   // ── auxiliares ──
   const empresaPorId = async (id: string): Promise<Empresa> => {
-    const [e] = await db.query<{ id: string; utilizador: string; nif: string; nome: string; regiao: string; regime_iva: string; email: string | null; cae: string | null; caes_secundarios: string[] | null; dimensao: string | null; telefone: string | null; contacto_nome: string | null; emails_dicas: boolean }>(
-      `SELECT id, utilizador, nif, nome, regiao, regime_iva, email, cae, caes_secundarios, dimensao, telefone, contacto_nome, emails_dicas FROM empresas WHERE id = $1`, [id]);
+    const [e] = await db.query<{ id: string; utilizador: string; nif: string; nome: string; regiao: string; regime_iva: string; email: string | null; cae: string | null; caes_secundarios: string[] | null; dimensao: string | null; telefone: string | null; contacto_nome: string | null; emails_dicas: boolean; whatsapp_consentimento_em: string | null }>(
+      `SELECT id, utilizador, nif, nome, regiao, regime_iva, email, cae, caes_secundarios, dimensao, telefone, contacto_nome, emails_dicas, whatsapp_consentimento_em FROM empresas WHERE id = $1`, [id]);
     if (!e) throw new ErroApp("nao_encontrada", "Empresa não encontrada.", 404);
     return { id: e.id, utilizador: e.utilizador, nif: e.nif, nome: e.nome, regiao: e.regiao as Empresa["regiao"], regimeIVA: e.regime_iva as Empresa["regimeIVA"], email: e.email,
       cae: e.cae, caesSecundarios: e.caes_secundarios ?? [], dimensao: (e.dimensao as Dimensao | null) ?? null,
-      telefone: e.telefone, contactoNome: e.contacto_nome, emailsDicas: e.emails_dicas };
+      telefone: e.telefone, contactoNome: e.contacto_nome, emailsDicas: e.emails_dicas, whatsappLembretes: !!e.whatsapp_consentimento_em };
   };
   const regrasAtuais = async (): Promise<Regras> => {
     const [r] = await db.query<{ regras: Regras }>(`SELECT regras FROM regras_versoes ORDER BY publicada_em DESC LIMIT 1`);
@@ -1127,9 +1141,22 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   auto = criarAutomacoes({
     db, avisar: push.avisar, enviarEmail, urlPublico: cfg.urlPublico, segredo: cfg.segredoJWT,
     automacaoUrl: cfg.automacaoUrl ?? process.env.AUTOMACAO_URL, automacaoSegredo: cfg.automacaoSegredo ?? process.env.AUTOMACAO_SEGREDO,
-    enviarWebhook: cfg.enviarWebhook, catalogo: catalogoAtual, agora,
+    enviarWebhook: cfg.enviarWebhook, catalogo: catalogoAtual, agora, lembreteWhatsApp: wa.lembrete,
   });
   const A = auto;
+  wa.rotas(app, (empresaId, texto) => A.aoWhatsApp(empresaId, texto));
+  /** Consentimento expresso da empresa para lembretes por WhatsApp (só o gestor; exige telemóvel). */
+  app.put("/v1/empresas/:id/whatsapp", async (req) => {
+    const a = ator(req);
+    exigirPapel(a, "empresa");
+    await exigirAcesso(db, a, params(req).id);
+    exigirGestor(a);
+    const b = z.object({ ativo: z.boolean() }).parse(req.body);
+    const [e] = await db.query<{ telefone: string | null }>(`SELECT telefone FROM empresas WHERE id = $1`, [a.id]);
+    if (b.ativo && !telefoneInternacional(e?.telefone)) throw new ErroApp("sem_telefone", "Guarde primeiro o telemóvel em Contacto para o seu contabilista.");
+    await db.query(`UPDATE empresas SET whatsapp_consentimento_em = $1 WHERE id = $2`, [b.ativo ? agoraISO() : null, a.id]);
+    return empresaPorId(a.id);
+  });
   app.get("/v1/contabilista/avisos", async (req) => {
     const a = ator(req);
     exigirPapel(a, "contabilista");
@@ -1166,6 +1193,11 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
       contactoNome: z.string().trim().max(80).nullable().optional(),
     }).parse(req.body);
     if (b.telefone && !telefoneInternacional(b.telefone)) throw new ErroApp("telefone_invalido", "O telefone não parece válido. Use, por exemplo, 912 345 678 ou +351 912 345 678.");
+    if (b.telefone !== undefined) {
+      // o consentimento para WhatsApp foi dado para um número: se o número muda, tem de ser dado de novo
+      const [antes] = await db.query<{ telefone: string | null }>(`SELECT telefone FROM empresas WHERE id = $1`, [id]);
+      if (telefoneInternacional(antes?.telefone) !== telefoneInternacional(b.telefone)) await db.query(`UPDATE empresas SET whatsapp_consentimento_em = NULL WHERE id = $1`, [id]);
+    }
     await db.query(`UPDATE empresas SET telefone = COALESCE($1, telefone), contacto_nome = COALESCE($2, contacto_nome) WHERE id = $3`,
       [b.telefone === undefined ? null : b.telefone || "", b.contactoNome === undefined ? null : b.contactoNome || "", id]);
     await db.query(`UPDATE empresas SET telefone = NULLIF(telefone, ''), contacto_nome = NULLIF(contacto_nome, '') WHERE id = $1`, [id]);

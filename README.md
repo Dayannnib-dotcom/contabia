@@ -137,6 +137,24 @@ A rotina corre às 9h (Lisboa) e não repete nada no mesmo dia. Para correr à m
 
 **Activepieces (ou outra automação):** defina `AUTOMACAO_URL` (o «Webhook» do fluxo) e `AUTOMACAO_SEGREDO` no Render. Cada evento chega como `POST` JSON `{id, tipo, em, empresa:{id,nome,nif,email,telefone}, dados}` com os cabeçalhos `x-contabia-evento`, `x-contabia-tempo` e `x-contabia-assinatura: sha256=HMAC(segredo, tempo + "." + corpo)`. Eventos: `empresa.registada`, `contabilista.registado`, `documento.criado`, `documento.anulacao_pedida`, `pedido.criado`, `pedido.recebido`, `assistente.encaminhado`, `estudo.pedido`, `estudo.pedido_site`, `iva.submetida`, `periodo.fechado`, `ligacao.*`, `banco.*`, entre outros. Até 3 tentativas por evento.
 
+## WhatsApp Business (número oficial da Contabia)
+
+Os contabilistas **não** precisam de passar a conta pessoal para Business:
+- **Respostas** (já ativo): o botão WhatsApp abre o WhatsApp do contabilista — pessoal ou Business — com a mensagem escrita.
+- **Lembretes automáticos** saem de um único número oficial da Contabia (WhatsApp Business Platform), em nome do gabinete, só para empresas que ligaram «Lembretes por WhatsApp» em Conta (consentimento expresso, guardado com data; mudar de número retira-o; «PARAR» retira-o).
+- **Respostas dos clientes** a esse número viram aviso Urgente para o contabilista, com a resposta pronta.
+- Quem quiser usar o próprio número com automação pode, mais tarde, ligar o seu WhatsApp Business ao Cloud API em modo «coexistência» (app e API no mesmo número), através de um parceiro da Meta.
+
+Para ativar:
+1. Criar um Meta Business Portfolio para a empresa titular da Contabia e verificá-la.
+2. Em developers.facebook.com: criar uma app «Business», acrescentar o produto WhatsApp e registar um número próprio (não pode estar em uso no WhatsApp normal).
+3. Criar um utilizador de sistema com token permanente (permissões `whatsapp_business_messaging` e `whatsapp_business_management`).
+4. Submeter os modelos (categoria Utilidade, idioma `pt_PT`) com os nomes e textos de `MODELOS_WHATSAPP` em `apps/server/src/whatsapp.ts`.
+5. Webhook: URL `https://contabia-eu.onrender.com/v1/whatsapp/webhook`, token de verificação = `WHATSAPP_VERIFICAR`; subscrever `messages`.
+6. No Render: `WHATSAPP_TOKEN`, `WHATSAPP_NUMERO_ID`, `WHATSAPP_APP_SEGREDO` (App secret) e `WHATSAPP_VERIFICAR`.
+
+A Meta cobra por modelo entregue (categoria Utilidade, em Portugal, cêntimos por mensagem; confirmar a tabela atual da Meta).
+
 ## Antes de entrar em produção (não se resolve só com código)
 
 - [ ] **Certificação da AT** do módulo de faturação (Portaria n.º 363/2010): a emissão de faturas certificadas (assinatura/hash, ATCUD) ainda não está incluída — as apps registam faturas recebidas e emitidas por outros programas.

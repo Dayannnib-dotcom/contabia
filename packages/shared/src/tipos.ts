@@ -20,6 +20,8 @@ export interface Empresa {
   telefone?: string | null;
   contactoNome?: string | null;
   emailsDicas?: boolean;
+  /** Lembretes automáticos por WhatsApp (número oficial da Contabia), com consentimento expresso. */
+  whatsappLembretes?: boolean;
 }
 
 export interface Contabilista {

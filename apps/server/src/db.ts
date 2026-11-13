@@ -328,6 +328,8 @@ const MIGRACOES: string[] = [
   `ALTER TABLE empresas ADD COLUMN IF NOT EXISTS contacto_nome text`,
   `ALTER TABLE empresas ADD COLUMN IF NOT EXISTS emails_dicas boolean NOT NULL DEFAULT true`,
   `ALTER TABLE contabilistas ADD COLUMN IF NOT EXISTS resumo_diario boolean NOT NULL DEFAULT true`,
+  // WhatsApp: consentimento expresso da empresa para lembretes automáticos (data em que o deu)
+  `ALTER TABLE empresas ADD COLUMN IF NOT EXISTS whatsapp_consentimento_em text`,
 ];
 
 async function migrar(db: Db) {

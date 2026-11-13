@@ -23,6 +23,8 @@ export default function Conta() {
   const [erroContacto, setErroContacto] = useState<string | null>(null);
   const [contactoOk, setContactoOk] = useState(false);
   const [dicas, setDicas] = useState<boolean | null>(null);
+  const [wa, setWa] = useState<boolean | null>(null);
+  const [erroWa, setErroWa] = useState<string | null>(null);
   async function guardarContacto() {
     setErroContacto(null); setContactoOk(false);
     try {
@@ -76,6 +78,15 @@ export default function Conta() {
           <Erro texto={erroContacto} />
           {contactoOk ? <Texto tamanho={13} cor={cor.verde}>Contacto guardado.</Texto> : null}
           <Botao titulo="Guardar contacto" variante="secundario" onPress={guardarContacto} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Texto forte>Lembretes por WhatsApp</Texto>
+              <Texto sec tamanho={13}>Prazos e pedidos do seu contabilista, do número oficial da Contabia. Pode parar a qualquer momento, aqui ou respondendo PARAR.</Texto>
+            </View>
+            <Switch accessibilityLabel="Lembretes por WhatsApp" value={wa ?? dados.empresa.whatsappLembretes ?? false}
+              onValueChange={async (v) => { setErroWa(null); setWa(v); try { await api.lembretesWhatsApp(sessao!.id, v); } catch (e) { setWa(!v); setErroWa((e as Error).message); } }} trackColor={{ true: cor.verde, false: cor.bordaForte }} />
+          </View>
+          <Erro texto={erroWa} />
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 8 }}>
             <View style={{ flex: 1 }}>
               <Texto forte>Dicas do Luís por e-mail</Texto>

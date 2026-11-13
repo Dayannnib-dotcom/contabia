@@ -418,6 +418,9 @@ with sync_playwright() as p:
         emp.get_by_label("Telemóvel (WhatsApp)").fill("912 345 678")
         emp.get_by_role("button", name="Guardar contacto").click()
         emp.get_by_text("Contacto guardado.").wait_for()
+        emp.get_by_role("switch", name="Lembretes por WhatsApp").click()
+        emp.wait_for_timeout(800)
+        assert emp.get_by_role("switch", name="Lembretes por WhatsApp").is_checked()
 
         # centro de avisos do contabilista e resposta rápida pronta
         cc.goto(BASE + "/contabilista/avisos")
