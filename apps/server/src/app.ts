@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { z, ZodError } from "zod";
 import {
   apoiosCompativeis, CATALOGO_BASE, erroCAE, normalizarCAE, seccaoDoCAE, validarCatalogo, type ApoioCompativel, type Catalogo, type Dimensao, type PedidoEstudo, type PerfilApoios,
-  ajudaNIF, lerQR, limparNIF, normalizarUtilizador, proximasObrigacoes, qrConsistente, REGRAS_BASE, taxasEm, utilizadorValido, validarNIF,
+  ajudaNIF, lerQR, telefoneInternacional, limparNIF, normalizarUtilizador, proximasObrigacoes, qrConsistente, REGRAS_BASE, taxasEm, utilizadorValido, validarNIF,
   type Anexo, type Atividade, type RegraFornecedor, type Colaborador, type Documento, type MovimentoBancario, type Empresa, type Ligacao, type Pedido, type Regras, type ResumoEmpresa, type Sessao, type VerificacaoFecho,
 } from "@contabia/shared";
 import type { Db } from "./db.ts";
@@ -22,6 +22,7 @@ import {
 import { perguntar } from "./assistente.ts";
 import { sugerir, type DocConc } from "./conciliacao.ts";
 import { criarPush, enviarExpo, type EnviarPush } from "./push.ts";
+import { criarAutomacoes, type EnviarWebhook } from "./automacoes.ts";
 import { criarEnvioEmail, emailPedidoEstudo, emailRecuperacao, type EnviarEmail } from "./email.ts";
 import { randomBytes } from "node:crypto";
 
@@ -42,6 +43,10 @@ export interface Config {
   catalogoBase?: Catalogo;
   /** Caixa da equipa que recebe os pedidos de estudo de viabilidade económica. */
   emailEstudos?: string;
+  /** Automação externa (Activepieces): recebe eventos assinados com HMAC-SHA256. */
+  automacaoUrl?: string;
+  automacaoSegredo?: string;
+  enviarWebhook?: EnviarWebhook;
   /** Verificar os prazos e enviar avisos todos os dias às 9h de Lisboa. */
   agendarAvisosPrazos?: boolean;
 }
@@ -54,9 +59,16 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   const hub = new Hub();
   const tokens = criarTokens(cfg.segredoJWT);
   const push = criarPush(db, cfg.enviarPush ?? enviarExpo);
-  hub.aoPublicar = (e, cc) => { void push.aoEvento(e, cc).catch(() => undefined); };
   const agora = cfg.agora ?? (() => new Date());
   const hojeISO = () => agora().toISOString().slice(0, 10);
+  // As automações precisam do catálogo de apoios e do envio de e-mail, definidos mais abaixo: ficam ligadas no fim.
+  let auto: ReturnType<typeof criarAutomacoes> | null = null;
+  hub.aoPublicar = (e, cc) => {
+    void push.aoEvento(e, cc).catch(() => undefined);
+    if (!auto) return;
+    void auto.aoEvento(e).catch((x) => console.warn("[avisos]", x));
+    if (e.tipo === "ligacao.pedida" && (e.dados as { iniciadaPor?: string }).iniciadaPor === "empresa" && cc) void auto.avisarConvite(cc, e.empresaId).catch(() => undefined);
+  };
   const tentativasLigacao = new Map<string, number[]>();
 
   await app.register(cors, { origin: true, exposedHeaders: ["x-contabia-token"] });
@@ -115,11 +127,12 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
 
   // ── auxiliares ──
   const empresaPorId = async (id: string): Promise<Empresa> => {
-    const [e] = await db.query<{ id: string; utilizador: string; nif: string; nome: string; regiao: string; regime_iva: string; email: string | null; cae: string | null; caes_secundarios: string[] | null; dimensao: string | null }>(
-      `SELECT id, utilizador, nif, nome, regiao, regime_iva, email, cae, caes_secundarios, dimensao FROM empresas WHERE id = $1`, [id]);
+    const [e] = await db.query<{ id: string; utilizador: string; nif: string; nome: string; regiao: string; regime_iva: string; email: string | null; cae: string | null; caes_secundarios: string[] | null; dimensao: string | null; telefone: string | null; contacto_nome: string | null; emails_dicas: boolean }>(
+      `SELECT id, utilizador, nif, nome, regiao, regime_iva, email, cae, caes_secundarios, dimensao, telefone, contacto_nome, emails_dicas FROM empresas WHERE id = $1`, [id]);
     if (!e) throw new ErroApp("nao_encontrada", "Empresa não encontrada.", 404);
     return { id: e.id, utilizador: e.utilizador, nif: e.nif, nome: e.nome, regiao: e.regiao as Empresa["regiao"], regimeIVA: e.regime_iva as Empresa["regimeIVA"], email: e.email,
-      cae: e.cae, caesSecundarios: e.caes_secundarios ?? [], dimensao: (e.dimensao as Dimensao | null) ?? null };
+      cae: e.cae, caesSecundarios: e.caes_secundarios ?? [], dimensao: (e.dimensao as Dimensao | null) ?? null,
+      telefone: e.telefone, contactoNome: e.contacto_nome, emailsDicas: e.emails_dicas };
   };
   const regrasAtuais = async (): Promise<Regras> => {
     const [r] = await db.query<{ regras: Regras }>(`SELECT regras FROM regras_versoes ORDER BY publicada_em DESC LIMIT 1`);
@@ -149,6 +162,8 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const id = novoId();
     await db.query(`INSERT INTO empresas (id, utilizador, nif, nome, regiao, regime_iva, senha_hash, criada_em, email) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
       [id, utilizador, nif, b.nome, b.regiao, b.regimeIVA, await hashSenha(b.senha), agoraISO(), b.email ?? null]);
+    void auto?.boasVindasEmpresa(id).catch(() => false);
+    void auto?.emitir("empresa.registada", id, { regiao: b.regiao }).catch(() => false);
     return reply.code(201).send(await sessao({ papel: "empresa", id, nome: b.nome }));
   });
 
@@ -162,6 +177,8 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const id = novoId();
     await db.query(`INSERT INTO contabilistas (id, email, nome, numero_occ, senha_hash, criado_em) VALUES ($1,$2,$3,$4,$5,$6)`,
       [id, email, b.nome, b.numeroOCC, await hashSenha(b.senha), agoraISO()]);
+    void auto?.boasVindasContabilista(id).catch(() => false);
+    void auto?.emitir("contabilista.registado", null, { contabilistaId: id, nome: b.nome }).catch(() => false);
     return reply.code(201).send(await sessao({ papel: "contabilista", id, nome: b.nome }));
   });
 
@@ -275,6 +292,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     exigirGestor(a);
     const b = z.object({ email: z.string().trim().toLowerCase().email("O e-mail não parece válido.") }).parse(req.body);
     await db.query(`UPDATE empresas SET email = $1 WHERE id = $2`, [b.email, a.id]);
+    void auto?.boasVindasEmpresa(a.id).catch(() => false); // só sai uma vez por empresa
     return empresaPorId(a.id);
   });
 
@@ -1101,7 +1119,76 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const destino = cfg.emailEstudos ?? process.env.EMAIL_ESTUDOS;
     if (destino) void enviarEmail({ para: destino, ...emailPedidoEstudo({ nome: `${b.empresa} (pedido pelo site, sem conta)`, nif: nif || "não indicado", regiao: b.regiao, cae: cae || null, dimensao: null }, estudoDe(r)) }).catch(() => false);
     else console.warn(`[estudos] EMAIL_ESTUDOS em falta — pedido do site ${r.id} guardado, sem e-mail para a equipa.`);
+    void auto?.emitir("estudo.pedido_site", null, { estudoId: r.id, empresa: b.empresa, nome: b.nome, email: b.email, telefone: b.telefone ?? null, cae: cae || null, regiao: b.regiao, aviso: apoio ? `${apoio.codigo} · ${apoio.nome}` : null }).catch(() => false);
     return reply.code(201).send({ ok: true, id: r.id });
+  });
+
+  // ═════════════ Centro de avisos, contacto do cliente e e-mails automáticos ═════════════
+  auto = criarAutomacoes({
+    db, avisar: push.avisar, enviarEmail, urlPublico: cfg.urlPublico, segredo: cfg.segredoJWT,
+    automacaoUrl: cfg.automacaoUrl ?? process.env.AUTOMACAO_URL, automacaoSegredo: cfg.automacaoSegredo ?? process.env.AUTOMACAO_SEGREDO,
+    enviarWebhook: cfg.enviarWebhook, catalogo: catalogoAtual, agora,
+  });
+  const A = auto;
+  app.get("/v1/contabilista/avisos", async (req) => {
+    const a = ator(req);
+    exigirPapel(a, "contabilista");
+    const q = req.query as { todas?: string };
+    return { avisos: await A.lista(a.id, q.todas !== "1"), contagem: await A.contagem(a.id) };
+  });
+  app.get("/v1/contabilista/avisos/contagem", async (req) => {
+    const a = ator(req);
+    exigirPapel(a, "contabilista");
+    return A.contagem(a.id);
+  });
+  app.post("/v1/contabilista/avisos/lidas", async (req) => {
+    const a = ator(req);
+    exigirPapel(a, "contabilista");
+    const b = z.object({ ids: z.array(z.string()).max(500).optional(), todas: z.boolean().optional() }).parse(req.body);
+    await A.marcarLidas(a.id, b.todas ? "todas" : b.ids ?? []);
+    return A.contagem(a.id);
+  });
+  app.put("/v1/contabilista/preferencias", async (req) => {
+    const a = ator(req);
+    exigirPapel(a, "contabilista");
+    const b = z.object({ resumoDiario: z.boolean() }).parse(req.body);
+    await db.query(`UPDATE contabilistas SET resumo_diario = $1 WHERE id = $2`, [b.resumoDiario, a.id]);
+    return { resumoDiario: b.resumoDiario };
+  });
+  /** Contacto da empresa para respostas rápidas: o gestor ou o contabilista ligado podem atualizar. */
+  app.put("/v1/empresas/:id/contacto", async (req) => {
+    const a = ator(req);
+    const id = params(req).id;
+    await exigirAcesso(db, a, id);
+    exigirGestor(a);
+    const b = z.object({
+      telefone: z.string().trim().max(30).nullable().optional(),
+      contactoNome: z.string().trim().max(80).nullable().optional(),
+    }).parse(req.body);
+    if (b.telefone && !telefoneInternacional(b.telefone)) throw new ErroApp("telefone_invalido", "O telefone não parece válido. Use, por exemplo, 912 345 678 ou +351 912 345 678.");
+    await db.query(`UPDATE empresas SET telefone = COALESCE($1, telefone), contacto_nome = COALESCE($2, contacto_nome) WHERE id = $3`,
+      [b.telefone === undefined ? null : b.telefone || "", b.contactoNome === undefined ? null : b.contactoNome || "", id]);
+    await db.query(`UPDATE empresas SET telefone = NULLIF(telefone, ''), contacto_nome = NULLIF(contacto_nome, '') WHERE id = $1`, [id]);
+    await publicar(db, hub, id, "empresa.atualizada", a.papel, { campo: "contacto" });
+    return empresaPorId(id);
+  });
+  app.put("/v1/empresas/:id/preferencias-email", async (req) => {
+    const a = ator(req);
+    exigirPapel(a, "empresa");
+    await exigirAcesso(db, a, params(req).id);
+    exigirGestor(a);
+    const b = z.object({ dicas: z.boolean() }).parse(req.body);
+    await db.query(`UPDATE empresas SET emails_dicas = $1 WHERE id = $2`, [b.dicas, a.id]);
+    return { dicas: b.dicas };
+  });
+  /** Ligação «Deixar de receber» dos e-mails (sem sessão, assinada). */
+  app.get("/v1/email/sair", async (req, reply) => {
+    const q = req.query as { t?: string; i?: string; k?: string };
+    const ok = !!q.t && !!q.i && !!q.k && (q.t === "empresa" || q.t === "contabilista") && A.validarSair(q.t, q.i, q.k);
+    if (ok && q.t === "empresa") await db.query(`UPDATE empresas SET emails_dicas = false WHERE id = $1`, [q.i]);
+    if (ok && q.t === "contabilista") await db.query(`UPDATE contabilistas SET resumo_diario = false WHERE id = $1`, [q.i]);
+    const msg = ok ? (q.t === "empresa" ? "Não voltará a receber dicas por e-mail. Os avisos de prazos continuam, porque são parte do serviço." : "Não voltará a receber o resumo diário. Os avisos continuam na app.") : "Esta ligação não é válida.";
+    return reply.code(ok ? 200 : 400).type("text/html; charset=utf-8").send(`<!doctype html><html lang="pt-PT"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Contabia</title><body style="font-family:system-ui,sans-serif;background:#F6F7F5;color:#12232E;display:grid;place-items:center;min-height:90vh;margin:0"><div style="max-width:420px;padding:28px;background:#fff;border:1px solid #E3E8E5;border-radius:16px"><h1 style="font-size:22px;margin:0 0 10px">${ok ? "Feito." : "Ups."}</h1><p style="line-height:1.5">${msg}</p><p style="line-height:1.5;color:#5B6B73;font-size:14px">Pode voltar a ativar na app, em Conta.</p></div></body></html>`);
   });
 
   // ═════════════ Avisos push ═════════════
@@ -1123,12 +1210,16 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   /** Para um serviço externo (ex.: cron-job.org) acordar o servidor às 9h e enviar os avisos de prazos. */
   app.post("/v1/admin/avisos-prazos", async (req) => {
     if (!cfg.tokenAdmin || req.headers["x-admin-token"] !== cfg.tokenAdmin) throw new ErroApp("sem_permissao", "Acesso reservado.", 403);
-    return { enviados: await push.avisarPrazos(hojeISO(), await regrasAtuais()) };
+    const regras = await regrasAtuais();
+    return { enviados: await push.avisarPrazos(hojeISO(), regras), rotina: await A.rotinaDiaria(hojeISO(), regras) };
   });
   if (cfg.agendarAvisosPrazos) {
     const verificar = async () => {
       const hora = Number(new Intl.DateTimeFormat("pt-PT", { timeZone: "Europe/Lisbon", hour: "numeric", hourCycle: "h23" }).format(agora()));
-      if (hora >= 9) await push.avisarPrazos(hojeISO(), await regrasAtuais()).catch(() => 0);
+      if (hora < 9) return;
+      const regras = await regrasAtuais();
+      await push.avisarPrazos(hojeISO(), regras).catch(() => 0);
+      await A.rotinaDiaria(hojeISO(), regras).catch((x) => console.warn("[rotina diária]", x));
     };
     const t = setInterval(() => void verificar(), 30 * 60 * 1000);
     app.addHook("onClose", async () => clearInterval(t));

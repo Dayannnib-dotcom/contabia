@@ -16,6 +16,10 @@ export interface Empresa {
   cae?: string | null;
   caesSecundarios?: string[];
   dimensao?: Dimensao | null;
+  /** Contacto para respostas rápidas (WhatsApp / telefone) e nome de quem trata das contas. */
+  telefone?: string | null;
+  contactoNome?: string | null;
+  emailsDicas?: boolean;
 }
 
 export interface Contabilista {

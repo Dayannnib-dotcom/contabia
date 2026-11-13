@@ -13,7 +13,8 @@ let url = "";
 const S: Record<string, string> = {};
 const enviados: MensagemPush[] = [];
 const naoRegistados = new Set<string>();
-const emails: { para: string; assunto: string; texto: string }[] = [];
+const emails: { para: string; assunto: string; texto: string; html?: string }[] = [];
+const webhooks: { url: string; corpo: string; cab: Record<string, string> }[] = [];
 const enviarFalso = async (m: MensagemPush[]) => { enviados.push(...m); return m.map((x) => (naoRegistados.has(x.to) ? { status: "error" as const, details: { error: "DeviceNotRegistered" } } : { status: "ok" as const })); };
 
 async function chamar(metodo: string, caminho: string, token?: string, corpo?: unknown, extra: Record<string, string> = {}) {
@@ -28,7 +29,8 @@ async function chamar(metodo: string, caminho: string, token?: string, corpo?: u
 
 before(async () => {
   db = await abrirDb(process.env.TEST_DATABASE_URL);
-  ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => new Date("2026-11-11T10:00:00Z"), enviarPush: enviarFalso, enviarEmail: async (e) => { emails.push(e); return true; }, urlPublico: "https://contabia-eu.onrender.com", emailEstudos: "estudos@contabia.test", catalogoBase: CATALOGO_TESTE }));
+  ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => new Date("2026-11-11T10:00:00Z"), enviarPush: enviarFalso, enviarEmail: async (e) => { emails.push(e); return true; }, urlPublico: "https://contabia-eu.onrender.com", emailEstudos: "estudos@contabia.test", catalogoBase: CATALOGO_TESTE,
+    automacaoUrl: "https://hooks.test/contabia", automacaoSegredo: "segredo-ap", enviarWebhook: async (u, corpo, cab) => { webhooks.push({ url: u, corpo, cab }); return true; } }));
   url = await app.listen({ port: 0, host: "127.0.0.1" });
 });
 after(async () => {
@@ -617,4 +619,113 @@ test("25. site público: verificador de apoios por CAE e pedido de estudo sem co
   // limite por endereço: 5 por hora
   for (let i = 0; i < 4; i++) await chamar("POST", "/v1/estudos/site", undefined, { ...base, autorizoContacto: true });
   assert.equal((await chamar("POST", "/v1/estudos/site", undefined, { ...base, autorizoContacto: true })).status, 429);
+});
+
+test("26. centro de avisos do contabilista, respostas rápidas, e-mails automáticos e eventos assinados", async () => {
+  const { createHmac } = await import("node:crypto");
+  const espera = () => new Promise((r) => setTimeout(r, 60));
+  emails.length = 0; webhooks.length = 0;
+  // registos: boas-vindas por e-mail e evento externo assinado
+  const cc = await chamar("POST", "/v1/auth/contabilistas", undefined, { email: "joana@gabinete.pt", nome: "Joana Freitas", numeroOCC: "77123", senha: "segredo123" });
+  const emp = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "mar.azul", nif: "509999808", nome: "Mar Azul, Lda.", senha: "segredo123", regiao: "PT-MA", regimeIVA: "mensal", email: "rita@marazul.pt" });
+  assert.equal(emp.status, 201, JSON.stringify(emp.json));
+  await espera();
+  const bv = emails.filter((e) => e.assunto.startsWith("Bem-vind"));
+  assert.deepEqual(bv.map((e) => e.para).sort(), ["joana@gabinete.pt", "rita@marazul.pt"]);
+  assert.ok(bv.every((e) => e.html?.includes("A maré certa.")));
+  const reg = webhooks.find((w) => w.cab["x-contabia-evento"] === "empresa.registada");
+  assert.ok(reg, "evento de registo enviado ao Activepieces");
+  const assin = createHmac("sha256", "segredo-ap").update(`${reg!.cab["x-contabia-tempo"]}.${reg!.corpo}`).digest("hex");
+  assert.equal(reg!.cab["x-contabia-assinatura"], `sha256=${assin}`);
+  assert.equal(JSON.parse(reg!.corpo).empresa.nome, "Mar Azul, Lda.");
+  // não repete as boas-vindas ao pôr o e-mail outra vez
+  await chamar("PUT", "/v1/auth/email", emp.json.token, { email: "rita@marazul.pt" });
+  await espera();
+  assert.equal(emails.filter((e) => e.para === "rita@marazul.pt").length, 1);
+
+  // convite da empresa → aviso para o contabilista; aceitar
+  const conv = await chamar("POST", "/v1/ligacoes", emp.json.token, { contabilista: "joana@gabinete.pt" });
+  assert.equal(conv.status, 201, JSON.stringify(conv.json));
+  await espera();
+  let av = await chamar("GET", "/v1/contabilista/avisos", cc.json.token);
+  const cv = av.json.avisos.find((a: { titulo: string }) => a.titulo === "Mar Azul, Lda. convidou-o para contabilista");
+  assert.ok(cv);
+  assert.equal(cv.contacto, null, "sem ligação ativa, o contabilista não vê o contacto do cliente");
+  assert.equal(cv.abrir, null);
+  assert.equal((await chamar("POST", `/v1/ligacoes/${conv.json.id}/aceitar`, cc.json.token, { versao: conv.json.versao })).json.estado, "ativa");
+  await chamar("POST", "/v1/contabilista/avisos/lidas", cc.json.token, { todas: true });
+
+  // contacto do cliente para respostas rápidas
+  assert.equal((await chamar("PUT", `/v1/empresas/${emp.json.id}/contacto`, cc.json.token, { telefone: "123" })).status, 400);
+  const ct = await chamar("PUT", `/v1/empresas/${emp.json.id}/contacto`, emp.json.token, { telefone: "912 345 678", contactoNome: "Rita Gomes" });
+  assert.equal(ct.json.telefone, "912 345 678");
+  assert.equal(ct.json.contactoNome, "Rita Gomes");
+
+  // documentos novos agrupam-se num só aviso por dia, com resposta sugerida e contacto
+  const qr = (n: number) => `A:500000000*B:509999808*C:PT*D:FT*E:N*F:20261110*G:FT 2026/${n}*H:ABCD1234-${n}*I1:PT-MA*I7:100.00*I8:22.00*N:22.00*O:122.00*Q:Ab1C*R:9999`;
+  await chamar("POST", "/v1/dispositivos", cc.json.token, { token: "ExponentPushToken[joana]", plataforma: "ios" });
+  enviados.length = 0;
+  await chamar("POST", `/v1/empresas/${emp.json.id}/documentos`, emp.json.token, { qr: qr(901), tipo: "compra" });
+  await chamar("POST", `/v1/empresas/${emp.json.id}/documentos`, emp.json.token, { qr: qr(902), tipo: "compra" });
+  await espera();
+  av = await chamar("GET", "/v1/contabilista/avisos", cc.json.token);
+  const docs = av.json.avisos.filter((a: { tipo: string }) => a.tipo === "documento.criado");
+  assert.equal(docs.length, 1);
+  assert.equal(docs[0].titulo, "Mar Azul, Lda.: 2 documento(s) novo(s) hoje");
+  assert.equal(docs[0].urgencia, "normal");
+  assert.deepEqual(docs[0].contacto, { nome: "Rita Gomes", telefone: "912 345 678", email: "rita@marazul.pt" });
+  assert.equal(docs[0].resposta.id, "documentos_recebidos");
+  assert.equal(docs[0].resposta.contexto.contacto, "Rita Gomes");
+  assert.equal(docs[0].abrir.separador, "revisao");
+  assert.equal(av.json.contagem.normal, 1);
+  assert.equal(enviados.filter((m) => m.title.startsWith("Mar Azul, Lda.:")).length, 1, "um só push por grupo, não um por fatura");
+
+  // pedido de anulação é urgente; o contabilista não é avisado do que ele próprio faz
+  const [d1] = (await chamar("GET", `/v1/empresas/${emp.json.id}/documentos`, emp.json.token)).json;
+  await chamar("POST", `/v1/empresas/${emp.json.id}/documentos/${d1.id}/anulacao`, emp.json.token, { motivo: "duplicado", detalhe: "Lancei duas vezes" });
+  await chamar("POST", `/v1/empresas/${emp.json.id}/pedidos`, cc.json.token, { tipo: "Fatura em falta", detalhe: "EDP outubro" });
+  await espera();
+  av = await chamar("GET", "/v1/contabilista/avisos", cc.json.token);
+  assert.equal(av.json.avisos[0].urgencia, "alta", "urgentes primeiro");
+  assert.match(av.json.avisos[0].titulo, /pede para anular/);
+  assert.ok(!av.json.avisos.some((a: { tipo: string }) => a.tipo === "pedido.criado"));
+  assert.equal((await chamar("GET", "/v1/contabilista/avisos", S.emp)).status, 403);
+
+  // rotina diária: pedido sem resposta há mais de 3 dias, prazos, resumo do dia por e-mail, dicas à empresa
+  await db.query(`UPDATE pedidos SET criado_em = '2026-11-05T09:00:00Z' WHERE empresa_id = $1`, [emp.json.id]);
+  await db.query(`UPDATE empresas SET criada_em = '2026-11-01T09:00:00Z' WHERE id = $1`, [emp.json.id]);
+  emails.length = 0;
+  const rot = await chamar("POST", "/v1/admin/avisos-prazos", undefined, {}, { "x-admin-token": "admin" });
+  assert.equal(rot.status, 200, JSON.stringify(rot.json));
+  av = await chamar("GET", "/v1/contabilista/avisos", cc.json.token);
+  const sem = av.json.avisos.find((a: { tipo: string }) => a.tipo === "pedido.sem_resposta");
+  assert.ok(sem, JSON.stringify(av.json.avisos.map((a: { titulo: string }) => a.titulo)));
+  assert.equal(sem.resposta.id, "lembrete_pedido");
+  assert.match(sem.resposta.contexto.documento, /EDP outubro/);
+  const resumo = emails.find((e) => e.para === "joana@gabinete.pt");
+  assert.ok(resumo && /aviso\(s\) para hoje/.test(resumo.assunto), JSON.stringify(emails.map((e) => e.assunto)));
+  assert.ok(resumo!.html!.includes("URGENTE") && resumo!.html!.includes("/v1/email/sair?t=contabilista"));
+  // a empresa já tem documentos e contabilista: não recebe dicas desnecessárias
+  assert.ok(!emails.some((e) => e.para === "rita@marazul.pt" && /primeira fatura|Ligue o seu contabilista/.test(e.assunto)));
+  // a rotina é idempotente: correr de novo no mesmo dia não repete nada
+  emails.length = 0;
+  await chamar("POST", "/v1/admin/avisos-prazos", undefined, {}, { "x-admin-token": "admin" });
+  assert.equal(emails.length, 0);
+
+  // deixar de receber o resumo: ligação assinada, sem sessão
+  const sair = resumo!.html!.match(/href="([^"]*\/v1\/email\/sair[^"]*)"/)![1].replace(/&amp;/g, "&").replace("https://contabia-eu.onrender.com", "");
+  assert.equal((await app.inject({ method: "GET", url: sair.replace(/k=[0-9a-f]+/, "k=" + "0".repeat(32)) })).statusCode, 400);
+  const ok = await app.inject({ method: "GET", url: sair });
+  assert.equal(ok.statusCode, 200);
+  assert.match(ok.body, /Não voltará a receber o resumo diário/);
+  const [{ resumo_diario }] = await db.query<{ resumo_diario: boolean }>(`SELECT resumo_diario FROM contabilistas WHERE email = 'joana@gabinete.pt'`);
+  assert.equal(resumo_diario, false);
+
+  // marcar como lidas
+  const lidas = await chamar("POST", "/v1/contabilista/avisos/lidas", cc.json.token, { todas: true });
+  assert.equal(lidas.json.total, 0);
+  assert.equal((await chamar("GET", "/v1/contabilista/avisos?todas=1", cc.json.token)).json.avisos.length > 0, true);
+
+  // os eventos da app também seguem para o Activepieces
+  assert.ok(webhooks.some((w) => w.cab["x-contabia-evento"] === "documento.anulacao_pedida"));
 });

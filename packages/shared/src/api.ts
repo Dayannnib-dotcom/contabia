@@ -12,6 +12,7 @@ import type {
 import type { Regras, Regiao, RegimeIVA } from "./regras.ts";
 import type { LinhaEfatura } from "./efatura.ts";
 import type { LinhaExtrato } from "./extrato.ts";
+import type { Notificacao } from "./respostas.ts";
 import type { ApoioCompativel, Dimensao, PedidoEstudo, PerfilApoios } from "./apoios.ts";
 
 export class ErroApi extends Error {
@@ -163,6 +164,26 @@ export class ApiContabia {
   }
   removerDispositivo(token: string) {
     return this.pedido<{ ok: true }>("POST", "/v1/dispositivos/remover", { token }, 1);
+  }
+
+  // ── Centro de avisos do contabilista e contacto do cliente ──
+  avisos(todas = false) {
+    return this.pedido<{ avisos: Notificacao[]; contagem: ContagemAvisos }>("GET", `/v1/contabilista/avisos${todas ? "?todas=1" : ""}`);
+  }
+  contagemAvisos() {
+    return this.pedido<ContagemAvisos>("GET", "/v1/contabilista/avisos/contagem");
+  }
+  marcarAvisosLidos(ids: string[] | "todas") {
+    return this.pedido<ContagemAvisos>("POST", "/v1/contabilista/avisos/lidas", ids === "todas" ? { todas: true } : { ids });
+  }
+  preferenciasContabilista(p: { resumoDiario: boolean }) {
+    return this.pedido<{ resumoDiario: boolean }>("PUT", "/v1/contabilista/preferencias", p);
+  }
+  definirContacto(empresaId: string, p: { telefone?: string | null; contactoNome?: string | null }) {
+    return this.pedido<Empresa>("PUT", `/v1/empresas/${empresaId}/contacto`, p);
+  }
+  preferenciasEmail(empresaId: string, dicas: boolean) {
+    return this.pedido<{ dicas: boolean }>("PUT", `/v1/empresas/${empresaId}/preferencias-email`, { dicas });
   }
 
   // ── Apoios europeus e estudos de viabilidade ──
@@ -354,3 +375,5 @@ export class TempoReal {
     this.ws?.close();
   }
 }
+
+export interface ContagemAvisos { alta: number; normal: number; info: number; total: number }

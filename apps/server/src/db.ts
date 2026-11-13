@@ -304,6 +304,30 @@ const MIGRACOES: string[] = [
   `ALTER TABLE pedidos_estudo ADD COLUMN IF NOT EXISTS empresa_nif text`,
   `ALTER TABLE pedidos_estudo ADD COLUMN IF NOT EXISTS cae text`,
   `ALTER TABLE pedidos_estudo ADD COLUMN IF NOT EXISTS regiao text`,
+  // Centro de avisos do contabilista, e-mails automáticos e contacto da empresa.
+  `CREATE TABLE IF NOT EXISTS notificacoes (
+     id text PRIMARY KEY,
+     contabilista_id text NOT NULL,
+     empresa_id text,
+     tipo text NOT NULL,
+     chave text NOT NULL,
+     urgencia text NOT NULL,
+     titulo text NOT NULL,
+     corpo text NOT NULL,
+     resposta jsonb,
+     separador text,
+     contagem integer NOT NULL DEFAULT 1,
+     lida_em text,
+     criada_em text NOT NULL,
+     atualizada_em text NOT NULL
+   )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS notificacoes_chave ON notificacoes(contabilista_id, chave)`,
+  `CREATE INDEX IF NOT EXISTS notificacoes_cc ON notificacoes(contabilista_id, lida_em, atualizada_em)`,
+  `CREATE TABLE IF NOT EXISTS emails_enviados (chave text PRIMARY KEY, em text NOT NULL)`,
+  `ALTER TABLE empresas ADD COLUMN IF NOT EXISTS telefone text`,
+  `ALTER TABLE empresas ADD COLUMN IF NOT EXISTS contacto_nome text`,
+  `ALTER TABLE empresas ADD COLUMN IF NOT EXISTS emails_dicas boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE contabilistas ADD COLUMN IF NOT EXISTS resumo_diario boolean NOT NULL DEFAULT true`,
 ];
 
 async function migrar(db: Db) {

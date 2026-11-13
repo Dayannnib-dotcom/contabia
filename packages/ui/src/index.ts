@@ -15,3 +15,4 @@ export * from "./atividade";
 export * from "./grafico";
 export * from "./recuperar";
 export * from "./apoios";
+export * from "./respostas";

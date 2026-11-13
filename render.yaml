@@ -30,3 +30,7 @@ services:
         sync: false
       - key: EMAIL_ESTUDOS
         sync: false
+      - key: AUTOMACAO_URL
+        sync: false
+      - key: AUTOMACAO_SEGREDO
+        sync: false

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Switch, View } from "react-native";
 import { formatarNIF } from "@contabia/shared";
 import { Botao, Campo, Cartao, Ecra, Erro, Linha, MensagemLuis, Texto, Titulo, confirmarBiometria, cor, useDados, useSessao } from "@contabia/ui";
 
@@ -18,6 +18,18 @@ export default function Conta() {
   const [erroEmail, setErroEmail] = useState<string | null>(null);
   const [emailGuardado, setEmailGuardado] = useState<string | null>(null);
   const gestor = sessao!.perfil !== "colaborador";
+  const [tel, setTel] = useState<string | null>(null);
+  const [nomeContacto, setNomeContacto] = useState<string | null>(null);
+  const [erroContacto, setErroContacto] = useState<string | null>(null);
+  const [contactoOk, setContactoOk] = useState(false);
+  const [dicas, setDicas] = useState<boolean | null>(null);
+  async function guardarContacto() {
+    setErroContacto(null); setContactoOk(false);
+    try {
+      await api.definirContacto(sessao!.id, { telefone: tel ?? dados?.empresa.telefone ?? null, contactoNome: nomeContacto ?? dados?.empresa.contactoNome ?? null });
+      setContactoOk(true);
+    } catch (e) { setErroContacto((e as Error).message); }
+  }
   async function guardarEmail() {
     setErroEmail(null);
     try { setEmailGuardado((await api.definirEmail(email)).email ?? email); setEmail(""); } catch (e) { setErroEmail((e as Error).message); }
@@ -52,6 +64,26 @@ export default function Conta() {
           <Campo rotulo={dados.empresa.email || emailGuardado ? "Mudar o e-mail" : "E-mail do gestor"} value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" />
           <Erro texto={erroEmail} />
           <Botao titulo="Guardar e-mail" variante="secundario" onPress={guardarEmail} desativado={!/^\S+@\S+\.\S+$/.test(email.trim())} />
+        </Cartao>
+      ) : null}
+
+      {gestor && dados ? (
+        <Cartao>
+          <Texto forte tamanho={15}>Contacto para o seu contabilista</Texto>
+          <Texto sec tamanho={13}>Com o telemóvel, o contabilista responde-lhe pelo WhatsApp num toque.</Texto>
+          <Campo rotulo="Nome de quem trata das contas" value={nomeContacto ?? dados.empresa.contactoNome ?? ""} onChangeText={(v) => { setNomeContacto(v); setContactoOk(false); }} autoComplete="name" />
+          <Campo rotulo="Telemóvel (WhatsApp)" value={tel ?? dados.empresa.telefone ?? ""} onChangeText={(v) => { setTel(v); setContactoOk(false); }} keyboardType="phone-pad" placeholder="912 345 678" autoComplete="tel" />
+          <Erro texto={erroContacto} />
+          {contactoOk ? <Texto tamanho={13} cor={cor.verde}>Contacto guardado.</Texto> : null}
+          <Botao titulo="Guardar contacto" variante="secundario" onPress={guardarContacto} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Texto forte>Dicas do Luís por e-mail</Texto>
+              <Texto sec tamanho={13}>Os avisos de prazos chegam sempre; isto são só dicas para tirar partido da app.</Texto>
+            </View>
+            <Switch accessibilityLabel="Dicas do Luís por e-mail" value={dicas ?? dados.empresa.emailsDicas ?? true}
+              onValueChange={async (v) => { setDicas(v); try { await api.preferenciasEmail(sessao!.id, v); } catch { setDicas(!v); } }} trackColor={{ true: cor.verde, false: cor.bordaForte }} />
+          </View>
         </Cartao>
       ) : null}
 

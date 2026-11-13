@@ -109,6 +109,34 @@ Builds para as lojas: `npx eas build -p ios` / `-p android` em cada app (precisa
   (o formato é o de `CATALOGO_BASE` em `packages/shared/src/apoios.ts`). Avisos com o prazo passado deixam de aparecer sozinhos.
 - **Pedidos de estudo:** ficam guardados; a equipa recebe um e-mail em `EMAIL_ESTUDOS` (precisa do Brevo configurado). Lista: `GET /v1/admin/estudos`; estado: `POST /v1/admin/estudos/<id>/estado` com `{"estado":"em_contacto"}` ou `"concluido"`.
 
+## Avisos, respostas rápidas e e-mails automáticos
+
+**Para o contabilista (separador «Avisos»)** — por ordem de urgência, com push (Urgente e Para tratar) e lista na app:
+
+| Aviso | Urgência | Resposta sugerida |
+| --- | --- | --- |
+| Pedido de anulação de um documento | Urgente | Anulação aprovada / recusada |
+| Pergunta de um cliente que o Luís encaminhou | Urgente | Responder à pergunta |
+| Prazo a 2 dias ou no próprio dia, ainda não submetido | Urgente | Lembrar prazo |
+| Documentos novos (agrupados por empresa e por dia) | Para tratar | Confirmar receção |
+| Cliente respondeu a um pedido | Para tratar | Confirmar receção |
+| Pedido ao cliente sem resposta há mais de 3 dias | Para tratar | Lembrar pedido |
+| Documentos por validar há mais de 3 dias | Para tratar | — |
+| Prazo a 7 dias | Para tratar | Lembrar prazo |
+| Cliente pediu estudo de viabilidade · convite de empresa | Para tratar | Estudo / Boas-vindas |
+| Extrato importado · CAE atualizado · aviso de fundos compatível a fechar | Para saber | — |
+
+**Responder num toque:** cada aviso (e o botão «Contactar» de cada empresa) abre a mensagem já escrita, com o nome do cliente, o prazo e o documento. «WhatsApp» abre o WhatsApp do contabilista (`wa.me`) com o texto; «E-mail» abre o e-mail com assunto e texto. A mensagem sai do número e do e-mail que o cliente já conhece; não há custos nem aprovação da Meta. O telemóvel do cliente fica em Conta (empresa) ou é acrescentado no próprio painel de resposta.
+
+**E-mails automáticos (Brevo, precisam de `BREVO_API_KEY` e `EMAIL_REMETENTE`):**
+- boas-vindas à empresa (ao registar ou ao pôr o e-mail) e ao contabilista;
+- dicas à empresa: «primeira fatura» ao 2.º dia sem documentos, «ligue o seu contabilista» ao 5.º dia sem ligação (com «Deixar de receber»);
+- avisos de prazos à empresa a 7 e a 2 dias (serviço, sem cancelamento);
+- resumo do dia ao contabilista às 9h, só se houver avisos por tratar (com «Deixar de receber»).
+A rotina corre às 9h (Lisboa) e não repete nada no mesmo dia. Para correr à mão: `POST /v1/admin/avisos-prazos` com `x-admin-token`.
+
+**Activepieces (ou outra automação):** defina `AUTOMACAO_URL` (o «Webhook» do fluxo) e `AUTOMACAO_SEGREDO` no Render. Cada evento chega como `POST` JSON `{id, tipo, em, empresa:{id,nome,nif,email,telefone}, dados}` com os cabeçalhos `x-contabia-evento`, `x-contabia-tempo` e `x-contabia-assinatura: sha256=HMAC(segredo, tempo + "." + corpo)`. Eventos: `empresa.registada`, `contabilista.registado`, `documento.criado`, `documento.anulacao_pedida`, `pedido.criado`, `pedido.recebido`, `assistente.encaminhado`, `estudo.pedido`, `estudo.pedido_site`, `iva.submetida`, `periodo.fechado`, `ligacao.*`, `banco.*`, entre outros. Até 3 tentativas por evento.
+
 ## Antes de entrar em produção (não se resolve só com código)
 
 - [ ] **Certificação da AT** do módulo de faturação (Portaria n.º 363/2010): a emissão de faturas certificadas (assinatura/hash, ATCUD) ainda não está incluída — as apps registam faturas recebidas e emitidas por outros programas.

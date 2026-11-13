@@ -120,3 +120,22 @@ test("o catálogo real de apoios está bem formado (protege a revisão automáti
     assert.ok(l.resumo.length > 10 && l.programa.length > 2, l.id);
   }
 });
+
+test("respostas rápidas: modelos, WhatsApp e e-mail prontos", async () => {
+  const { gerarResposta, ligacaoWhatsApp, ligacaoEmail, telefoneInternacional, MODELOS_RESPOSTA } = await import("./respostas.ts");
+  const r = gerarResposta("lembrete_prazo", { empresa: "Atlântico, Lda.", contacto: "Rita Gomes", contabilista: "Ana Sousa", obrigacao: "Declaração periódica de IVA", prazo: "2026-11-20" });
+  assert.match(r.texto, /^Olá, Rita\./);
+  assert.match(r.texto, /termina a 20\/11\/2026/);
+  assert.match(r.texto, /Ana Sousa$/);
+  assert.equal(r.assunto, "Atlântico, Lda. — Declaração periódica de IVA até 20/11/2026");
+  assert.ok(MODELOS_RESPOSTA.every((m) => m.texto({ empresa: "X" }).length > 10), "todos os modelos funcionam sem dados opcionais");
+  assert.match(gerarResposta("iva_a_pagar", { empresa: "X", valor: 1234.5 }).texto, /1234,50\s€|1\s?234,50\s€/);
+  assert.equal(telefoneInternacional("912 345 678"), "351912345678");
+  assert.equal(telefoneInternacional("+351 291 000 000"), "351291000000");
+  assert.equal(telefoneInternacional("0034 600 111 222"), "34600111222");
+  assert.equal(telefoneInternacional("123"), null);
+  assert.equal(ligacaoWhatsApp("912345678", "Olá & até já"), "https://wa.me/351912345678?text=Ol%C3%A1%20%26%20at%C3%A9%20j%C3%A1");
+  assert.equal(ligacaoWhatsApp(null, "x"), null);
+  assert.match(ligacaoEmail("rita@x.pt", "Assunto", "Linha 1\nLinha 2")!, /^mailto:rita@x\.pt\?subject=Assunto&body=Linha%201%0ALinha%202$/);
+  assert.equal(ligacaoEmail("sem-arroba", "a", "b"), null);
+});

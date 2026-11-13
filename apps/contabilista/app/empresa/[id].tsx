@@ -3,7 +3,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { Regras } from "../../components/Regras";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { euros, motivoLegivel, nomePeriodo, type Lancamento } from "@contabia/shared";
-import { Apoios, Banco, Botao, RegistoAtividade, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, VerOriginal, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
+import { Apoios, RespostaRapida, Banco, Botao, RegistoAtividade, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, VerOriginal, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
 
 type Sec = "revisao" | "banco" | "regras" | "iva" | "pedidos" | "saft" | "fecho" | "atividade" | "apoios";
 const SECS: [Sec, string][] = [["revisao", "Revisão"], ["banco", "Banco"], ["regras", "Regras"], ["iva", "IVA"], ["pedidos", "Pedidos"], ["saft", "SAF-T"], ["fecho", "Fecho"], ["apoios", "Apoios UE"], ["atividade", "Atividade"]];
@@ -20,6 +20,7 @@ export default function EmpresaDetalhe() {
   const { api } = useSessao();
   const nav = useNavigation();
   const [sec, setSec] = useState<Sec>(secInicial ?? "revisao");
+  const [contactar, setContactar] = useState(false);
   const { dados: resumo } = useDados(async () => {
     const r = await api.resumo(id);
     nav.setOptions({ title: r.empresa.nome });
@@ -29,6 +30,16 @@ export default function EmpresaDetalhe() {
   return (
     <Ecra>
       <Titulo sub={resumo ? `NIF ${resumo.empresa.nif} · IVA ${resumo.empresa.regimeIVA}` : undefined}>{resumo?.empresa.nome ?? "…"}</Titulo>
+      {resumo ? (
+        contactar ? (
+          <Cartao>
+            <RespostaRapida empresaId={id} contexto={{ empresa: resumo.empresa.nome }} onFechar={() => setContactar(false)}
+              contacto={{ nome: resumo.empresa.contactoNome ?? null, telefone: resumo.empresa.telefone ?? null, email: resumo.empresa.email ?? null }} />
+          </Cartao>
+        ) : (
+          <Botao titulo={`Contactar ${resumo.empresa.contactoNome?.split(" ")[0] ?? "o cliente"} · WhatsApp ou e-mail`} variante="secundario" onPress={() => setContactar(true)} />
+        )
+      ) : null}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} accessibilityRole="tablist">
         {SECS.map(([k, t]) => {
           const on = k === sec;

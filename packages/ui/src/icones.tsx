@@ -12,6 +12,9 @@ const P: Record<string, string> = {
   seguir: "m9 6 6 6-6 6",
   enviar: "M5 12h14M13 6l6 6-6 6",
   sair: "M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10",
+  sino: "M6 16v-5a6 6 0 1 1 12 0v5l2 2H4zM10 21a2 2 0 0 0 4 0",
+  email: "M3 6h18v12H3zM3 7l9 6 9-6",
+  conversa: "M20 12a8 8 0 0 1-11.7 7.1L4 20l1-3.9A8 8 0 1 1 20 12zM9 10.5c.3 1.6 1.9 3.2 3.5 3.5l1.2-1.1 1.8.9-.3 1.6c-3.5.2-6.6-2.9-6.4-6.4l1.6-.3.9 1.8z",
 };
 
 export function Icone({ nome, cor = "currentColor", tamanho = 22 }: { nome: keyof typeof P | "prazos" | "carteira"; cor?: string; tamanho?: number }) {

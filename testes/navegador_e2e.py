@@ -412,6 +412,28 @@ with sync_playwright() as p:
         assert cc.get_by_role("button", name="Pedir estudo de viabilidade").count() == 0
         shot(cc, "31_cc_apoios")
 
+        # contacto do cliente para o WhatsApp (app da empresa)
+        emp.goto(BASE + "/empresa/conta")
+        emp.get_by_label("Nome de quem trata das contas").fill("Rita Gomes")
+        emp.get_by_label("Telemóvel (WhatsApp)").fill("912 345 678")
+        emp.get_by_role("button", name="Guardar contacto").click()
+        emp.get_by_text("Contacto guardado.").wait_for()
+
+        # centro de avisos do contabilista e resposta rápida pronta
+        cc.goto(BASE + "/contabilista/avisos")
+        cc.get_by_text("pediu um estudo de viabilidade", exact=False).first.wait_for(timeout=15000)
+        shot(cc, "32_cc_avisos")
+        cc.get_by_role("button", name="Responder").first.click()
+        caixa = cc.get_by_label("Texto da resposta")
+        caixa.wait_for()
+        assert caixa.input_value().startswith("Olá, Rita."), caixa.input_value()[:60]
+        cc.get_by_role("radio", name="Lembrar prazo").click()
+        assert "termina a" in cc.get_by_label("Texto da resposta").input_value()
+        assert cc.get_by_role("button", name="WhatsApp").is_enabled()
+        shot(cc, "33_cc_resposta_rapida")
+        cc.get_by_role("button", name="Marcar tudo como lido").click()
+        cc.get_by_text("Está tudo em dia.", exact=False).wait_for(timeout=10000)
+
 
 
     except Exception:
