@@ -14,6 +14,7 @@ import type { LinhaEfatura } from "./efatura.ts";
 import type { LinhaExtrato } from "./extrato.ts";
 import type { Notificacao } from "./respostas.ts";
 import type { ApoioCompativel, Dimensao, PedidoEstudo, PerfilApoios } from "./apoios.ts";
+import type { EspacoServicos, LinhaHorasCarteira, Modalidade, PlanoServicos, Servico, TipoServico } from "./servicos.ts";
 
 export class ErroApi extends Error {
   constructor(public codigo: string, mensagem: string, public status: number) {
@@ -201,6 +202,38 @@ export class ApiContabia {
   }
   estudos(empresaId: string) {
     return this.pedido<PedidoEstudo[]>("GET", `/v1/empresas/${empresaId}/estudos`);
+  }
+
+  // ── Espaço de serviços e horas ──
+  servicos(empresaId: string, mes?: string) {
+    return this.pedido<EspacoServicos>("GET", `/v1/empresas/${empresaId}/servicos${mes ? `?mes=${mes}` : ""}`);
+  }
+  registarServico(empresaId: string, s: { tipo: TipoServico; titulo?: string; data?: string; minutos: number; modalidade?: Modalidade | null; notas?: string; faturavel?: boolean; doPlano?: boolean }) {
+    return this.pedido<Servico>("POST", `/v1/empresas/${empresaId}/servicos`, s);
+  }
+  iniciarServico(empresaId: string, s: { tipo?: TipoServico; titulo?: string; modalidade?: Modalidade | null; doPlano?: boolean } = {}) {
+    return this.pedido<Servico>("POST", `/v1/empresas/${empresaId}/servicos/iniciar`, s);
+  }
+  terminarServico(empresaId: string, servicoId: string, notas?: string) {
+    return this.pedido<Servico>("POST", `/v1/empresas/${empresaId}/servicos/${servicoId}/terminar`, notas ? { notas } : {});
+  }
+  corrigirServico(empresaId: string, servicoId: string, c: { versao: number; titulo?: string; data?: string; minutos?: number; modalidade?: Modalidade | null; notas?: string | null; faturavel?: boolean }) {
+    return this.pedido<Servico>("PUT", `/v1/empresas/${empresaId}/servicos/${servicoId}`, c);
+  }
+  anularServico(empresaId: string, servicoId: string, motivo: string) {
+    return this.pedido<Servico>("POST", `/v1/empresas/${empresaId}/servicos/${servicoId}/anular`, { motivo });
+  }
+  definirPlanoServicos(empresaId: string, p: { diasSemana: number[]; hora?: string | null; minutos: number; modalidade: Modalidade; ativo?: boolean }) {
+    return this.pedido<PlanoServicos>("PUT", `/v1/empresas/${empresaId}/plano-servicos`, p);
+  }
+  exportarServicos(empresaId: string, mes: string) {
+    return this.pedido<{ nome: string; csv: string }>("GET", `/v1/empresas/${empresaId}/servicos/exportar?mes=${mes}`);
+  }
+  horasCarteira(mes?: string) {
+    return this.pedido<{ mes: string; hoje: string; empresas: LinhaHorasCarteira[]; total: { minutos: number; faturaveis: number; reunioes: number; previstas: number; minutosReunioes: number } }>("GET", `/v1/contabilista/servicos${mes ? `?mes=${mes}` : ""}`);
+  }
+  exportarHorasCarteira(mes: string) {
+    return this.pedido<{ nome: string; csv: string }>("GET", `/v1/contabilista/servicos/exportar?mes=${mes}`);
   }
 
   // ── Regras por fornecedor ──

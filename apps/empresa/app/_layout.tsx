@@ -25,6 +25,7 @@ function Navegacao() {
         <Stack.Screen name="ligacao" options={{ headerShown: true, title: "Ligação ao contabilista", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="importar" options={{ headerShown: true, title: "Importar do e-Fatura", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="banco" options={{ headerShown: true, title: "Banco", headerBackTitle: "Voltar" }} />
+        <Stack.Screen name="servicos" options={{ headerShown: true, title: "Serviços e reuniões", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="apoios" options={{ headerShown: true, title: "Apoios europeus", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="utilizadores" options={{ headerShown: true, title: "Utilizadores", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="conta" options={{ headerShown: true, title: "Conta e segurança", headerBackTitle: "Voltar" }} />

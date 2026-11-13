@@ -8,6 +8,8 @@ import { REGRAS_BASE } from "@contabia/shared";
 import { CATALOGO_TESTE } from "../../../packages/shared/src/catalogo-teste.ts";
 
 let db: Db;
+const INICIO = new Date("2026-11-11T10:00:00Z");
+let relogio = INICIO;
 let app: Awaited<ReturnType<typeof criarApp>>["app"];
 let url = "";
 const S: Record<string, string> = {};
@@ -30,7 +32,7 @@ async function chamar(metodo: string, caminho: string, token?: string, corpo?: u
 
 before(async () => {
   db = await abrirDb(process.env.TEST_DATABASE_URL);
-  ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => new Date("2026-11-11T10:00:00Z"), enviarPush: enviarFalso, enviarEmail: async (e) => { emails.push(e); return true; }, urlPublico: "https://contabia-eu.onrender.com", emailEstudos: "estudos@contabia.test", catalogoBase: CATALOGO_TESTE,
+  ({ app } = await criarApp(db, { segredoJWT: "teste", tokenAdmin: "admin", agora: () => relogio, enviarPush: enviarFalso, enviarEmail: async (e) => { emails.push(e); return true; }, urlPublico: "https://contabia-eu.onrender.com", emailEstudos: "estudos@contabia.test", catalogoBase: CATALOGO_TESTE,
     automacaoUrl: "https://hooks.test/contabia", automacaoSegredo: "segredo-ap", enviarWebhook: async (u, corpo, cab) => { webhooks.push({ url: u, corpo, cab }); return true; },
     whatsapp: { segredoApp: "wa-seg", tokenVerificar: "wa-ver", enviar: async (m) => { whats.push(m as never); return true; } } }));
   url = await app.listen({ port: 0, host: "127.0.0.1" });
@@ -879,4 +881,87 @@ test("29. registo completo: tudo fica, com detalhe e origem, sem segredos, e nad
     await db.query(`ALTER TABLE atividade ENABLE TRIGGER atividade_imutavel`);
   }
   assert.equal((await chamar("GET", "/v1/admin/registo/verificar", undefined, undefined, { "x-admin-token": "admin" })).json.integro, true);
+});
+
+test("30. espaço de serviços: contador de horas de reunião, plano semanal, anular sem apagar e exportação", async () => {
+  const e = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "empresa.horas", nif: "509999727", nome: "Empresa Horas, Lda.", senha: "segredo123", regiao: "PT-MA", regimeIVA: "trimestral" });
+  assert.equal(e.status, 201, JSON.stringify(e.json));
+  const id = e.json.id; const emp = e.json.token;
+  const c = await chamar("POST", "/v1/auth/contabilistas", undefined, { email: "horas.cc@exemplo.pt", nome: "Hugo CC", numeroOCC: "66666", senha: "segredo123" });
+  const cc = c.json.token;
+  const outro = (await chamar("POST", "/v1/auth/contabilistas", undefined, { email: "outro.cc@exemplo.pt", nome: "Outro CC", numeroOCC: "77777", senha: "segredo123" })).json.token;
+  const p = await chamar("POST", "/v1/ligacoes", cc, { utilizador: "empresa.horas", nif: "509999727" });
+  await chamar("POST", `/v1/ligacoes/${p.json.id}/aceitar`, emp, { versao: 1 });
+  const base = `/v1/empresas/${id}`;
+
+  // só o contabilista ligado regista; a empresa consulta
+  assert.equal((await chamar("POST", `${base}/servicos`, emp, { tipo: "reuniao", minutos: 30 })).status, 403);
+  assert.equal((await chamar("POST", `${base}/servicos`, outro, { tipo: "reuniao", minutos: 30 })).status, 403);
+  assert.equal((await chamar("GET", `${base}/servicos`, outro)).status, 403);
+
+  // plano: 2 reuniões por semana (quarta e sexta, 60 min) — hoje, 11/11/2026, é quarta
+  const pl = await chamar("PUT", `${base}/plano-servicos`, cc, { diasSemana: [5, 3, 3], hora: "10:00", minutos: 60, modalidade: "videochamada" });
+  assert.equal(pl.status, 200, JSON.stringify(pl.json));
+  assert.deepEqual(pl.json.diasSemana, [3, 5]);
+  assert.equal((await chamar("PUT", `${base}/plano-servicos`, cc, { diasSemana: [], minutos: 60, modalidade: "presencial" })).json.codigo, "sem_dias");
+  let esp = (await chamar("GET", `${base}/servicos?mes=2026-11`, cc)).json;
+  assert.equal(esp.reuniaoDeHojePorRegistar, true);
+  assert.deepEqual(esp.resumo.reunioes, { feitas: 0, previstas: 8, previstasAteHoje: 3, minutos: 0 });
+
+  // cronómetro: começa, não deixa dois ao mesmo tempo, termina 50 minutos depois
+  const ini = await chamar("POST", `${base}/servicos/iniciar`, cc, { modalidade: "videochamada", doPlano: true });
+  assert.equal(ini.status, 201, JSON.stringify(ini.json));
+  assert.equal(ini.json.estado, "a_decorrer");
+  assert.equal((await chamar("POST", `${base}/servicos/iniciar`, cc, {})).json.codigo, "cronometro_ativo");
+  const carteiraDurante = (await chamar("GET", "/v1/contabilista/servicos?mes=2026-11", cc)).json;
+  assert.equal(carteiraDurante.empresas.find((x: { empresa: { id: string } }) => x.empresa.id === id).aDecorrer.id, ini.json.id);
+  relogio = new Date(INICIO.getTime() + 50 * 60_000);
+  try {
+    const fim = await chamar("POST", `${base}/servicos/${ini.json.id}/terminar`, cc, { notas: "Revisão do trimestre" });
+    assert.equal(fim.json.minutos, 50);
+    assert.equal(fim.json.estado, "registado");
+    assert.equal((await chamar("POST", `${base}/servicos/${ini.json.id}/terminar`, cc, {})).json.codigo, "ja_terminado");
+  } finally { relogio = INICIO; }
+
+  // registos à mão: reunião de sexta passada, uma declaração não faturável; nada no futuro
+  const m = await chamar("POST", `${base}/servicos`, cc, { tipo: "reuniao", data: "2026-11-06", minutos: 45, modalidade: "presencial", doPlano: true });
+  assert.equal(m.status, 201, JSON.stringify(m.json));
+  await chamar("POST", `${base}/servicos`, cc, { tipo: "declaracao", titulo: "DP IVA 3.º trimestre", minutos: 20, faturavel: false });
+  assert.equal((await chamar("POST", `${base}/servicos`, cc, { tipo: "reuniao", data: "2026-11-20", minutos: 30 })).json.codigo, "data_futura");
+  assert.equal((await chamar("POST", `${base}/servicos`, cc, { tipo: "reuniao", minutos: 0 })).status, 400);
+  // corrigir com controlo de versão
+  assert.equal((await chamar("PUT", `${base}/servicos/${m.json.id}`, cc, { versao: 99, minutos: 60 })).json.codigo, "conflito_versao");
+  assert.equal((await chamar("PUT", `${base}/servicos/${m.json.id}`, cc, { versao: m.json.versao, minutos: 60 })).json.minutos, 60);
+  // anular (com motivo) em vez de apagar
+  const errado = await chamar("POST", `${base}/servicos`, cc, { tipo: "reuniao", minutos: 30 });
+  assert.equal((await chamar("POST", `${base}/servicos/${errado.json.id}/anular`, cc, { motivo: "" })).status, 400);
+  const an = await chamar("POST", `${base}/servicos/${errado.json.id}/anular`, cc, { motivo: "Registada em duplicado" });
+  assert.equal(an.json.estado, "anulado");
+  assert.equal((await chamar("PUT", `${base}/servicos/${errado.json.id}`, cc, { versao: an.json.versao, minutos: 10 })).json.codigo, "nao_editavel");
+  await assert.rejects(db.query(`DELETE FROM servicos WHERE id = $1`, [errado.json.id]));
+  await assert.rejects(db.query(`DELETE FROM planos_servicos WHERE empresa_id = $1`, [id]));
+
+  // resumo do mês: 2 reuniões (50 + 60 min) de 8 previstas; a anulada não conta
+  esp = (await chamar("GET", `${base}/servicos?mes=2026-11`, emp)).json; // a empresa vê o seu espaço
+  assert.equal(esp.reuniaoDeHojePorRegistar, false, "a reunião de hoje já está registada");
+  assert.deepEqual(esp.resumo.reunioes, { feitas: 2, previstas: 8, previstasAteHoje: 3, minutos: 110 });
+  assert.equal(esp.resumo.minutosTotal, 130);
+  assert.equal(esp.resumo.minutosFaturaveis, 110);
+  assert.equal(esp.servicos.length, 4, "a anulada continua visível");
+  assert.equal((await chamar("GET", `${base}/servicos?mes=2026-10`, emp)).json.servicos.length, 0);
+
+  // contador da carteira e exportação para Excel
+  const cart = (await chamar("GET", "/v1/contabilista/servicos?mes=2026-11", cc)).json;
+  assert.equal(cart.total.minutosReunioes, 110);
+  assert.equal(cart.total.reunioes, 2);
+  assert.equal(cart.empresas[0].aDecorrer, null);
+  const x = (await chamar("GET", "/v1/contabilista/servicos/exportar?mes=2026-11", cc)).json;
+  assert.equal(x.nome, "horas-carteira-2026-11.csv");
+  assert.ok(x.csv.includes("Empresa Horas, Lda.") && x.csv.includes("1,00") && x.csv.includes("Anulado (Registada em duplicado)") && x.csv.includes("DP IVA 3.º trimestre"));
+  assert.equal((await chamar("GET", `${base}/servicos/exportar?mes=2026-11`, emp)).status, 200);
+
+  // tudo fica no registo de atividade
+  const ativ = (await chamar("GET", `${base}/atividade`, emp)).json.map((a: { acao: string }) => a.acao);
+  for (const a of ["definiu o plano de reuniões", "iniciou o cronómetro de uma reunião/serviço", "terminou o cronómetro e registou o tempo", "registou um serviço prestado", "corrigiu um serviço registado", "anulou um serviço registado", "exportou os serviços do mês"])
+    assert.ok(ativ.includes(a), `falta no registo: ${a}`);
 });

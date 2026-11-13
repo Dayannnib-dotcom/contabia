@@ -3,10 +3,10 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { Regras } from "../../components/Regras";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { euros, motivoLegivel, nomePeriodo, type Lancamento } from "@contabia/shared";
-import { Apoios, RespostaRapida, Banco, Botao, RegistoAtividade, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, VerOriginal, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
+import { Apoios, EspacoServicosVista, RespostaRapida, Banco, Botao, RegistoAtividade, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, VerOriginal, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
 
-type Sec = "revisao" | "banco" | "regras" | "iva" | "pedidos" | "saft" | "fecho" | "atividade" | "apoios";
-const SECS: [Sec, string][] = [["revisao", "Revisão"], ["banco", "Banco"], ["regras", "Regras"], ["iva", "IVA"], ["pedidos", "Pedidos"], ["saft", "SAF-T"], ["fecho", "Fecho"], ["apoios", "Apoios UE"], ["atividade", "Atividade"]];
+type Sec = "servicos" | "revisao" | "banco" | "regras" | "iva" | "pedidos" | "saft" | "fecho" | "atividade" | "apoios";
+const SECS: [Sec, string][] = [["revisao", "Revisão"], ["servicos", "Serviços e horas"], ["banco", "Banco"], ["regras", "Regras"], ["iva", "IVA"], ["pedidos", "Pedidos"], ["saft", "SAF-T"], ["fecho", "Fecho"], ["apoios", "Apoios UE"], ["atividade", "Atividade"]];
 
 function mesAnterior(): string {
   const d = new Date();
@@ -54,6 +54,7 @@ export default function EmpresaDetalhe() {
         })}
       </ScrollView>
       {sec === "revisao" ? <Revisao id={id} irPara={setSec} /> : null}
+      {sec === "servicos" ? <EspacoServicosVista empresaId={id} papel="contabilista" /> : null}
       {sec === "regras" ? <Regras empresaId={id} /> : null}
       {sec === "banco" ? <Banco empresaId={id} papel="contabilista" /> : null}
       {sec === "iva" ? <Iva id={id} irPara={setSec} /> : null}

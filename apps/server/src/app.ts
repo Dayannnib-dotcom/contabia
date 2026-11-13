@@ -25,6 +25,7 @@ import { criarPush, enviarExpo, type EnviarPush } from "./push.ts";
 import { criarAutomacoes, type EnviarWebhook } from "./automacoes.ts";
 import { criarWhatsApp, type CfgWhatsApp } from "./whatsapp.ts";
 import { criarRegisto, mascararEmail } from "./registo.ts";
+import { ACOES_SERVICOS, rotasServicos } from "./servicos.ts";
 import { criarEnvioEmail, emailPedidoEstudo, emailRecuperacao, type EnviarEmail } from "./email.ts";
 import { randomBytes } from "node:crypto";
 
@@ -976,9 +977,11 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     // consultas que também ficam registadas: ver originais e exportar
     "GET /v1/empresas/:id/documentos/:doc/anexos/:aid": "abriu o original de um documento",
     "GET /v1/empresas/:id/atividade.csv": "exportou o registo de atividade",
+    "GET /v1/contabilista/servicos/exportar": "exportou as horas da carteira",
+    ...ACOES_SERVICOS,
   };
   /** Rotas GET que, por mexerem em originais ou exportações, ficam registadas. */
-  const CONSULTAS_REGISTADAS = new Set(["GET /v1/empresas/:id/documentos/:doc/anexos/:aid", "GET /v1/empresas/:id/atividade.csv"]);
+  const CONSULTAS_REGISTADAS = new Set(["GET /v1/empresas/:id/documentos/:doc/anexos/:aid", "GET /v1/empresas/:id/atividade.csv", "GET /v1/empresas/:id/servicos/exportar", "GET /v1/contabilista/servicos/exportar"]);
 
   // o id criado num registo de conta vem na resposta: guarda-se para o registo
   app.addHook("onSend", async (req, reply, payload) => {
@@ -1046,6 +1049,9 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     }
     await registo.registar({ ...base, empresaId, contaId, quem, papel, acao, detalhe: detalhe(Buffer.isBuffer(corpo) ? corpo : corpo) });
   });
+
+  // ═════════════ Espaço de serviços e horas do contabilista ═════════════
+  rotasServicos(app, db, agora);
 
   // ═════════════ Regras por fornecedor (do contabilista) ═════════════
   type LinhaRegra = { nif: string; nome: string; conta: string; iva_dedutivel: boolean; auto_lancar: boolean; criada_em: string };

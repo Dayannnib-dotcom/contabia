@@ -67,10 +67,10 @@ export function Chip({ texto, tipo = "neutro" }: { texto: string; tipo?: "bom" |
   return <View style={[s.chip, { backgroundColor: c[0] }]}><Text style={{ color: c[1], fontSize: 12, fontWeight: "600" }}>{texto}</Text></View>;
 }
 
-export function Campo({ rotulo, ajuda, erro, ...p }: TextInputProps & { rotulo: string; ajuda?: string; erro?: boolean }) {
+export function Campo({ rotulo, ajuda, erro, rotuloCor, ...p }: TextInputProps & { rotulo: string; ajuda?: string; erro?: boolean; rotuloCor?: string }) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={{ fontSize: 13, fontWeight: "600", color: cor.texto }}>{rotulo}</Text>
+      <Text style={{ fontSize: 13, fontWeight: "600", color: rotuloCor ?? cor.texto }}>{rotulo}</Text>
       <TextInput
         placeholderTextColor="#8A9893"
         accessibilityLabel={rotulo}

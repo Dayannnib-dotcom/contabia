@@ -361,6 +361,44 @@ const MIGRACOES: string[] = [
      criado_em text NOT NULL,
      avisado_em text
    )`,
+  // Espaço de serviços por empresa (reuniões e outros serviços do contabilista, com tempo)
+  `CREATE TABLE IF NOT EXISTS servicos (
+     id text PRIMARY KEY,
+     empresa_id text NOT NULL REFERENCES empresas(id),
+     contabilista_id text NOT NULL REFERENCES contabilistas(id),
+     tipo text NOT NULL,
+     titulo text NOT NULL,
+     data text NOT NULL,
+     inicio text,
+     fim text,
+     minutos integer,
+     modalidade text,
+     notas text,
+     faturavel boolean NOT NULL DEFAULT true,
+     estado text NOT NULL,
+     motivo_anulacao text,
+     do_plano boolean NOT NULL DEFAULT false,
+     registado_por text NOT NULL,
+     criado_em text NOT NULL,
+     versao integer NOT NULL DEFAULT 1
+   )`,
+  `CREATE INDEX IF NOT EXISTS servicos_empresa_data ON servicos(empresa_id, data)`,
+  `CREATE INDEX IF NOT EXISTS servicos_contabilista ON servicos(contabilista_id, estado)`,
+  `CREATE TABLE IF NOT EXISTS planos_servicos (
+     empresa_id text PRIMARY KEY REFERENCES empresas(id),
+     contabilista_id text NOT NULL,
+     dias_semana jsonb NOT NULL,
+     hora text,
+     minutos integer NOT NULL,
+     modalidade text NOT NULL,
+     desde text NOT NULL,
+     ativo boolean NOT NULL DEFAULT true,
+     atualizado_em text NOT NULL
+   )`,
+  ...["servicos", "planos_servicos"].flatMap((t) => [
+    `DROP TRIGGER IF EXISTS ${t}_sem_apagar ON ${t}`,
+    `CREATE TRIGGER ${t}_sem_apagar BEFORE DELETE ON ${t} FOR EACH ROW EXECUTE FUNCTION contabia_sem_apagar()`,
+  ]),
   `DROP TRIGGER IF EXISTS lista_espera_sem_apagar ON lista_espera`,
   `CREATE TRIGGER lista_espera_sem_apagar BEFORE DELETE ON lista_espera FOR EACH ROW EXECUTE FUNCTION contabia_sem_apagar()`,
 ];

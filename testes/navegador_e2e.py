@@ -458,6 +458,51 @@ with sync_playwright() as p:
         cc.get_by_role("button", name="Marcar tudo como lido").click()
         cc.get_by_text("Está tudo em dia.", exact=False).wait_for(timeout=10000)
 
+        # ── Serviços e horas: plano de 2 reuniões por semana, cronómetro, registo à mão, contador da carteira ──
+        cc.goto(BASE + "/contabilista/")
+        cc.get_by_text("Atlântico Serviços, Lda.", exact=True).first.click()
+        cc.get_by_role("tab", name="Serviços e horas").click()
+        cc.get_by_text("Contador de horas de reunião").wait_for(timeout=15000)
+        cc.get_by_role("button", name="Definir").click()
+        cc.get_by_role("checkbox", name="Ter").click()
+        cc.get_by_role("checkbox", name="Qui").click()
+        cc.get_by_text("2 reuniões por semana").first.wait_for()
+        cc.get_by_label("Hora (opcional)").fill("10:00")
+        cc.get_by_role("button", name="Guardar plano").click()
+        cc.get_by_text("2 reuniões por semana (Ter, Qui às 10:00)", exact=False).wait_for(timeout=15000)
+        cc.get_by_role("radio", name="Videochamada").first.click()
+        cc.get_by_role("button", name="Iniciar reunião agora").click()
+        cc.get_by_text("A DECORRER", exact=False).first.wait_for(timeout=15000)
+        cc.wait_for_timeout(1500)
+        shot(cc, "34_cc_cronometro")
+        cc.get_by_label("Notas da reunião (opcional)").fill("Revisão do mês")
+        cc.get_by_role("button", name="Terminar e registar").click()
+        cc.get_by_text("Revisão do mês", exact=False).wait_for(timeout=15000)
+        cc.get_by_role("button", name="Registar serviço ou reunião já feita").click()
+        cc.get_by_role("radio", name="Declaração fiscal").click()
+        cc.get_by_role("radio", name="30", exact=True).click()
+        cc.get_by_role("radio", name="Não (incluído na avença)").click()
+        cc.get_by_role("button", name="Guardar", exact=True).click()
+        cc.get_by_text("Não faturável").wait_for(timeout=15000)
+        assert cc.get_by_text("31 min").count() >= 1, "total de 31 min (1 de reunião + 30)"
+        shot(cc, "35_cc_servicos")
+        # anular (não apagar) a declaração
+        cc.get_by_role("button", name="Anular Declaração fiscal").click()
+        cc.get_by_label("Motivo da anulação").fill("Registada por engano")
+        cc.get_by_role("button", name="Anular serviço").click()
+        cc.get_by_text("Anulado: Registada por engano", exact=False).wait_for(timeout=15000)
+        # contador da carteira
+        cc.goto(BASE + "/contabilista/horas")
+        cc.get_by_text("Por empresa").wait_for(timeout=15000)
+        cc.get_by_text("1/", exact=False).first.wait_for()
+        shot(cc, "36_cc_horas")
+        # a empresa vê o seu espaço (só leitura)
+        emp.goto(BASE + "/empresa/servicos")
+        emp.get_by_text("Plano acordado com o seu contabilista").wait_for(timeout=15000)
+        emp.get_by_text("Revisão do mês", exact=False).wait_for()
+        assert emp.get_by_role("button", name="Iniciar reunião agora").count() == 0
+        shot(emp, "37_emp_servicos")
+
 
 
     except Exception:

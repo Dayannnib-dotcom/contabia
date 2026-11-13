@@ -139,3 +139,28 @@ test("respostas rápidas: modelos, WhatsApp e e-mail prontos", async () => {
   assert.match(ligacaoEmail("rita@x.pt", "Assunto", "Linha 1\nLinha 2")!, /^mailto:rita@x\.pt\?subject=Assunto&body=Linha%201%0ALinha%202$/);
   assert.equal(ligacaoEmail("sem-arroba", "a", "b"), null);
 });
+
+test("serviços: reuniões previstas pelo plano e horas do mês", async () => {
+  const { datasPrevistas, resumirServicos, horasLegiveis, horasDecimais, mudarMes, diaSemanaISO, hojeLisboa } = await import("./servicos.ts");
+  assert.equal(diaSemanaISO("2026-11-13"), 5); // sexta
+  assert.equal(diaSemanaISO("2026-11-15"), 7); // domingo
+  const plano = { diasSemana: [2, 4], hora: "10:00", minutos: 60, modalidade: "videochamada" as const, desde: "2026-11-01", ativo: true };
+  // novembro de 2026: terças 3,10,17,24 e quintas 5,12,19,26 → 8
+  assert.deepEqual(datasPrevistas(plano, "2026-11"), ["2026-11-03", "2026-11-05", "2026-11-10", "2026-11-12", "2026-11-17", "2026-11-19", "2026-11-24", "2026-11-26"]);
+  assert.equal(datasPrevistas({ ...plano, desde: "2026-11-15" }, "2026-11").length, 4);
+  assert.equal(datasPrevistas({ ...plano, ativo: false }, "2026-11").length, 0);
+  assert.equal(datasPrevistas(plano, "2026-10").length, 0, "antes do início do plano não há previstas");
+  const s = (tipo: string, data: string, minutos: number, extra: object = {}) => ({ id: data + tipo, empresaId: "e", tipo, titulo: "", data, inicio: null, fim: null, minutos, modalidade: null, notas: null, faturavel: true, estado: "registado", motivoAnulacao: null, doPlano: false, registadoPor: "", criadoEm: "", versao: 1, ...extra }) as never;
+  const r = resumirServicos([s("reuniao", "2026-11-03", 60), s("reuniao", "2026-11-05", 45), s("reuniao", "2026-11-10", 30, { estado: "anulado" }), s("declaracao", "2026-11-10", 20, { faturavel: false }), s("reuniao", "2026-10-30", 60)], plano, "2026-11", "2026-11-13");
+  assert.deepEqual(r.reunioes, { feitas: 2, previstas: 8, previstasAteHoje: 4, minutos: 105 });
+  assert.equal(r.minutosTotal, 125);
+  assert.equal(r.minutosFaturaveis, 105);
+  assert.deepEqual(r.porTipo.map((x) => x.tipo), ["reuniao", "declaracao"]);
+  assert.equal(horasLegiveis(105), "1 h 45 min");
+  assert.equal(horasLegiveis(120), "2 h");
+  assert.equal(horasLegiveis(40), "40 min");
+  assert.equal(horasDecimais(90), "1,50");
+  assert.equal(mudarMes("2026-12", 1), "2027-01");
+  assert.equal(mudarMes("2026-01", -1), "2025-12");
+  assert.equal(hojeLisboa(new Date("2026-07-31T23:30:00Z")), "2026-08-01", "no verão, Lisboa está uma hora à frente");
+});
