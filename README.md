@@ -155,6 +155,10 @@ Para ativar:
 
 A Meta cobra por modelo entregue (categoria Utilidade, em Portugal, cêntimos por mensagem; confirmar a tabela atual da Meta).
 
+## Descarregar a app (site)
+
+A secção «Leve a Contabia no bolso» mostra App Store e Google Play como «em breve» e guarda uma lista de espera (`GET /v1/admin/lista-espera` com `x-admin-token`). No dia da publicação, basta pôr no Render `URL_APP_STORE` e `URL_GOOGLE_PLAY`: os botões passam a ligações reais sem mexer no código. Nessa altura, trocar os botões pelas insígnias oficiais da Apple e da Google (as regras de marca só as permitem para apps publicadas). O código QR aponta para a app web; se o domínio mudar, `python3 ferramentas/gerar_qr.py https://contabia.pt/empresa/`.
+
 ## Antes de entrar em produção (não se resolve só com código)
 
 - [ ] **Certificação da AT** do módulo de faturação (Portaria n.º 363/2010): a emissão de faturas certificadas (assinatura/hash, ATCUD) ainda não está incluída — as apps registam faturas recebidas e emitidas por outros programas.

@@ -65,6 +65,20 @@ with sync_playwright() as p:
         assert tel.evaluate("document.documentElement.scrollWidth") <= 390
         shot(tel, "00d_site_movel")
         tel.close()
+        # Descarregar a app: lojas «em breve», instruções e lista de espera
+        site.goto(BASE + "/#descarregar")
+        site.get_by_role("heading", name="Leve a Contabia no bolso.").wait_for()
+        site.get_by_role("link", name="Google Play: em breve. Pedir aviso quando sair").click()
+        fe2 = site.locator("#f-espera")
+        assert fe2.locator('input[value="android"]').is_checked()
+        fe2.get_by_label("E-mail").fill("lista@exemplo.pt")
+        fe2.get_by_role("checkbox").check()
+        fe2.get_by_role("button", name="Avisem-me").click()
+        site.get_by_text("Feito! Avisamos", exact=False).wait_for()
+        site.get_by_role("tab", name="Android").click()
+        site.get_by_text("Instalar app", exact=False).wait_for()
+        shot(site, "00f_site_descarregar")
+
         # Termos e Condições: página própria, ligada no rodapé
         site.goto(BASE + "/")
         site.get_by_role("contentinfo").get_by_role("link", name="Termos e Condições").click()

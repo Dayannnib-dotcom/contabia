@@ -1525,6 +1525,35 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     if (nome && req.method === "GET") return reply.type("text/html").sendFile("index.html", join(cfg.pastaWeb!, nome));
     return reply.code(404).send({ codigo: "nao_encontrado", mensagem: "Endereço não encontrado." });
   });
+  // ═════════════ Descarregar a app: lojas e lista de espera ═════════════
+  /** Ligações das lojas (vazias até a app ser publicada): o site ativa os botões sozinho. */
+  app.get("/v1/site/lojas", async (_req, reply) => {
+    reply.header("cache-control", "public, max-age=300");
+    return { ios: process.env.URL_APP_STORE || null, android: process.env.URL_GOOGLE_PLAY || null, web: "/empresa/" };
+  });
+  const esperaPorIp = new Map<string, number[]>();
+  app.post("/v1/lista-espera", async (req, reply) => {
+    const b = z.object({
+      email: z.string().trim().toLowerCase().email("O e-mail não parece válido."),
+      plataforma: z.enum(["ios", "android", "ambos"]),
+      perfil: z.enum(["empresa", "contabilista"]).default("empresa"),
+      autorizoContacto: z.literal(true, { errorMap: () => ({ message: "Para o avisarmos, autorize o contacto." }) }),
+      website: z.string().max(0).optional(),
+    }).parse(req.body);
+    const t = agora().getTime();
+    const rec = (esperaPorIp.get(req.ip) ?? []).filter((x) => t - x < 3600_000);
+    if (rec.length >= 10) throw new ErroApp("demasiados_pedidos", "Recebemos vários pedidos seguidos. Tente de novo dentro de uma hora.", 429);
+    esperaPorIp.set(req.ip, [...rec, t]);
+    await db.query(`INSERT INTO lista_espera (email, plataforma, perfil, criado_em) VALUES ($1,$2,$3,$4)
+      ON CONFLICT (email) DO UPDATE SET plataforma = EXCLUDED.plataforma, perfil = EXCLUDED.perfil`, [b.email, b.plataforma, b.perfil, agoraISO()]);
+    void auto?.emitir("lista_espera.inscricao", null, { email: b.email, plataforma: b.plataforma, perfil: b.perfil }).catch(() => false);
+    return reply.code(201).send({ ok: true });
+  });
+  app.get("/v1/admin/lista-espera", async (req) => {
+    if (!cfg.tokenAdmin || req.headers["x-admin-token"] !== cfg.tokenAdmin) throw new ErroApp("sem_permissao", "Acesso reservado.", 403);
+    return db.query(`SELECT email, plataforma, perfil, criado_em, avisado_em FROM lista_espera ORDER BY criado_em DESC`);
+  });
+
   // Termos e Condições: página própria, também pedida pelas apps
   const temTermos = !!cfg.pastaWeb && existsSync(join(cfg.pastaWeb, "site", "termos.html"));
   app.get("/termos", async (_req, reply) =>

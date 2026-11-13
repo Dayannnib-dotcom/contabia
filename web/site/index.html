@@ -420,6 +420,44 @@ html{scroll-padding-top:76px}
 @media(min-width:640px){.mare{font-size:26px;line-height:32px}}
 .mare::before{content:"";width:46px;height:12px;flex:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 12'%3E%3Cpath d='M2 6q5-6 10.5 0t10.5 0t10.5 0t10.5 0' fill='none' stroke='%233CC6A0' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center/contain}
 .mare-rodape{color:var(--on-ink);font-weight:600}
+
+/* descarregar a app */
+.descarregar{position:relative;overflow:hidden}
+.descarregar::before{content:"";position:absolute;width:520px;height:520px;right:-180px;top:-160px;border-radius:50%;background:radial-gradient(circle,rgba(60,198,160,.28),transparent 65%);filter:blur(40px);pointer-events:none}
+.dl-grid{display:grid;gap:44px;align-items:center;position:relative}
+@media(min-width:980px){.dl-grid{grid-template-columns:1.1fr .9fr}}
+.lojas{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.loja{display:inline-flex;align-items:center;gap:12px;min-width:190px;padding:10px 18px 10px 14px;border-radius:14px;background:#0B1820;border:1.5px solid #2A4252;color:#fff;text-decoration:none;transition:transform .3s cubic-bezier(.2,.8,.2,1),border-color .25s,opacity .25s}
+.loja svg{width:28px;height:28px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;flex:none}
+.loja small{display:block;font-size:11px;line-height:13px;color:var(--on-ink-muted);letter-spacing:.02em}
+.loja b{display:block;font:700 19px/23px var(--font-display)}
+.loja i{display:block;font-style:normal;font-size:11px;line-height:13px;color:var(--on-ink-muted)}
+.loja[data-em-breve]{opacity:.72}.loja[data-em-breve]:hover{opacity:1;border-color:#4A6A7D}
+.loja:not([data-em-breve]):hover{transform:translateY(-3px);border-color:var(--mint)}
+.loja.sugerida{opacity:1;border-color:var(--mint);box-shadow:0 0 0 4px rgba(60,198,160,.15)}
+.ja-agora{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
+.btn-contorno-claro{border:1.5px solid rgba(255,255,255,.5);color:#fff;background:transparent}
+.btn-contorno-claro:hover{border-color:#fff}
+.instalar{margin-top:28px;background:rgba(255,255,255,.05);border:1px solid #2A4252;border-radius:var(--radius-l);padding:16px 18px}
+.inst-abas{display:flex;gap:6px;margin-bottom:10px}
+.inst-abas button{font:600 14px var(--font-sans);color:var(--on-ink-muted);background:none;border:1px solid transparent;border-radius:var(--radius-pill);padding:6px 14px;cursor:pointer}
+.inst-abas button[aria-selected="true"]{color:#0C1A22;background:var(--mint)}
+.instalar ol[hidden]{display:none}
+.instalar ol{margin:0;padding-left:20px;display:grid;gap:6px;color:var(--on-ink);font-size:15px}
+.instalar b{color:#fff}
+.dl-lado{display:grid;gap:18px}
+.qr-cartao{display:flex;gap:18px;align-items:center;background:#fff;color:var(--ink);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-device)}
+.qr-cartao img{width:132px;height:132px;flex:none;border-radius:10px}
+.qr-cartao b{display:block;font:700 18px/24px var(--font-display)}
+.qr-cartao span{display:block;color:var(--ink-muted);font-size:14px;margin-top:4px}
+@media(max-width:760px){.qr-cartao{display:none}}
+.espera{background:var(--surface-raised);color:var(--ink);border-radius:var(--radius-xl);padding:22px;display:grid;gap:12px}
+.espera p{margin:0;color:var(--ink-muted);font-size:14px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg label{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;border:1.5px solid var(--border-strong);border-radius:var(--radius-pill);padding:7px 12px;cursor:pointer}
+.seg label:has(input:checked){border-color:var(--primary);background:var(--mint-tint);color:var(--on-mint-tint)}
+.seg input{accent-color:var(--primary)}
+.espera-ok{color:var(--primary)!important;font-weight:600}
 </style>
 </head>
 <body>
@@ -467,6 +505,10 @@ html{scroll-padding-top:76px}
         <p class="grupo-rot">Confiança</p>
         <a class="item-menu" style="--i:5" href="#seguranca" data-fecha data-sec="seguranca"><span class="ic-m"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg></span><span><b>Segurança e RGPD</b><small>Dados na UE, nada se apaga por engano</small></span><span class="seta" aria-hidden="true">›</span></a>
         <a class="item-menu" style="--i:6" href="#perguntas" data-fecha data-sec="perguntas"><span class="ic-m"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.5v.01"/></svg></span><span><b>Perguntas frequentes</b><small>Preço, dados, Madeira e Açores</small></span><span class="seta" aria-hidden="true">›</span></a>
+      </div>
+      <div>
+        <p class="grupo-rot">App</p>
+        <a class="item-menu" style="--i:7" href="#descarregar" data-fecha data-sec="descarregar"><span class="ic-m"><svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M12 7v7M9 11l3 3 3-3M10 18.5h4"/></svg></span><span><b>Descarregar a app</b><small>iPhone, Android ou já no navegador</small></span><span class="seta" aria-hidden="true">›</span></a>
       </div>
       <div class="folha-acoes">
         <a class="btn btn-primario" href="/empresa/registar">Criar conta grátis <span aria-hidden="true">→</span></a>
@@ -764,8 +806,73 @@ html{scroll-padding-top:76px}
   </div>
 </section>
 
+<!-- 8b. Descarregar a app -->
+<section id="descarregar" class="escuro descarregar" aria-labelledby="t-descarregar">
+  <div class="contentor dl-grid">
+    <div class="revela">
+      <p class="eyebrow" style="color:var(--mint)">Android · iPhone · navegador</p>
+      <h2 class="h1" id="t-descarregar">Leve a Contabia <span class="onda">no bolso.<svg viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" vector-effect="non-scaling-stroke" d="M2 6q7.5-7 15 0t15 0t15 0t15 0t15 0t15 0t15 0t13 0"/></svg></span></h2>
+      <p class="lead" style="color:var(--on-ink-muted)">As apps para iPhone e Android estão a chegar às lojas. Até lá, a Contabia já funciona no navegador do telemóvel — e pode pô-la no ecrã principal como uma app.</p>
+      <div class="lojas" id="lojas">
+        <a class="loja" id="loja-ios" href="#f-espera" data-em-breve="true" data-plat="ios" aria-label="App Store: em breve. Pedir aviso quando sair">
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="tel-ic"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>
+          <span><small>Em breve na</small><b>App Store</b><i>iPhone</i></span>
+        </a>
+        <a class="loja" id="loja-android" href="#f-espera" data-em-breve="true" data-plat="android" aria-label="Google Play: em breve. Pedir aviso quando sair">
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="tel-ic"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>
+          <span><small>Em breve no</small><b>Google Play</b><i>Android</i></span>
+        </a>
+      </div>
+
+      <div class="ja-agora">
+        <a class="btn btn-menta" href="/empresa/">Usar já no navegador <span aria-hidden="true">→</span></a>
+        <a class="btn btn-contorno-claro" href="/contabilista/">Sou contabilista</a>
+      </div>
+
+      <div class="instalar" role="tablist" aria-label="Como pôr no ecrã principal">
+        <div class="inst-abas">
+          <button type="button" role="tab" id="aba-ios" aria-selected="true" aria-controls="painel-ios">iPhone</button>
+          <button type="button" role="tab" id="aba-android" aria-selected="false" aria-controls="painel-android">Android</button>
+        </div>
+        <ol id="painel-ios" role="tabpanel" aria-labelledby="aba-ios">
+          <li>Abra <b>contabia-eu.onrender.com/empresa</b> no Safari.</li>
+          <li>Toque em <b>Partilhar</b> (o quadrado com a seta para cima).</li>
+          <li>Escolha <b>Adicionar ao ecrã principal</b>. Pronto: abre como uma app.</li>
+        </ol>
+        <ol id="painel-android" role="tabpanel" aria-labelledby="aba-android" hidden>
+          <li>Abra <b>contabia-eu.onrender.com/empresa</b> no Chrome.</li>
+          <li>Toque no menu <b>⋮</b> no canto superior direito.</li>
+          <li>Escolha <b>Adicionar ao ecrã principal</b> ou <b>Instalar app</b>.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="dl-lado revela">
+      <div class="qr-cartao">
+        <img src="/site/img/qr-app.svg" alt="Código QR que abre a Contabia no telemóvel" width="180" height="180">
+        <div><b>Está no computador?</b><span>Aponte a câmara do telemóvel ao código e a Contabia abre logo.</span></div>
+      </div>
+      <form class="espera" id="f-espera" novalidate>
+        <h3 class="h3">Avise-me quando sair nas lojas</h3>
+        <p>Um único e-mail, no dia em que a app estiver disponível.</p>
+        <label class="campo"><span>E-mail</span><input name="email" type="email" autocomplete="email" required></label>
+        <div class="seg" role="radiogroup" aria-label="O meu telemóvel">
+          <label><input type="radio" name="plataforma" value="ios"> iPhone</label>
+          <label><input type="radio" name="plataforma" value="android"> Android</label>
+          <label><input type="radio" name="plataforma" value="ambos" checked> Os dois</label>
+        </div>
+        <label class="armadilha" aria-hidden="true">Site<input name="website" tabindex="-1" autocomplete="off"></label>
+        <label class="consent"><input type="checkbox" name="autorizo"> <span>Autorizo a Contabia a enviar-me este aviso (<a href="/termos" target="_blank" rel="noopener">Termos</a>).</span></label>
+        <p class="pe-erro" id="espera-erro" role="alert" hidden></p>
+        <button class="btn btn-primario" type="submit">Avisem-me</button>
+        <p class="espera-ok" id="espera-ok" role="status" hidden>Feito! Avisamos assim que a app estiver nas lojas.</p>
+      </form>
+    </div>
+  </div>
+</section>
+
 <!-- 8. Perguntas -->
-<section id="perguntas" aria-labelledby="t-faq" style="padding-top:0">
+<section id="perguntas" aria-labelledby="t-faq">
   <div class="contentor">
     <div class="cabeca-seccao revela"><p class="eyebrow">Perguntas frequentes</p><h2 class="h2" id="t-faq">O que costumam perguntar-nos</h2></div>
     <div class="faq revela">
@@ -797,7 +904,7 @@ html{scroll-padding-top:76px}
 <footer>
   <div class="contentor">
     <a class="marca" href="/"><svg viewBox="0 0 64 64" aria-hidden="true" style="width:30px;height:30px"><circle cx="32" cy="32" r="32" fill="#1F3B4A"/><path d="M43 19a16 16 0 1 0 0 26" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/><path d="M27 37q5-5 10 0t10 0t10 0" fill="none" stroke="#3CC6A0" stroke-width="4.5" stroke-linecap="round"/></svg>contabia</a>
-    <nav aria-label="Rodapé"><a href="/empresa/">App da empresa</a><a href="#fundos">Fundos europeus</a><a href="#estudos">Estudos de viabilidade</a><a href="/contabilista/">App do contabilista</a><a href="#seguranca">Segurança</a><a href="#perguntas">Perguntas</a><a href="/termos">Termos e Condições</a></nav>
+    <nav aria-label="Rodapé"><a href="/empresa/">App da empresa</a><a href="#fundos">Fundos europeus</a><a href="#estudos">Estudos de viabilidade</a><a href="/contabilista/">App do contabilista</a><a href="#seguranca">Segurança</a><a href="#perguntas">Perguntas</a><a href="#descarregar">Descarregar a app</a><a href="/termos">Termos e Condições</a></nav>
     <p style="margin:0"><span class="mare-rodape">A maré certa. O seu contabilista, à mão.</span><br>Feito na Madeira, para empresas de todo o Portugal.</p>
   </div>
 </footer>
@@ -966,9 +1073,9 @@ html{scroll-padding-top:76px}
   aoRolar();
 
   // secção ativa: menu do topo, doca e folha
-  var ids = ["inicio", "como-funciona", "vantagens", "fundos", "estudos", "luis", "contabilistas", "seguranca", "perguntas"];
+  var ids = ["inicio", "como-funciona", "vantagens", "fundos", "estudos", "luis", "contabilistas", "seguranca", "perguntas", "descarregar"];
   var secs = ids.map(function (i) { return document.getElementById(i); }).filter(Boolean);
-  var mapaDoca = { vantagens: "como-funciona", luis: "estudos", contabilistas: "estudos", seguranca: "estudos", perguntas: "estudos" };
+  var mapaDoca = { vantagens: "como-funciona", luis: "estudos", contabilistas: "estudos", seguranca: "estudos", perguntas: "estudos", descarregar: "estudos" };
   function marcar(id) {
     document.querySelectorAll("nav.menu a").forEach(function (a) { a.classList.toggle("ativo", a.getAttribute("href") === "#" + id); });
     var d = id === "inicio" ? "inicio" : mapaDoca[id] || id;
@@ -1032,6 +1139,53 @@ html{scroll-padding-top:76px}
     document.querySelector(".hero").addEventListener("mouseleave", function () { palco.style.transform = ""; });
     palco.style.transition = "transform .4s cubic-bezier(.2,.8,.2,1)";
   }
+})();
+</script>
+<script>
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+  var ua = navigator.userAgent || "";
+  var plat = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ? "ios" : /Android/i.test(ua) ? "android" : null;
+  // separador de instruções certo para o telemóvel da pessoa
+  function aba(p) {
+    ["ios", "android"].forEach(function (x) {
+      var on = x === p;
+      $("#aba-" + x).setAttribute("aria-selected", on ? "true" : "false");
+      $("#painel-" + x).hidden = !on;
+    });
+  }
+  ["ios", "android"].forEach(function (x) { $("#aba-" + x).addEventListener("click", function () { aba(x); }); });
+  if (plat) { aba(plat); var l = $("#loja-" + plat); if (l) l.classList.add("sugerida"); var r = document.querySelector('#f-espera input[value="' + plat + '"]'); if (r) r.checked = true; }
+  // lojas: quando as ligações existirem no servidor, os botões ficam ativos sozinhos
+  fetch("/v1/site/lojas").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+    if (!j) return;
+    [["ios", j.ios, "Descarregar na"], ["android", j.android, "Disponível no"]].forEach(function (x) {
+      if (!x[1]) return;
+      var a = $("#loja-" + x[0]);
+      a.href = x[1]; a.removeAttribute("data-em-breve"); a.removeAttribute("aria-label"); a.setAttribute("target", "_blank"); a.setAttribute("rel", "noopener");
+      a.querySelector("small").textContent = x[2];
+    });
+  }).catch(function () {});
+  document.querySelectorAll(".loja").forEach(function (a) {
+    a.addEventListener("click", function (e) {
+      if (a.hasAttribute("data-em-breve")) { e.preventDefault(); var f = $("#f-espera"); f.scrollIntoView({ behavior: "smooth", block: "center" }); var r = f.querySelector('input[value="' + a.dataset.plat + '"]'); if (r) r.checked = true; setTimeout(function () { f.email.focus({ preventScroll: true }); }, 400); }
+    });
+  });
+  // lista de espera
+  var f = $("#f-espera"), erro = $("#espera-erro");
+  f.addEventListener("submit", function (e) {
+    e.preventDefault(); erro.hidden = true;
+    var falha = function (m) { erro.textContent = m; erro.hidden = false; };
+    if (!/^\S+@\S+\.\S+$/.test(f.email.value.trim())) return falha("O e-mail não parece válido.");
+    if (!f.autorizo.checked) return falha("Para o avisarmos, autorize o contacto.");
+    var corpo = { email: f.email.value.trim(), plataforma: (f.querySelector('input[name="plataforma"]:checked') || {}).value || "ambos", autorizoContacto: true };
+    if (f.website.value) corpo.website = f.website.value;
+    var b = f.querySelector("button[type=submit]"); b.disabled = true;
+    fetch("/v1/lista-espera", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corpo) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (x) { b.disabled = false; if (!x.ok) return falha(x.j.mensagem || "Não foi possível guardar. Tente de novo."); $("#espera-ok").hidden = false; b.hidden = true; })
+      .catch(function () { b.disabled = false; falha("Sem ligação. Tente de novo."); });
+  });
 })();
 </script>
 </body>

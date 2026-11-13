@@ -42,3 +42,7 @@ services:
         sync: false
       - key: WHATSAPP_VERIFICAR
         sync: false
+      - key: URL_APP_STORE
+        sync: false
+      - key: URL_GOOGLE_PLAY
+        sync: false

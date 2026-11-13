@@ -789,3 +789,18 @@ test("27. WhatsApp Business (número oficial): consentimento, lembretes, respost
   // o resto da API continua a ler JSON normalmente (o leitor cru só existe no webhook)
   assert.equal((await chamar("GET", "/v1/contabilista/avisos/contagem", cc.json.token)).status, 200);
 });
+
+test("28. descarregar a app: lojas por configuração e lista de espera", async () => {
+  const l = await chamar("GET", "/v1/site/lojas");
+  assert.deepEqual(l.json, { ios: null, android: null, web: "/empresa/" });
+  assert.equal((await chamar("POST", "/v1/lista-espera", undefined, { email: "x@y.pt", plataforma: "ios" })).status, 400);
+  assert.equal((await chamar("POST", "/v1/lista-espera", undefined, { email: "x@y.pt", plataforma: "ios", autorizoContacto: true, website: "spam" })).status, 400);
+  assert.equal((await chamar("POST", "/v1/lista-espera", undefined, { email: "Ana@Exemplo.pt", plataforma: "ios", autorizoContacto: true })).status, 201);
+  assert.equal((await chamar("POST", "/v1/lista-espera", undefined, { email: "ana@exemplo.pt", plataforma: "ambos", autorizoContacto: true })).status, 201);
+  assert.equal((await chamar("GET", "/v1/admin/lista-espera")).status, 403);
+  const adm = (await chamar("GET", "/v1/admin/lista-espera", undefined, undefined, { "x-admin-token": "admin" })).json;
+  assert.equal(adm.length, 1, "o mesmo e-mail não se repete");
+  assert.equal(adm[0].plataforma, "ambos");
+  process.env.URL_APP_STORE = "https://apps.apple.com/app/id000";
+  try { assert.equal((await chamar("GET", "/v1/site/lojas")).json.ios, "https://apps.apple.com/app/id000"); } finally { delete process.env.URL_APP_STORE; }
+});
