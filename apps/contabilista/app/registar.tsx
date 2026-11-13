@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRouter } from "expo-router";
-import { Botao, Campo, Ecra, Erro, Texto, Titulo, useSessao } from "@contabia/ui";
+import { Botao, Campo, Ecra, Erro, LigacaoTermos, Texto, Titulo, useSessao } from "@contabia/ui";
 
 export default function Registar() {
   const { api, entrar } = useSessao();
@@ -32,6 +32,7 @@ export default function Registar() {
       <Campo rotulo="Senha" value={senha} onChangeText={setSenha} secureTextEntry ajuda="Mínimo de 8 caracteres." />
       <Texto sec tamanho={12}>As empresas veem o seu nome e n.º OCC antes de aceitarem a ligação.</Texto>
       <Erro texto={erro} />
+      <LigacaoTermos prefixo="Ao criar a conta, aceita os " />
       <Botao titulo="Criar conta" onPress={enviar} carregando={aEnviar} desativado={nome.length < 2 || !email.includes("@") || !occ || senha.length < 8} />
     </Ecra>
   );

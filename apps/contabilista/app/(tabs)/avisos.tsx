@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, Switch, View } from "react-native";
 import { useRouter } from "expo-router";
 import { NOME_URGENCIA, type Notificacao } from "@contabia/shared";
-import { Botao, Cartao, Chip, Ecra, Erro, MensagemLuis, RespostaRapida, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
+import { Botao, Cartao, Chip, Ecra, Erro, LigacaoTermos, MensagemLuis, RespostaRapida, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
 
 const quando = (iso: string) => {
   const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
@@ -85,6 +85,7 @@ export default function Avisos() {
             trackColor={{ true: cor.verde, false: cor.bordaForte }} />
         </View>
       </Cartao>
+      <LigacaoTermos />
     </Ecra>
   );
 }

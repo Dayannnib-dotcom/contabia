@@ -16,3 +16,4 @@ export * from "./grafico";
 export * from "./recuperar";
 export * from "./apoios";
 export * from "./respostas";
+export * from "./termos";

@@ -65,6 +65,13 @@ with sync_playwright() as p:
         assert tel.evaluate("document.documentElement.scrollWidth") <= 390
         shot(tel, "00d_site_movel")
         tel.close()
+        # Termos e Condições: página própria, ligada no rodapé
+        site.goto(BASE + "/")
+        site.get_by_role("contentinfo").get_by_role("link", name="Termos e Condições").click()
+        site.get_by_role("heading", name="Termos e Condições de Utilização").wait_for()
+        site.get_by_text("Os serviços de contabilidade são pagos à parte.").first.wait_for()
+        assert site.get_by_role("navigation", name="Índice").get_by_role("link").count() == 20
+        shot(site, "00e_site_termos")
         site.goto(BASE + "/")
         site.get_by_role("link", name="Criar conta grátis").first.click()
         site.get_by_text("Configurar a empresa").wait_for(timeout=20000)

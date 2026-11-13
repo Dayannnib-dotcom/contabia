@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { ajudaNIF, normalizarUtilizador, utilizadorValido, type Regiao, type RegimeIVA } from "@contabia/shared";
-import { Botao, Campo, Ecra, Erro, Texto, Titulo, cor, useSessao } from "@contabia/ui";
+import { Botao, Campo, Ecra, Erro, LigacaoTermos, Texto, Titulo, cor, useSessao } from "@contabia/ui";
 
 function Opcoes<T extends string>({ rotulo, valor, opcoes, mudar }: { rotulo: string; valor: T; opcoes: [T, string][]; mudar: (v: T) => void }) {
   return (
@@ -67,6 +67,7 @@ export default function Registar() {
       <Campo rotulo="Senha" value={senha} onChangeText={setSenha} secureTextEntry ajuda="Mínimo de 8 caracteres." />
       <Texto sec tamanho={12}>A Contabia nunca pede a senha do Portal das Finanças. As submissões são feitas pelo seu contabilista.</Texto>
       <Erro texto={erro} />
+      <LigacaoTermos prefixo="Ao criar a conta, aceita os " />
       <Botao titulo="Criar conta" onPress={enviar} carregando={aEnviar} desativado={!valido} />
     </Ecra>
   );

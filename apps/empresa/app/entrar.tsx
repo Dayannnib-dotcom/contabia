@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRouter } from "expo-router";
-import { Botao, Campo, Ecra, Erro, Titulo, useSessao } from "@contabia/ui";
+import { Botao, Campo, Ecra, Erro, LigacaoTermos, Titulo, useSessao } from "@contabia/ui";
 
 export default function Entrar() {
   const { api, entrar } = useSessao();
@@ -32,6 +32,7 @@ export default function Entrar() {
       <Botao titulo="Entrar" onPress={enviar} carregando={aEnviar} desativado={!utilizador || senha.length < 8} />
       <Botao titulo="Esqueci-me da senha" variante="secundario" onPress={() => router.push("/recuperar")} />
       <Botao titulo="Ainda não tenho conta — criar conta" variante="secundario" onPress={() => router.replace("/registar")} />
+      <LigacaoTermos />
     </Ecra>
   );
 }

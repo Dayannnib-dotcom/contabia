@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Switch, View } from "react-native";
 import { formatarNIF } from "@contabia/shared";
-import { Botao, Campo, Cartao, Ecra, Erro, Linha, MensagemLuis, Texto, Titulo, confirmarBiometria, cor, useDados, useSessao } from "@contabia/ui";
+import { Botao, Campo, Cartao, Ecra, Erro, Linha, MensagemLuis, Texto, Titulo, confirmarBiometria, cor, LigacaoTermos, useDados, useSessao } from "@contabia/ui";
 
 /**
  * Conta e segurança. Terminar a sessão NUNCA apaga dados: tudo vive na nuvem.
@@ -119,6 +119,7 @@ export default function Conta() {
         </Cartao>
       )}
       <Texto sec tamanho={11} cor={cor.textoSec}>A sessão continua aberta durante 30 dias de uso, mesmo que feche a app.</Texto>
+      <LigacaoTermos prefixo="Contabia · ferramenta de apoio. A contabilidade e os estudos são pagos à parte. " />
     </Ecra>
   );
 }
