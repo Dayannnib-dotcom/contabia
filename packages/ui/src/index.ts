@@ -19,3 +19,4 @@ export * from "./respostas";
 export * from "./termos";
 export * from "./servicos";
 export * from "./tempo";
+export * from "./paginacao";

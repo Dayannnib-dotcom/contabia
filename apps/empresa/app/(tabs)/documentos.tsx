@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { dataPT, euros, type Documento } from "@contabia/shared";
-import { Botao, Campo, Cartao, Chip, Ecra, Erro, Linha, Texto, Titulo, Vazio, cor, useDados, useSessao } from "@contabia/ui";
+import { Botao, Campo, Cartao, Chip, Ecra, Erro, Linha, MostrarMais, Texto, Titulo, Vazio, cor, useDados, usePaginacao, useSessao } from "@contabia/ui";
 
 const TIPOS: [Documento["tipo"], string][] = [["compra", "Compras"], ["venda", "Vendas"], ["banco", "Bancos"], ["pessoal", "Pessoal"]];
 type Filtro = "todos" | "validar" | "sem_original" | "anulados";
@@ -27,6 +27,7 @@ export default function Documentos() {
   const lista = doTipo
     .filter((d) => FILTROS[filtro][1](d))
     .filter((d) => !q || [d.terceiroNome, d.numero, d.terceiroNif, d.total.toFixed(2), d.categoria, d.data.split("-").reverse().join("/")].some((x) => x.toLowerCase().includes(q)));
+  const { visiveis, resto, mostrarMais } = usePaginacao(lista, `${tipo}|${filtro}|${q}`);
 
   return (
     <Ecra>
@@ -57,13 +58,14 @@ export default function Documentos() {
       <Erro texto={erro} />
       <Cartao estilo={{ paddingVertical: 4 }}>
         {lista.length === 0 ? <Vazio texto={q || filtro !== "todos" ? "Nenhum documento corresponde à pesquisa." : "Sem documentos deste tipo. Use «Digitalizar» para adicionar."} /> : null}
-        {lista.map((d) => (
+        {visiveis.map((d) => (
           <Linha key={d.id} onPress={() => router.push({ pathname: "/documento/[id]", params: { id: d.id } })}
             esquerda={d.terceiroNome}
             sub={`${dataPT(d.data)} · ${d.numero}${d.anexos ? " · 📎" : ""} · ${d.categoria}${d.ivaDedutivel ? "" : " · IVA não dedutível"}`}
             direita={<View style={{ alignItems: "flex-end", gap: 4 }}><Text style={{ fontVariant: ["tabular-nums"], fontWeight: "600", color: cor.texto }}>{euros(d.total)}</Text><Chip texto={ESTADO[d.estado][0]} tipo={ESTADO[d.estado][1]} /></View>} />
         ))}
       </Cartao>
+      <MostrarMais resto={resto} onPress={mostrarMais} />
       <Texto sec tamanho={12}>Toque num documento para o validar ou corrigir a classificação.</Texto>
     </Ecra>
   );

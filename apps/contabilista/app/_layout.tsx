@@ -4,7 +4,13 @@ import { Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ProvedorSessao, cor, useSessao } from "@contabia/ui";
 
-const URL_API = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+// Endereço da API: 1) EXPO_PUBLIC_API_URL (definido no eas.json para cada compilação);
+// 2) na web, o próprio servidor que serve a app; 3) no telemóvel, «localhost» só em
+// desenvolvimento — numa compilação para as lojas usa sempre o servidor de produção.
+const URL_PRODUCAO = "https://contabia-eu.onrender.com";
+const URL_API =
+  process.env.EXPO_PUBLIC_API_URL ||
+  (Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : __DEV__ ? "http://localhost:3000" : URL_PRODUCAO);
 
 function Navegacao() {
   const { sessao, pronto } = useSessao();

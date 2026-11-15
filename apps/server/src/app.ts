@@ -1139,7 +1139,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
       email: z.string().trim().toLowerCase().email("O e-mail não parece válido."),
       telefone: z.string().trim().max(30).regex(/^[+\d\s()-]*$/, "O telefone só pode ter algarismos, espaços e +.").optional(),
       mensagem: z.string().trim().max(1500).optional(),
-      autorizoContacto: z.literal(true, { errorMap: () => ({ message: "Para lhe ligarmos, autorize o contacto." }) }),
+      autorizoContacto: z.literal(true, { error: "Para lhe ligarmos, autorize o contacto." }),
     }).parse(req.body);
     const desde = new Date(agora().getTime() - 86_400_000).toISOString();
     const [{ n }] = await db.query<{ n: string }>(`SELECT count(*) AS n FROM pedidos_estudo WHERE empresa_id = $1 AND criado_em > $2`, [id, desde]);
@@ -1249,7 +1249,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
       regiao: z.enum(["PT", "PT-MA", "PT-AC"]),
       apoioId: z.string().max(80).nullable().optional(),
       mensagem: z.string().trim().max(1500).optional(),
-      autorizoContacto: z.literal(true, { errorMap: () => ({ message: "Para o contactarmos, autorize o contacto." }) }),
+      autorizoContacto: z.literal(true, { error: "Para o contactarmos, autorize o contacto." }),
       website: z.string().max(0).optional(), // armadilha para robôs: fica sempre vazio
     }).parse(req.body);
     const nif = b.nif ? limparNIF(b.nif) : "";
@@ -1676,7 +1676,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
       email: z.string().trim().toLowerCase().email("O e-mail não parece válido."),
       plataforma: z.enum(["ios", "android", "ambos"]),
       perfil: z.enum(["empresa", "contabilista"]).default("empresa"),
-      autorizoContacto: z.literal(true, { errorMap: () => ({ message: "Para o avisarmos, autorize o contacto." }) }),
+      autorizoContacto: z.literal(true, { error: "Para o avisarmos, autorize o contacto." }),
       website: z.string().max(0).optional(),
     }).parse(req.body);
     const t = agora().getTime();

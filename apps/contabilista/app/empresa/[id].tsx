@@ -3,7 +3,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { Regras } from "../../components/Regras";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { euros, motivoLegivel, nomePeriodo, type Lancamento } from "@contabia/shared";
-import { Apoios, EspacoServicosVista, useTempoTrabalho, RespostaRapida, Banco, Botao, RegistoAtividade, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Numero, Texto, Titulo, Vazio, VerOriginal, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
+import { Apoios, EspacoServicosVista, useTempoTrabalho, RespostaRapida, Banco, Botao, RegistoAtividade, Campo, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, MostrarMais, usePaginacao, Numero, Texto, Titulo, Vazio, VerOriginal, cor, entregarFicheiro, useDados, useSessao } from "@contabia/ui";
 
 type Sec = "servicos" | "revisao" | "banco" | "regras" | "iva" | "pedidos" | "saft" | "fecho" | "atividade" | "apoios";
 const SECS: [Sec, string][] = [["revisao", "Revisão"], ["servicos", "Serviços e horas"], ["banco", "Banco"], ["regras", "Regras"], ["iva", "IVA"], ["pedidos", "Pedidos"], ["saft", "SAF-T"], ["fecho", "Fecho"], ["apoios", "Apoios UE"], ["atividade", "Atividade"]];
@@ -121,6 +121,7 @@ function Revisao({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
   const [editar, setEditar] = useState<Record<string, string>>({});
   const [erro, setErro] = useState<string | null>(null);
   const [aTratar, setATratar] = useState<string | null>(null);
+  const { visiveis, resto, mostrarMais } = usePaginacao(dados ?? [], id);
 
   async function aprovar(l: Lancamento, conta?: string) {
     setATratar(l.id);
@@ -144,7 +145,7 @@ function Revisao({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
       <Texto sec>Propostos pela IA a partir dos documentos validados pela empresa. Nada é lançado sem a sua aprovação.</Texto>
       <Botao titulo="Aprovar todos com confiança alta" onPress={async () => { const r = await api.aprovarConfiancaAlta(id); setErro(r.aprovados ? null : "Não há lançamentos com confiança alta."); recarregar(); }} />
       <Erro texto={erro} />
-      {dados.map((l) => (
+      {visiveis.map((l) => (
         <Cartao key={l.id}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
             <View style={{ flex: 1 }}><Texto forte>{l.descricao}</Texto><Texto sec tamanho={12}>{l.diario} · {l.data.split("-").reverse().join("/")}</Texto></View>
@@ -172,6 +173,7 @@ function Revisao({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
           )}
         </Cartao>
       ))}
+      <MostrarMais resto={resto} onPress={mostrarMais} />
     </View>
   );
 }
