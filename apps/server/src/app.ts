@@ -1723,7 +1723,7 @@ const PAGINA_INICIAL = `<!doctype html><html lang="pt-PT"><head><meta charset="u
 <style>body{margin:0;font-family:system-ui,sans-serif;background:#12232E;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center}
 main{max-width:420px;padding:32px;display:flex;flex-direction:column;gap:18px;text-align:center}h1{font-size:40px;margin:8px 0 0;letter-spacing:-1px}p{color:#C9D6DC;margin:0 0 12px}
 a{display:block;padding:16px;border-radius:14px;font-weight:600;font-size:17px;text-decoration:none}.a{background:#3CC6A0;color:#0C1A22}.b{border:1px solid #4B6878;color:#fff}</style></head>
-<body><main><svg width="88" height="88" viewBox="0 0 64 64" style="margin:0 auto" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="#1F3B4A"/><path d="M43 19a16 16 0 1 0 0 26" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/><path d="M27 37q5-5 10 0t10 0t10 0" fill="none" stroke="#3CC6A0" stroke-width="4.5" stroke-linecap="round"/></svg>
+<body><main><svg width="88" height="88" viewBox="0 0 64 64" style="margin:0 auto" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="#1F3B4A"/><path d="M43 19a16 16 0 1 0 0 26" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/><path d="M27 32q5-5 10 0t10 0t10 0" fill="none" stroke="#3CC6A0" stroke-width="4.5" stroke-linecap="round"/></svg>
 <h1>contabia</h1><p>A contabilidade da sua empresa, em dia.</p>
 <a class="a" href="/empresa/">App da empresa</a><a class="b" href="/contabilista/">App do Contabilista Certificado</a>
 <p style="margin-top:22px;padding:10px 14px;border-radius:10px;background:#FBEEDC;color:#7A3B05;font-size:13px">Versão de testes: use apenas dados fictícios. Não introduza dados reais de empresas.</p></main></body></html>`;
