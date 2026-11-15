@@ -26,7 +26,7 @@ export default function Painel() {
   const prox = dados?.prazos.find((p) => !p.submetida);
   const faltas = (dados?.resumo.documentosPorValidar ?? 0) + (dados?.pedidos.length ?? 0) + (dados?.ligPendente ? 1 : 0);
   const msg = !dados ? "A preparar o seu resumo…"
-    : faltas === 0 ? `${saudacao()}! Estou atento a todas as suas faturas e obrigações. Por agora está tudo em dia — pode ficar descansado.`
+    : faltas === 0 ? `${saudacao()}! Estou atento a todas as suas faturas e obrigações. Por agora está tudo em dia.`
     : `${saudacao()}! Estou atento às suas faturas e obrigações. Tem ${faltas} ${faltas === 1 ? "coisa" : "coisas"} para tratar${prox ? `; o próximo prazo é a ${dataPT(prox.prazo)}` : ""}.`;
 
   return (
@@ -34,7 +34,12 @@ export default function Painel() {
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
         <Titulo sub={`${sessao!.quem ? `${sessao!.quem} · ` : ""}${online ? "Sincronizado em tempo real" : "Sem internet — pode continuar a registar faturas; enviamos quando a rede voltar"}`}>{dados?.resumo.empresa.nome ?? sessao!.nome}</Titulo>
       </View>
-      <MensagemLuis texto={msg} escuro rotulo="Luís · o seu gestor virtual" />
+      <MensagemLuis texto={msg} escuro expressao={faltas === 0 && dados ? "celebrar" : "sorriso"} />
+      {dados && gestor ? <PrimeirosPassos passos={[
+        { titulo: "Fotografar a primeira fatura", feito: dados.docs.length > 0, ir: () => router.push("/(tabs)/digitalizar") },
+        { titulo: "Ligar o seu contabilista", feito: !!(dados.ligAtiva || dados.conviteEnviado), ir: () => router.push("/ligacao") },
+        { titulo: "Indicar o CAE para ver apoios europeus", feito: !!dados.apoios?.perfil.cae, ir: () => router.push("/apoios") },
+      ]} /> : null}
       <Erro texto={erro} />
       <FilaPendente compacto />
 
@@ -122,5 +127,26 @@ export default function Painel() {
         <Linha esquerda="Atualizações fiscais" sub="Aplicadas automaticamente na data legal" direita={<Icone nome="seguir" cor={cor.textoSec} />} onPress={() => router.push("/atualizacoes")} />
       </Cartao>
     </Ecra>
+  );
+}
+
+/** Primeiros passos (Guia 5): três tarefas da ativação; o cartão desaparece quando estão todas feitas. */
+function PrimeirosPassos({ passos }: { passos: { titulo: string; feito: boolean; ir: () => void }[] }) {
+  const feitos = passos.filter((p) => p.feito).length;
+  if (feitos === passos.length) return null;
+  return (
+    <Cartao>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Texto forte tamanho={15}>Primeiros passos</Texto>
+        <Texto sec tamanho={12}>{feitos} de {passos.length}</Texto>
+      </View>
+      <View style={{ height: 6, borderRadius: 3, backgroundColor: cor.linha, overflow: "hidden" }} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: passos.length, now: feitos }}>
+        <View style={{ width: `${(feitos / passos.length) * 100}%`, height: 6, backgroundColor: cor.menta }} />
+      </View>
+      {passos.map((p) => (
+        <Linha key={p.titulo} esquerda={p.titulo} onPress={p.feito ? undefined : p.ir}
+          direita={p.feito ? <Chip texto="Feito" tipo="bom" /> : <Icone nome="seguir" cor={cor.textoSec} />} />
+      ))}
+    </Cartao>
   );
 }

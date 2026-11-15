@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { cor, espaco, letra, raio } from "./tema";
+import { fonte } from "./fontes";
 import { Luis, type ExpressaoLuis } from "./marca";
 
 /** `aoInteragir`: chamado a cada toque ou deslocação (serve para medir o tempo ativo). */
@@ -26,11 +27,11 @@ export function Titulo({ children, sub }: { children: ReactNode; sub?: string })
 }
 
 export function Texto({ children, sec, forte, tamanho, cor: c, estilo }: { children: ReactNode; sec?: boolean; forte?: boolean; tamanho?: number; cor?: string; estilo?: StyleProp<TextStyle> }) {
-  return <Text style={[{ color: c ?? (sec ? cor.textoSec : cor.texto), fontSize: tamanho ?? letra.normal, fontWeight: forte ? "600" : "400", lineHeight: (tamanho ?? letra.normal) * 1.4 }, estilo]}>{children}</Text>;
+  return <Text style={[{ color: c ?? (sec ? cor.textoSec : cor.texto), fontSize: tamanho ?? letra.normal, fontFamily: forte ? fonte.textoForte : fonte.texto, lineHeight: (tamanho ?? letra.normal) * 1.4 }, estilo]}>{children}</Text>;
 }
 
 export function Numero({ children, tamanho = letra.media, forte = true, cor: c }: { children: ReactNode; tamanho?: number; forte?: boolean; cor?: string }) {
-  return <Text style={{ fontVariant: ["tabular-nums"], fontSize: tamanho, fontWeight: forte ? "600" : "400", color: c ?? cor.texto }}>{children}</Text>;
+  return <Text style={{ fontVariant: ["tabular-nums"], fontSize: tamanho, fontFamily: forte ? fonte.numero : fonte.texto, color: c ?? cor.texto }}>{children}</Text>;
 }
 
 type Variante = "principal" | "secundario" | "perigo" | "menta" | "contorno";
@@ -50,10 +51,10 @@ export function Botao({ titulo, onPress, variante = "principal", carregando, des
       accessibilityRole="button"
       accessibilityState={{ disabled: !!off, busy: !!carregando }}
       onPress={off ? undefined : onPress}
-      style={({ pressed }) => [s.botao, { backgroundColor: off ? "#C9D0CC" : v.bg, borderColor: off ? "#C9D0CC" : v.bd, opacity: pressed ? 0.85 : 1 }, estilo]}
+      style={({ pressed }) => [s.botao, { backgroundColor: off ? cor.desativado : v.bg, borderColor: off ? cor.desativado : v.bd, opacity: pressed ? 0.85 : 1 }, estilo]}
     >
       {carregando ? <ActivityIndicator color={v.fg} /> : icone}
-      <Text style={{ color: off ? cor.textoSec : v.fg, fontSize: letra.media, fontWeight: "600" }}>{titulo}</Text>
+      <Text style={{ color: off ? cor.textoSec : v.fg, fontSize: letra.media, fontFamily: fonte.textoForte }}>{titulo}</Text>
     </Pressable>
   );
 }
@@ -65,20 +66,20 @@ export function Cartao({ children, estilo, destaque, onPress }: { children: Reac
 
 export function Chip({ texto, tipo = "neutro" }: { texto: string; tipo?: "bom" | "aviso" | "erro" | "neutro" }) {
   const c = { bom: [cor.verdeClaro, cor.verdeEscuro], aviso: [cor.ambar, cor.ambarTexto], erro: [cor.vermelhoClaro, cor.vermelho], neutro: [cor.linha, cor.texto] }[tipo];
-  return <View style={[s.chip, { backgroundColor: c[0] }]}><Text style={{ color: c[1], fontSize: 12, fontWeight: "600" }}>{texto}</Text></View>;
+  return <View style={[s.chip, { backgroundColor: c[0] }]}><Text style={{ color: c[1], fontSize: 12, fontFamily: fonte.textoForte }}>{texto}</Text></View>;
 }
 
 export function Campo({ rotulo, ajuda, erro, rotuloCor, ...p }: TextInputProps & { rotulo: string; ajuda?: string; erro?: boolean; rotuloCor?: string }) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={{ fontSize: 13, fontWeight: "600", color: rotuloCor ?? cor.texto }}>{rotulo}</Text>
+      <Text style={{ fontSize: 13, fontFamily: fonte.textoForte, color: rotuloCor ?? cor.texto }}>{rotulo}</Text>
       <TextInput
-        placeholderTextColor="#8A9893"
+        placeholderTextColor={cor.marcador}
         accessibilityLabel={rotulo}
         {...p}
         style={[s.campo, erro && { borderColor: cor.vermelho }, p.style]}
       />
-      {ajuda ? <Text style={{ fontSize: 12, color: erro ? cor.vermelho : cor.textoSec }}>{ajuda}</Text> : null}
+      {ajuda ? <Text style={{ fontSize: 12, fontFamily: fonte.texto, color: erro ? cor.vermelho : cor.textoSec }}>{ajuda}</Text> : null}
     </View>
   );
 }
@@ -120,8 +121,8 @@ export function MensagemLuis({ texto, escuro, acao, rotulo = "Luís · assistent
     <Animated.View style={[s.luis, escuro && { backgroundColor: cor.tinta, borderColor: cor.tinta }, { opacity: o, transform: [{ translateY: y }] }]}>
       <Luis tamanho={44} id="msg" expressao={expressao} />
       <View style={{ flex: 1, gap: 4 }}>
-        <Text style={{ fontSize: 13, fontWeight: "600", color: escuro ? "#9FE3CF" : cor.verdeEscuro }}>{rotulo}</Text>
-        <Text style={{ fontSize: 14, lineHeight: 20, color: escuro ? "#FFFFFF" : cor.texto }}>{texto}</Text>
+        <Text style={{ fontSize: 13, fontFamily: fonte.textoForte, color: escuro ? "#9FE3CF" : cor.verdeEscuro }}>{rotulo}</Text>
+        <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: fonte.texto, color: escuro ? "#FFFFFF" : cor.texto }}>{texto}</Text>
         {acao}
       </View>
     </Animated.View>
@@ -140,12 +141,12 @@ export function Erro({ texto }: { texto?: string | null }) {
 const s = StyleSheet.create({
   ecra: { flex: 1, backgroundColor: cor.fundo },
   conteudo: { padding: espaco.xl, gap: espaco.l, paddingBottom: 40 },
-  titulo: { fontSize: letra.titulo, fontWeight: "600", color: cor.texto, letterSpacing: -0.2 },
-  sub: { fontSize: 13, color: cor.textoSec },
+  titulo: { fontSize: letra.titulo, fontFamily: fonte.titulo, color: cor.texto, letterSpacing: -0.4 },
+  sub: { fontSize: 13, fontFamily: fonte.texto, color: cor.textoSec },
   botao: { minHeight: 48, borderRadius: raio.m, borderWidth: 1, paddingHorizontal: espaco.l, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   cartao: { backgroundColor: cor.cartao, borderColor: cor.borda, borderWidth: 1, borderRadius: raio.l, padding: espaco.l, gap: espaco.m },
   chip: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: raio.pill, alignSelf: "flex-start" },
-  campo: { minHeight: 48, borderRadius: raio.m, borderWidth: 1, borderColor: cor.bordaForte, backgroundColor: cor.cartao, paddingHorizontal: 14, fontSize: 15, color: cor.texto },
+  campo: { minHeight: 48, borderRadius: raio.m, borderWidth: 1, borderColor: cor.bordaForte, backgroundColor: cor.cartao, paddingHorizontal: 14, fontSize: 15, fontFamily: fonte.texto, color: cor.texto },
   linha: { flexDirection: "row", alignItems: "center", gap: espaco.m, paddingVertical: espaco.m, borderTopWidth: 1, borderTopColor: cor.linha },
   luis: { flexDirection: "row", gap: espaco.m, alignItems: "flex-start", backgroundColor: cor.cartao, borderColor: cor.borda, borderWidth: 1, borderRadius: raio.l, padding: espaco.m },
 });

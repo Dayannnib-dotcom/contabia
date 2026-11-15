@@ -2,7 +2,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { ProvedorSessao, cor, useSessao } from "@contabia/ui";
+import { ProvedorSessao, cor, useFontesContabia, useSessao } from "@contabia/ui";
 
 // Endereço da API: 1) EXPO_PUBLIC_API_URL (definido no eas.json para cada compilação);
 // 2) na web, o próprio servidor que serve a app; 3) no telemóvel, «localhost» só em
@@ -14,9 +14,10 @@ const URL_API =
 
 function Navegacao() {
   const { sessao, pronto } = useSessao();
+  const fontes = useFontesContabia();
   // Esperar pela sessão guardada: senão, ao recarregar a página, os ecrãs protegidos
   // pareciam não existir e a app voltava sempre ao início.
-  if (!pronto) return null;
+  if (!pronto || !fontes) return null;
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: cor.fundo } }}>
       <Stack.Screen name="index" />

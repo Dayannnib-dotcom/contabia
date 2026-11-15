@@ -57,7 +57,7 @@ export default function Assistente() {
           </View>
         </ScrollView>
         <View style={{ flexDirection: "row", gap: 8, padding: 12, backgroundColor: "#FFF", borderTopWidth: 1, borderTopColor: cor.borda }}>
-          <TextInput value={texto} onChangeText={setTexto} onSubmitEditing={() => enviar()} placeholder="Escreva a sua pergunta…" placeholderTextColor="#8A9893" accessibilityLabel="Pergunta"
+          <TextInput value={texto} onChangeText={setTexto} onSubmitEditing={() => enviar()} placeholder="Escreva a sua pergunta…" placeholderTextColor={cor.marcador} accessibilityLabel="Pergunta"
             style={{ flex: 1, minHeight: 46, borderRadius: 23, borderWidth: 1, borderColor: cor.borda, paddingHorizontal: 16, backgroundColor: cor.fundo, color: cor.texto }} />
           <Pressable accessibilityRole="button" accessibilityLabel="Enviar pergunta" onPress={() => enviar()} style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: cor.verde, alignItems: "center", justifyContent: "center" }}>
             <Icone nome="enviar" cor="#FFF" />
