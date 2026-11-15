@@ -23,8 +23,8 @@ export default function Assistente() {
     try {
       const r = await api.perguntar(sessao!.id, pergunta);
       setMsgs((m) => [...m, { de: "luis", texto: r.resposta, fontes: r.fontes, encaminhada: r.encaminharParaContabilista }]);
-    } catch (e) {
-      setMsgs((m) => [...m, { de: "luis", texto: `Não consegui responder agora (${(e as Error).message}). Tente de novo.` }]);
+    } catch {
+      setMsgs((m) => [...m, { de: "luis", texto: "Não consegui responder agora. Tente de novo daqui a pouco; se for urgente, fale com o seu contabilista." }]);
     } finally {
       setAPensar(false);
       setTimeout(() => rolo.current?.scrollToEnd({ animated: true }), 50);

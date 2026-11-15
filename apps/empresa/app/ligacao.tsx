@@ -113,7 +113,7 @@ export default function LigacaoEcra() {
       {gestor && !ativas.length ? (
         <Cartao>
           <Texto forte tamanho={15}>Opção 1 · Convidar o meu contabilista</Texto>
-          <Texto sec tamanho={12}>Escreva o email com que o contabilista entra na Contabia, ou o número dele na Ordem (OCC).</Texto>
+          <Texto sec tamanho={12}>Escreva o e-mail com que o contabilista entra na Contabia, ou o número dele na Ordem (OCC).</Texto>
           <Campo rotulo="Email ou n.º OCC do contabilista" value={contabilista} onChangeText={setContabilista} autoCapitalize="none" autoCorrect={false} placeholder="ex.: ana@gabinete.pt ou 12345" />
           <Botao titulo="Enviar convite" onPress={convidar} carregando={aConvidar} desativado={!valorOk} />
         </Cartao>

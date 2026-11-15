@@ -20,7 +20,7 @@ export function EcraEntrada({ papel, saudacao, onEntrar, onCriarConta, rotulo = 
   });
   const confianca = [
     "Dados encriptados e alojados na UE",
-    "Faturação certificada pela AT · n.º [CERTIFICADO]",
+    "Respostas do Luís sempre com a fonte legal",
     "Cada empresa acompanhada por um Contabilista Certificado",
   ];
   return (

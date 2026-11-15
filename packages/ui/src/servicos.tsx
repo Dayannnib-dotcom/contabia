@@ -377,7 +377,7 @@ function Valores({ empresaId, dados, aoMudar }: { empresaId: string; dados: Espa
       <Cartao>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
           <View style={{ flex: 1, gap: 2 }}>
-            <Texto forte>Valor <Texto sec tamanho={12}>(opcional · só você vê)</Texto></Texto>
+            <Texto forte>Valor <Texto sec tamanho={12}>(opcional · visível só para si)</Texto></Texto>
             {v.valor == null ? <Texto sec tamanho={13}>Sem valor definido. Pode indicar a avença ou o valor por hora quando quiser.</Texto> : (
               <>
                 <Texto tamanho={13}>{[h?.avencaMensal != null ? `Avença ${euros(h.avencaMensal)}/mês` : null, h?.tarifaHora != null ? `${euros(h.tarifaHora)}/hora faturável` : null].filter(Boolean).join(" + ")}</Texto>

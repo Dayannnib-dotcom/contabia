@@ -60,7 +60,7 @@ export default function Carteira() {
         ))}
       </View>
       <Texto forte tamanho={16}>Carteira</Texto>
-      {dados?.length === 0 ? <Vazio texto="Sem empresas ligadas." /> : null}
+      {dados?.length === 0 ? <Vazio texto="Ainda não há empresas ligadas. Convide a primeira em «Ligar empresa»." /> : null}
       {dados?.map((r) => (
         <Cartao key={r.empresa.id} onPress={() => router.push({ pathname: "/empresa/[id]", params: { id: r.empresa.id } })}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>

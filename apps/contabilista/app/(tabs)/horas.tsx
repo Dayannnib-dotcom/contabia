@@ -56,7 +56,7 @@ export default function Horas() {
             <Botao titulo="Exportar (Excel)" variante="secundario" estilo={{ minHeight: 38 }}
               onPress={async () => { try { const x = await api.exportarHorasCarteira(m!); await entregarFicheiro(x.nome, x.csv, "text/csv"); } catch (e) { setMsg((e as Error).message); } }} />
           </View>
-          {dados.empresas.length === 0 ? <Vazio texto="Sem empresas ligadas." /> : null}
+          {dados.empresas.length === 0 ? <Vazio texto="Ainda não há empresas ligadas. Convide a primeira em «Ligar empresa»." /> : null}
           {dados.empresas.map((l) => {
             const r = l.resumo.reunioes;
             const emFalta = atual ? r.previstasAteHoje - r.feitas : r.previstas - r.feitas;
