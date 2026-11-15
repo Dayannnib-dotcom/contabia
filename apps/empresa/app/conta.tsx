@@ -111,7 +111,7 @@ export default function Conta() {
         <Botao titulo="Sair deste dispositivo" variante="secundario" onPress={() => setPasso(1)} />
       ) : (
         <Cartao>
-          <MensagemLuis texto="Tem a certeza? Para voltar a entrar vai precisar do utilizador e da senha da empresa. Os seus dados ficam todos na nuvem." />
+          <MensagemLuis expressao="alerta" texto="Tem a certeza? Para voltar a entrar vai precisar do utilizador e da senha da empresa. Os seus dados ficam todos na nuvem." />
           <View style={{ flexDirection: "row", gap: 10 }}>
             <Botao titulo="Ficar" onPress={() => setPasso(0)} estilo={{ flex: 1 }} />
             <Botao titulo="Sim, sair" variante="perigo" onPress={terminar} estilo={{ flex: 1 }} />

@@ -223,6 +223,7 @@ ${botao ? `<p style="margin:20px 0 6px"><a href="${esc(botao.url)}" style="backg
       "<b>1. Fotografe uma fatura</b> — o código QR é lido e o Luís arquiva-a por si.",
       "<b>2. Ligue o seu contabilista</b> — em Ligação, convide-o pelo e-mail ou n.º OCC. Ele passa a ver tudo em tempo real.",
       "<b>3. Ative os avisos</b> — a app lembra-o dos prazos do IVA, da Segurança Social e do IRC.",
+      "O Luís é o assistente virtual da Contabia, com inteligência artificial: responde a dúvidas simples, sempre com a fonte, e passa ao seu contabilista o que for para ele.",
       `O seu utilizador é <b>${esc(e.utilizador)}</b>. Guarde este e-mail.`,
     ], { texto: "Abrir a Contabia", url: `${url}/empresa/` });
     return enviarUmaVez(`boasvindas:empresa:${empresaId}`, e.email, "Bem-vinda à Contabia — 3 passos para começar", m);

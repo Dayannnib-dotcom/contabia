@@ -5,7 +5,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { cor, espaco, letra, raio } from "./tema";
-import { Luis } from "./marca";
+import { Luis, type ExpressaoLuis } from "./marca";
 
 /** `aoInteragir`: chamado a cada toque ou deslocação (serve para medir o tempo ativo). */
 export function Ecra({ children, rolar = true, estilo, aoInteragir }: { children: ReactNode; rolar?: boolean; estilo?: StyleProp<ViewStyle>; aoInteragir?: () => void }) {
@@ -107,7 +107,7 @@ export function Linha({ esquerda, direita, sub, onPress, direitaInterativa }: { 
 }
 
 /** Mensagem do Luís, que entra a subir suavemente. */
-export function MensagemLuis({ texto, escuro, acao, rotulo = "Luís · assistente virtual" }: { texto: string; escuro?: boolean; acao?: ReactNode; rotulo?: string }) {
+export function MensagemLuis({ texto, escuro, acao, rotulo = "Luís · assistente virtual", expressao = "sorriso" }: { texto: string; escuro?: boolean; acao?: ReactNode; rotulo?: string; expressao?: ExpressaoLuis }) {
   const y = useRef(new Animated.Value(16)).current;
   const o = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -118,7 +118,7 @@ export function MensagemLuis({ texto, escuro, acao, rotulo = "Luís · assistent
   }, [texto, o, y]);
   return (
     <Animated.View style={[s.luis, escuro && { backgroundColor: cor.tinta, borderColor: cor.tinta }, { opacity: o, transform: [{ translateY: y }] }]}>
-      <Luis tamanho={44} id="msg" />
+      <Luis tamanho={44} id="msg" expressao={expressao} />
       <View style={{ flex: 1, gap: 4 }}>
         <Text style={{ fontSize: 13, fontWeight: "600", color: escuro ? "#9FE3CF" : cor.verdeEscuro }}>{rotulo}</Text>
         <Text style={{ fontSize: 14, lineHeight: 20, color: escuro ? "#FFFFFF" : cor.texto }}>{texto}</Text>

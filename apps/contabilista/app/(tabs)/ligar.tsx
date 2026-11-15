@@ -77,7 +77,7 @@ export default function Ligar() {
         ajuda={ajuda.estado === "valido" ? "✓ NIF válido" : ajuda.mensagem} erro={ajuda.estado === "invalido"} />
       <Erro texto={erro} />
       <Botao titulo="Enviar pedido de ligação" onPress={enviar} carregando={aEnviar} desativado={!utilizador.trim() || ajuda.estado !== "valido"} />
-      {ultimoEvento?.tipo === "ligacao.aceite" ? <MensagemLuis texto="Uma empresa acabou de aceitar a ligação. Já está na sua carteira." acao={<Botao titulo="Ver carteira" variante="menta" onPress={() => router.push("/(tabs)")} estilo={{ alignSelf: "flex-start", minHeight: 40 }} />} /> : null}
+      {ultimoEvento?.tipo === "ligacao.aceite" ? <MensagemLuis expressao="celebrar" texto="Uma empresa acabou de aceitar a ligação. Já está na sua carteira." acao={<Botao titulo="Ver carteira" variante="menta" onPress={() => router.push("/(tabs)")} estilo={{ alignSelf: "flex-start", minHeight: 40 }} />} /> : null}
 
       {resto.length ? <Texto forte tamanho={16}>Pedidos e ligações</Texto> : null}
       {resto.map((l) => (

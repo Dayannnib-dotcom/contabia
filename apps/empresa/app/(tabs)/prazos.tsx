@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 import { dataPT, diasAte, nomePeriodo } from "@contabia/shared";
-import { AtivarAvisos, Cartao, Chip, Ecra, Erro, Linha, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
+import { AtivarAvisos, Cartao, Chip, Ecra, Erro, Linha, MensagemLuis, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
 
 const MES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
@@ -8,11 +8,19 @@ export default function Prazos() {
   const { api, sessao } = useSessao();
   const { dados, erro } = useDados(() => api.prazos(sessao!.id), [sessao!.id]);
   const hoje = new Date().toISOString().slice(0, 10);
+  const pendentes = (dados ?? []).filter((p) => !p.submetida && p.codigo !== "efatura" && diasAte(hoje, p.prazo) >= 0).sort((a, b) => a.prazo.localeCompare(b.prazo));
+  const proximo = pendentes[0];
+  const dProx = proximo ? diasAte(hoje, proximo.prazo) : null;
   return (
     <Ecra>
       <Titulo sub="Calculado para o seu regime e região; atualizado automaticamente quando a lei muda.">Prazos fiscais</Titulo>
       <AtivarAvisos avisos={dados ? dados.filter((p) => !p.submetida).map((p) => ({ chave: `${p.codigo}:${p.periodo}`, prazo: p.prazo, titulo: p.descricao, corpo: `Luís: termina a ${p.prazo.split("-").reverse().join("/")} (${nomePeriodo(p.periodo)}). Envie já os documentos que faltam.` })) : null} />
       <Erro texto={erro} />
+      {dados ? (proximo && dProx !== null ? (
+        dProx <= 7
+          ? <MensagemLuis expressao="alerta" texto={`${dProx === 0 ? "É hoje" : `Faltam ${dProx} ${dProx === 1 ? "dia" : "dias"}`}: ${proximo.descricao} (${nomePeriodo(proximo.periodo)}). Confirme que o seu contabilista já tem todos os documentos.`} />
+          : <MensagemLuis expressao="atento" texto={`O próximo prazo é ${proximo.descricao}, até ${dataPT(proximo.prazo)}. Eu aviso-o 7 e 2 dias antes.`} />
+      ) : <MensagemLuis expressao="celebrar" texto="Está tudo em dia: não há prazos por cumprir." />) : null}
       <Cartao estilo={{ paddingVertical: 4 }}>
         {(dados ?? []).map((p, i) => {
           const d = diasAte(hoje, p.prazo);

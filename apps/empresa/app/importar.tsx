@@ -97,7 +97,7 @@ export default function Importar() {
 
       {resultado ? (
         <>
-          <MensagemLuis texto={`Pronto! Importei ${resultado.importados} ${resultado.importados === 1 ? "fatura" : "faturas"}${resultado.repetidos ? `; ${resultado.repetidos} já estavam registadas` : ""}${resultado.erros ? `; ${resultado.erros} precisam da sua atenção` : ""}. Agora valide-as em Documentos e junte o original quando o tiver.`} />
+          <MensagemLuis expressao="celebrar" texto={`Pronto! Importei ${resultado.importados} ${resultado.importados === 1 ? "fatura" : "faturas"}${resultado.repetidos ? `; ${resultado.repetidos} já estavam registadas` : ""}${resultado.erros ? `; ${resultado.erros} precisam da sua atenção` : ""}. Agora valide-as em Documentos e junte o original quando o tiver.`} />
           {resultado.resultados.filter((r) => r.estado === "erro").map((r, i) => (
             <Cartao key={i}><View style={{ flexDirection: "row", justifyContent: "space-between" }}><Texto forte>{r.numero}</Texto><Chip texto="Não importada" tipo="erro" /></View><Texto sec tamanho={12}>{r.mensagem}</Texto></Cartao>
           ))}

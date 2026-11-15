@@ -138,7 +138,7 @@ function Revisao({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
   }
 
   if (!dados) return <Texto sec>A carregar…</Texto>;
-  if (!dados.length) return <View style={{ gap: 12 }}><Anulacoes id={id} aoMudar={recarregar} /><MensagemLuis texto="Todos os lançamentos desta empresa estão revistos." acao={<Botao titulo="Seguir para o IVA" variante="menta" onPress={() => irPara("iva")} estilo={{ alignSelf: "flex-start", minHeight: 40 }} />} /></View>;
+  if (!dados.length) return <View style={{ gap: 12 }}><Anulacoes id={id} aoMudar={recarregar} /><MensagemLuis expressao="celebrar" texto="Todos os lançamentos desta empresa estão revistos." acao={<Botao titulo="Seguir para o IVA" variante="menta" onPress={() => irPara("iva")} estilo={{ alignSelf: "flex-start", minHeight: 40 }} />} /></View>;
   return (
     <View style={{ gap: 12 }}>
       <Anulacoes id={id} aoMudar={recarregar} />
@@ -190,7 +190,7 @@ function Iva({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
   const [aEnviar, setAEnviar] = useState(false);
 
   if (!dp || !ap) return <Texto sec>A carregar…</Texto>;
-  if (dp.submetida) return <MensagemLuis texto={`A declaração de ${nomePeriodo(dp.periodo)} já está submetida e registada.`} acao={<Botao titulo="Ir para o fecho" variante="menta" onPress={() => irPara("fecho")} estilo={{ alignSelf: "flex-start", minHeight: 40 }} />} />;
+  if (dp.submetida) return <MensagemLuis expressao="celebrar" texto={`A declaração de ${nomePeriodo(dp.periodo)} já está submetida e registada.`} acao={<Botao titulo="Ir para o fecho" variante="menta" onPress={() => irPara("fecho")} estilo={{ alignSelf: "flex-start", minHeight: 40 }} />} />;
   return (
     <View style={{ gap: 12 }}>
       <Cartao>
@@ -308,7 +308,7 @@ function Fecho({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
       ))}
       <Erro texto={erro} />
       {dados.fechado ? (
-        <MensagemLuis texto={`${nomePeriodo(periodo)} está fechado. Os lançamentos ficam bloqueados e a empresa foi avisada.`} />
+        <MensagemLuis expressao="celebrar" texto={`${nomePeriodo(periodo)} está fechado. Os lançamentos ficam bloqueados e a empresa foi avisada.`} />
       ) : (
         <Botao titulo={`Fechar ${nomePeriodo(periodo)}`} desativado={!dados.podeFechar}
           onPress={async () => { try { await api.fecharPeriodo(id, periodo); recarregar(); } catch (e) { setErro((e as Error).message); } }} />
