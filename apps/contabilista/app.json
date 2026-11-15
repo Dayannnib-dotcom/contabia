@@ -7,9 +7,35 @@
     "orientation": "default",
     "userInterfaceStyle": "light",
     "backgroundColor": "#12232E",
-    "ios": { "bundleIdentifier": "pt.contabia.contabilista", "supportsTablet": true },
-    "android": { "package": "pt.contabia.contabilista" },
-    "plugins": ["expo-router", "expo-secure-store", "expo-local-authentication", ["expo-notifications", { "color": "#0B6E5B" }]],
-    "experiments": { "baseUrl": "/contabilista" }
+    "ios": {
+      "bundleIdentifier": "pt.contabia.contabilista",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "pt.contabia.contabilista",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/adaptive-icon-monochrome.png",
+        "backgroundColor": "#12232E"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-local-authentication",
+      [
+        "expo-notifications",
+        {
+          "color": "#0B6E5B"
+        }
+      ]
+    ],
+    "experiments": {
+      "baseUrl": "/contabilista"
+    },
+    "icon": "./assets/icon.png",
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
   }
 }

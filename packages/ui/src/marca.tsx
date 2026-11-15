@@ -8,7 +8,7 @@ export function Logo({ tamanho = 40, fundo = cor.tinta }: { tamanho?: number; fu
     <Svg width={tamanho} height={tamanho} viewBox="0 0 64 64" accessibilityLabel="Contabia">
       <Circle cx={32} cy={32} r={32} fill={fundo} />
       <Path d="M43 19a16 16 0 1 0 0 26" fill="none" stroke="#FFFFFF" strokeWidth={5.5} strokeLinecap="round" />
-      <Path d="M27 37q5-5 10 0t10 0t10 0" fill="none" stroke={cor.menta} strokeWidth={4.5} strokeLinecap="round" />
+      <Path d="M27 32q5-5 10 0t10 0t10 0" fill="none" stroke={cor.menta} strokeWidth={4.5} strokeLinecap="round" />
     </Svg>
   );
 }
