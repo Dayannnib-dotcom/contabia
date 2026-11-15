@@ -94,7 +94,7 @@ export default function Ligar() {
           {l.estado === "ativa" || l.estado === "pendente" ? <Botao titulo={l.estado === "ativa" ? "Terminar ligação" : "Cancelar pedido"} variante={l.estado === "ativa" ? "perigo" : "secundario"} onPress={() => acao(l, "revogar")} carregando={aTratar === l.id + "revogar"} /> : null}
         </Cartao>
       ))}
-      <Texto sec tamanho={12} cor={cor.textoSec}>A empresa também pode convidá-lo a partir da app dela, com o seu email ou n.º OCC; o convite aparece aqui no topo. Por segurança: máximo de 5 pedidos por hora; os pedidos expiram em 72 horas.</Texto>
+      <Texto sec tamanho={12} cor={cor.textoSec}>A empresa também pode convidá-lo a partir da app dela, com o seu e-mail ou n.º OCC; o convite aparece aqui no topo. Por segurança: máximo de 5 pedidos por hora; os pedidos expiram em 72 horas.</Texto>
     </Ecra>
   );
 }

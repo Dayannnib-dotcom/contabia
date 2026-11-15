@@ -252,7 +252,7 @@ function Pedidos({ id }: { id: string }) {
         <Texto sec tamanho={12}>O Luís entrega o pedido na app da empresa e lembra-a até estar resolvido.</Texto>
       </Cartao>
       <Cartao estilo={{ paddingVertical: 4 }}>
-        {dados?.length === 0 ? <Vazio texto="Sem pedidos." /> : null}
+        {dados?.length === 0 ? <Vazio texto="Sem pedidos em aberto." /> : null}
         {dados?.map((p) => (
           <Linha key={p.id} esquerda={p.tipo} sub={p.detalhe || undefined}
             direita={p.estado === "pendente" ? <Botao titulo="Recebido" variante="secundario" onPress={async () => { await api.marcarRecebido(id, p.id); recarregar(); }} estilo={{ minHeight: 38 }} /> : <Chip texto="Recebido" tipo="bom" />} />
