@@ -17,7 +17,7 @@ export default function Atualizacoes() {
         <Texto forte cor={cor.verdeEscuro}>Atualização automática ativa</Texto>
         <Texto cor="#1D4B40">As novas regras entram em vigor sozinhas na data legal. O seu contabilista é informado.</Texto>
       </Cartao>
-      {ultimoEvento?.tipo === "regras.atualizadas" ? <MensagemLuis texto="Acabou de chegar uma atualização fiscal. Já está aplicada." /> : null}
+      {ultimoEvento?.tipo === "regras.atualizadas" ? <MensagemLuis expressao="atento" texto="Acabou de chegar uma atualização fiscal. Veja o resumo abaixo e fale com o seu contabilista se tiver dúvidas." /> : null}
       <Cartao estilo={{ paddingVertical: 4 }}>
         <Texto forte estilo={{ paddingTop: 12 }}>Em vigor para a sua empresa</Texto>
         <Linha esquerda="Taxas de IVA" sub={`Reduzida ${t.reduzida}% · intermédia ${t.intermedia}% · normal ${t.normal}%`} direita={<Chip texto={dados.empresa.regiao === "PT" ? "Continente" : dados.empresa.regiao === "PT-MA" ? "Madeira" : "Açores"} tipo="bom" />} />

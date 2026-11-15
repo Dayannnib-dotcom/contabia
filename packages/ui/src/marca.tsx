@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
-import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from "react-native-svg";
+import { AccessibilityInfo } from "react-native";
+import Svg, { Circle, ClipPath, Defs, G, Path, Rect, SvgXml } from "react-native-svg";
+import { POSES_LUIS, type PoseLuis } from "./luis-corpo";
 import { cor } from "./tema";
 
 /** Logótipo Contabia — opção C «Atlântico». */
@@ -15,18 +17,44 @@ export function Logo({ tamanho = 40, fundo = cor.tinta }: { tamanho?: number; fu
 
 const K = { stroke: "#12232E", strokeWidth: 3, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
-/** Luís — assistente virtual. Pisca os olhos a cada 5 segundos. */
-export function Luis({ tamanho = 48, id = "luis" }: { tamanho?: number; id?: string }) {
-  const [olhos, setOlhos] = useState(true);
+export type ExpressaoLuis = "sorriso" | "atento" | "a-pensar" | "alerta" | "celebrar";
+
+/** Expressões aprovadas na Guia 2: só mudam sobrancelhas, olhos e boca. */
+const ROSTO: Record<ExpressaoLuis, { sobrancelhas: string; olhar?: [number, number]; olhosFechados?: boolean; boca: string; bocaAberta: boolean; cantos?: string }> = {
+  sorriso: { sobrancelhas: "M93 89 C99 85 107 85 112 88 M128 88 C133 85 141 85 147 89", boca: "M104 138 C112 148 128 148 136 138", bocaAberta: true, cantos: "M100 134 L104 138 M140 134 L136 138" },
+  atento: { sobrancelhas: "M93 86 C99 82 107 82 112 85 M128 85 C133 82 141 82 147 86", boca: "M107 139 C114 145 126 145 133 139", bocaAberta: false },
+  "a-pensar": { sobrancelhas: "M93 85 C99 80 107 80 112 84 M128 89 C133 87 141 87 147 89", olhar: [3, -3], boca: "M110 141 C117 143 125 141 131 136", bocaAberta: false },
+  alerta: { sobrancelhas: "M93 90 C99 87 106 85 112 84 M128 84 C134 85 141 87 147 90", boca: "M109 140 C115 141 125 141 131 140", bocaAberta: false },
+  celebrar: { sobrancelhas: "M93 86 C99 82 107 82 112 85 M128 85 C133 82 141 82 147 86", olhosFechados: true, boca: "M100 135 C110 153 130 153 140 135 Z", bocaAberta: true, cantos: "M96 131 L100 135 M144 131 L140 135" },
+};
+
+/** Respeita a opção «reduzir movimento» do sistema. */
+function useReduzirMovimento() {
+  const [reduzir, setReduzir] = useState(false);
   useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled?.().then(setReduzir).catch(() => undefined);
+    const sub = AccessibilityInfo.addEventListener?.("reduceMotionChanged", setReduzir);
+    return () => sub?.remove?.();
+  }, []);
+  return reduzir;
+}
+
+/** Luís — assistente virtual. Pisca os olhos a cada 5 segundos (parado com «reduzir movimento»). */
+export function Luis({ tamanho = 48, id = "luis", expressao = "sorriso" }: { tamanho?: number; id?: string; expressao?: ExpressaoLuis }) {
+  const [olhos, setOlhos] = useState(true);
+  const reduzir = useReduzirMovimento();
+  useEffect(() => {
+    if (reduzir) return;
     const t = setInterval(() => {
       setOlhos(false);
-      setTimeout(() => setOlhos(true), 160);
+      setTimeout(() => setOlhos(true), 150);
     }, 5000);
     return () => clearInterval(t);
-  }, []);
+  }, [reduzir]);
+  const r = ROSTO[expressao];
+  const [dx, dy] = r.olhar ?? [0, 0];
   return (
-    <Svg width={tamanho} height={tamanho} viewBox="0 0 240 240" accessibilityLabel="Luís, assistente virtual">
+    <Svg width={tamanho} height={tamanho} viewBox="0 0 240 240" accessibilityLabel="Luís, assistente virtual da Contabia">
       <Defs>
         <ClipPath id={`c-${id}`}>
           <Circle cx={120} cy={120} r={120} />
@@ -48,25 +76,33 @@ export function Luis({ tamanho = 48, id = "luis" }: { tamanho?: number; id?: str
         <Path d="M82 94 C82 68 98 54 120 54 C142 54 158 68 158 94 L158 114 C158 140 141 160 120 162 C99 160 82 140 82 114 Z" fill="#F0C9A6" {...K} />
         <Path d="M80 104 C76 82 82 60 98 50 C112 41 132 40 146 46 C160 52 166 66 164 82 C163 92 160 98 158 104 C156 92 152 84 145 80 C134 74 122 78 112 76 C106 75 102 72 100 68 C96 76 90 82 86 88 C83 93 81 98 80 104 Z" fill="#8E949A" {...K} />
         <Path d="M104 60 C118 50 138 50 154 58 M110 68 C124 62 140 62 156 70 M90 80 C88 70 92 62 98 56" fill="none" stroke="#FFFFFF" strokeWidth={2.4} strokeLinecap="round" />
-        <Path d="M93 89 C99 85 107 85 112 88 M128 88 C133 85 141 85 147 89" fill="none" stroke="#12232E" strokeWidth={3.6} strokeLinecap="round" />
-        {olhos ? (
+        <Path d={r.sobrancelhas} fill="none" stroke="#12232E" strokeWidth={3.6} strokeLinecap="round" />
+        {r.olhosFechados ? (
+          <Path d="M99 108 C102 103 108 103 111 108 M129 108 C132 103 138 103 141 108" fill="none" {...K} />
+        ) : olhos ? (
           <G>
-            <Circle cx={105} cy={106} r={3} fill="#12232E" />
-            <Circle cx={135} cy={106} r={3} fill="#12232E" />
+            <Circle cx={105 + dx} cy={106 + dy} r={3} fill="#12232E" />
+            <Circle cx={135 + dx} cy={106 + dy} r={3} fill="#12232E" />
           </G>
         ) : (
-          <Path d="M101 106 L109 106 M131 106 L139 106" stroke="#12232E" strokeWidth={2} strokeLinecap="round" />
+          <Path d="M99 106 C103 109 107 109 111 106 M129 106 C133 109 137 109 141 106" fill="none" {...K} />
         )}
         <Circle cx={105} cy={106} r={13} fill="#FFFFFF" fillOpacity={0.35} {...K} />
         <Circle cx={135} cy={106} r={13} fill="#FFFFFF" fillOpacity={0.35} {...K} />
         <Path d="M118 104 C119 101.5 121 101.5 122 104 M92 103 L80 100 M148 103 L160 100" fill="none" {...K} />
         <Path d="M99 100 L103 98 M129 100 L133 98" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" />
         <Path d="M120 114 C122 119 124 123 123 127 C121 129 118 129 116 128" fill="none" stroke="#12232E" strokeWidth={2.4} strokeLinecap="round" />
-        <Path d="M104 138 C112 148 128 148 136 138" fill="#FFFFFF" {...K} />
-        <Path d="M100 134 L104 138 M140 134 L136 138" fill="none" stroke="#12232E" strokeWidth={2.2} strokeLinecap="round" />
+        <Path d={r.boca} fill={r.bocaAberta ? "#FFFFFF" : "none"} {...K} />
+        {r.cantos ? <Path d={r.cantos} fill="none" stroke="#12232E" strokeWidth={2.2} strokeLinecap="round" /> : null}
         <Circle cx={94} cy={127} r={5} fill="#F2A08A" opacity={0.55} />
         <Circle cx={146} cy={127} r={5} fill="#F2A08A" opacity={0.55} />
       </G>
     </Svg>
   );
+}
+
+/** Luís de corpo inteiro (Guia 2): para ecrãs de boas-vindas e vazios, nunca nas conversas. Altura mínima 120. */
+export function LuisCorpo({ pose = "cumprimentar", altura = 220 }: { pose?: PoseLuis; altura?: number }) {
+  const h = Math.max(120, altura);
+  return <SvgXml xml={POSES_LUIS[pose]} width={(h * 320) / 600} height={h} accessibilityLabel="Luís, assistente virtual da Contabia" />;
 }
