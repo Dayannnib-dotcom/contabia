@@ -20,7 +20,7 @@ Esta pasta guarda tudo o que é preciso para voltar a gerar o **Kit de marca** (
 | 4 | Direção de arte | `b2a6db2e-460b-4d6b-9f82-adfd4fc7b1b9` | `7f0fa5f3-9e32` |
 | 5 | Produto digital | `5e26f45a-8bb9-46fe-abb6-85e6abc696da` | `92d04dfb-957a` |
 | 6 | Aplicações | `24d3747d-33ed-4e81-b956-60bc10cfe5dc` | `de412d85-afc9` |
-| 7 | Governança | (por criar) | — |
+| 7 | Governança | `8da8e2d1-3d21-43f3-bfc9-cbddefef44e1` | `a6925ddd-68c2` |
 
 Os PDF ficam em `kit/pdf/guia1.pdf` … `guia7.pdf` e **não entram no Git** (o repositório é público e a Guia 1 tem estratégia comercial).
 
@@ -38,4 +38,5 @@ Ao acrescentar a Guia 7: exportar o PDF para `kit/pdf/guia7.pdf`, atualizar a ta
 
 | Versão | Data | Conteúdo |
 | --- | --- | --- |
+| 1.1 | 16/11/2026 | Sete guias aprovadas (Guia 7 acrescentada; voz falada do Luís na Guia 3) |
 | 1.0 | 16/11/2026 | Guias 1 a 5 aprovadas, Guia 6 em revisão, 203 ficheiros em 9 pastas |
