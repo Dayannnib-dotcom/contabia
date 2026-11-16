@@ -3,12 +3,13 @@ import { Platform, Pressable, View } from "react-native";
 import Svg, { Line, Path, Text as SvgText } from "react-native-svg";
 import { euros, type Documento } from "@contabia/shared";
 import { Texto } from "./componentes";
+import { fonte } from "./fontes";
 import { cor } from "./tema";
 
 /** Paleta validada (CVD, contraste, croma): vendas = verde-azulado, compras = âmbar. */
 export const COR_VENDAS = "#12917A";
 export const COR_COMPRAS = "#C97A1E";
-const FONTE = Platform.OS === "web" ? "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" : undefined;
+const FONTE = fonte.texto;
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
 export function resumoMensal(docs: Documento[], hoje = new Date(), meses = 6) {

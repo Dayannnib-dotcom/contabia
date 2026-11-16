@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { cor } from "./tema";
+import { fonte } from "./fontes";
 import { Logo, Luis } from "./marca";
 import { Botao } from "./componentes";
 
@@ -58,7 +59,7 @@ export function EcraEntrada({ papel, saudacao, onEntrar, onCriarConta, rotulo = 
 const s = StyleSheet.create({
   fundo: { flex: 1, backgroundColor: cor.tinta, padding: 28, gap: 28 },
   topo: { alignItems: "center", gap: 12, marginTop: 48 },
-  nome: { fontSize: 38, fontWeight: "700", color: "#FFFFFF", letterSpacing: -0.8 },
+  nome: { fontSize: 38, fontFamily: fonte.titulo, color: "#FFFFFF", letterSpacing: -0.8 },
   lema: { fontSize: 16, color: "#C9D6DC", textAlign: "center" },
   confianca: { flexDirection: "row", alignItems: "center", gap: 12 },
   ponto: { width: 10, height: 10, borderRadius: 5, backgroundColor: cor.menta },

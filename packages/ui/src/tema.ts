@@ -12,7 +12,12 @@ export const cor = {
   fundo: "#F6F7F5",
   cartao: "#FFFFFF",
   borda: "#DDE2DF",
-  bordaForte: "#C9D0CC",
+  /** Contorno de campos e botões secundários: 3,35:1 sobre o fundo (WCAG 1.4.11). */
+  bordaForte: "#7C8A85",
+  /** Estado desativado (fundo de botões): sem exigência de contraste. */
+  desativado: "#C9D0CC",
+  /** Texto de exemplo nos campos: 4,6:1 sobre branco. */
+  marcador: "#6B7A75",
   texto: "#12232E",
   textoSec: "#4B5A63",
   linha: "#EEF1EF",
