@@ -1,5 +1,6 @@
 export * from "./tema";
 export * from "./fontes";
+export * from "./abertura";
 export * from "./marca";
 export * from "./componentes";
 export * from "./sessao";
