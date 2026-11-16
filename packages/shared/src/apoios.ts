@@ -159,24 +159,24 @@ const IDE = "https://ide.madeira.gov.pt";
 const COMPETE = "https://www.compete2030.gov.pt/avisos/";
 
 /**
- * Catálogo de partida, verificado em fontes oficiais e de consultoras a 13/11/2026.
+ * Catálogo de partida, verificado em fontes oficiais e de consultoras a 13/11/2026 (revisto a 16/11/2026).
  * O administrador publica versões novas em POST /v1/admin/apoios.
  */
 export const CATALOGO_BASE: Catalogo = {
-  versao: "2026-11-13",
-  verificadoEm: "2026-11-13",
+  versao: "2026-11-16",
+  verificadoEm: "2026-11-16",
   linhas: [
     {
       id: "m2030-2026-38", codigo: "M2030-2026-38", nome: "Funcionamento 2030 — Outros custos de funcionamento", programa: "Madeira 2030 (FEDER) · IDE-RAM",
       resumo: "Compensa custos de funcionamento acrescidos pela ultraperiferia: Segurança Social, rendas, eletricidade e água, serviços de contabilidade.",
       regioes: ["PT-MA"], dimensoes: TODAS, estado: "aberto", inicio: "2026-10-30T15:00", fim: "2026-12-04T17:00",
-      apoio: "Não reembolsável: 30% (+10% no Porto Santo)", ligacao: IDE, nota: "Exige contabilidade organizada. Candidatura no Balcão dos Fundos.", verificadoEm: "2026-11-13",
+      apoio: "Não reembolsável: 30% (+10% no Porto Santo)", ligacao: IDE, nota: "Exige contabilidade organizada. Candidatura no Balcão dos Fundos.", verificadoEm: "2026-11-16",
     },
     {
       id: "m2030-2026-35", codigo: "M2030-2026-35", nome: "Funcionamento 2030 — Transportes", programa: "Madeira 2030 (FEDER) · IDE-RAM",
       resumo: "Compensa o custo acrescido de transportar mercadorias de e para a Madeira.",
       regioes: ["PT-MA"], dimensoes: TODAS, estado: "aberto", fim: "2026-11-20T17:00",
-      apoio: "Não reembolsável", ligacao: IDE, nota: "Candidatura no Balcão dos Fundos.", verificadoEm: "2026-11-13",
+      apoio: "Não reembolsável", ligacao: IDE, nota: "Candidatura no Balcão dos Fundos.", verificadoEm: "2026-11-16",
     },
     {
       id: "mpr-2026-6", codigo: "MPR-2026-6", nome: "SICE — Inovação Produtiva", programa: "COMPETE 2030 e programas regionais",
@@ -200,7 +200,15 @@ export const CATALOGO_BASE: Catalogo = {
       resumo: "Grandes projetos de investimento para reduzir emissões e consumo de energia nos processos da empresa.",
       regioes: ["PT"], territorio: "as regiões Norte, Centro, Lisboa, Alentejo e Algarve", dimensoes: ["grande"], estado: "aberto", fim: "2026-12-30T18:00",
       ligacao: "https://www.compete2030.gov.pt/wp-content/uploads/2026/01/Aviso-MPR-2026-01-Apoios-a-Eficiencia-energetica-e-Descarbonizacao-Empresas-26_01_2026_Publicado.pdf",
-      nota: "Só a fase do Regime Contratual de Investimento (grandes empresas, despesa elegível mínima de 25 M€, ou 15 M€ com interesse estratégico) continua aberta. O regime geral já fechou.", verificadoEm: "2026-11-13",
+      nota: "Só a fase do Regime Contratual de Investimento (grandes empresas, despesa elegível mínima de 25 M€, ou 15 M€ com interesse estratégico) continua aberta. O regime geral já fechou.", verificadoEm: "2026-11-16",
+    },
+    {
+      id: "mpr-2026-11", codigo: "MPr-2026-11", nome: "SIID — I&D Empresarial (individual e em copromoção)", programa: "Centro 2030, Alentejo 2030, Algarve 2030 e Lisboa 2030",
+      resumo: "Projetos de investigação industrial e desenvolvimento experimental de empresas, sozinhas ou com entidades do sistema científico.",
+      regioes: ["PT"], territorio: "as regiões Centro, Alentejo, Algarve e Área Metropolitana de Lisboa", dimensoes: PME, estado: "aberto", inicio: "2026-10-30T18:00", fim: "2026-12-30T18:00",
+      apoio: "Subvenção: base até 50% (investigação industrial) e 25% (desenvolvimento experimental), com majorações até 80% (Lisboa até 40%)",
+      ligacao: "https://portugal2030.pt/wp-content/uploads/sites/3/2026/10/MPR-2026-11_SIID-ID_Final_30_10_2026.pdf",
+      nota: "Também para empresas de pequena-média capitalização (Small Mid Cap). Investimento elegível mínimo de 150 mil euros; projeto numa só região. Exige contabilidade organizada.", verificadoEm: "2026-11-16",
     },
     {
       id: "mpr-2026-9", codigo: "MPr-2026-9", nome: "STEP — I&D&I em tecnologias digitais e biotecnologia", programa: "COMPETE 2030 (STEP)",
@@ -212,7 +220,7 @@ export const CATALOGO_BASE: Catalogo = {
       id: "mpr-2026-10", codigo: "MPr-2026-10", nome: "STEP — Inovação produtiva em tecnologias digitais e biotecnologia", programa: "COMPETE 2030 (STEP)",
       resumo: "Investimento produtivo para fabricar ou desenvolver tecnologias digitais, deep tech ou biotecnologia.",
       regioes: ["PT"], territorio: "as regiões Norte, Centro, Alentejo e Algarve", dimensoes: TODAS, estado: "aberto", fim: "2027-01-04T17:00", ligacao: COMPETE,
-      nota: "No Algarve a candidatura é separada. Exige contabilidade organizada.", verificadoEm: "2026-11-13",
+      nota: "No Algarve a candidatura é separada. Exige contabilidade organizada.", verificadoEm: "2026-11-16",
     },
     {
       id: "compete2030-2026-11", codigo: "COMPETE2030-2026-11", nome: "STEP — I&D&I em tecnologias de energia limpa", programa: "COMPETE 2030 (STEP)",
@@ -222,7 +230,7 @@ export const CATALOGO_BASE: Catalogo = {
     {
       id: "compete2030-2026-12", codigo: "COMPETE2030-2026-12", nome: "STEP — Inovação produtiva em tecnologias de energia limpa", programa: "COMPETE 2030 (STEP)",
       resumo: "Investimento produtivo em tecnologias limpas e eficientes do ponto de vista energético.",
-      regioes: ["PT"], territorio: "as regiões Norte, Centro e Alentejo", dimensoes: TODAS, estado: "aberto", fim: "2027-01-04T17:00", ligacao: COMPETE, verificadoEm: "2026-11-13",
+      regioes: ["PT"], territorio: "as regiões Norte, Centro e Alentejo", dimensoes: TODAS, estado: "aberto", fim: "2027-01-04T17:00", ligacao: COMPETE, verificadoEm: "2026-11-16",
     },
     {
       id: "sice-qualificacao-2026", codigo: "Plano anual de avisos", nome: "SICE — Qualificação das PME", programa: "Norte 2030, Centro 2030, Alentejo 2030",
@@ -234,7 +242,7 @@ export const CATALOGO_BASE: Catalogo = {
       id: "sibt-ram-2026", codigo: "Plano anual de avisos", nome: "Sistema de Incentivos de Base Territorial — RAM", programa: "Madeira 2030 (FEDER)",
       resumo: "Apoio ao investimento de empresas, previsto no plano anual de avisos do Madeira 2030.",
       regioes: ["PT-MA"], dimensoes: TODAS, estado: "previsto", ligacao: "https://madeira.portugal2030.pt/plano-anual-de-avisos/",
-      nota: "Ainda sem aviso publicado. Dimensões e atividades elegíveis por confirmar no aviso.", verificadoEm: "2026-11-13",
+      nota: "Ainda sem aviso publicado. O plano anual prevê-o para 30/11 a 31/12/2026. Dimensões e atividades elegíveis por confirmar no aviso.", verificadoEm: "2026-11-16",
     },
     {
       id: "acores2030-2026-15", codigo: "ACORES2030-2026-15", nome: "Construir 2030 — Pequenos Negócios", programa: "Açores 2030",
