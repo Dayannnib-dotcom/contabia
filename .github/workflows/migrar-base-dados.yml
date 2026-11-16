@@ -1,0 +1,43 @@
+name: Migrar a base de dados (uma vez)
+
+# Copia todos os dados de uma base PostgreSQL para outra (Render → Neon).
+# Corre-se à mão, em Actions → «Migrar a base de dados» → Run workflow.
+# Precisa de dois segredos do repositório (Settings → Secrets and variables → Actions):
+#   BD_ORIGEM  — o endereço externo da base atual no Render
+#   BD_DESTINO — o endereço da nova base no Neon
+# Não apaga nada na origem. No fim compara o número de linhas de cada tabela.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: "Escreva MIGRAR para confirmar"
+        required: true
+
+jobs:
+  migrar:
+    if: ${{ inputs.confirmar == 'MIGRAR' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: postgres:18
+    env:
+      BD_ORIGEM: ${{ secrets.BD_ORIGEM }}
+      BD_DESTINO: ${{ secrets.BD_DESTINO }}
+    steps:
+      - name: Verificar os segredos
+        run: |
+          [ -n "$BD_ORIGEM" ] || { echo "Falta o segredo BD_ORIGEM" >&2; exit 1; }
+          [ -n "$BD_DESTINO" ] || { echo "Falta o segredo BD_DESTINO" >&2; exit 1; }
+      - name: Exportar a origem
+        run: pg_dump --no-owner --no-acl -Fc -d "$BD_ORIGEM" -f /tmp/contabia.dump
+      - name: Importar no destino
+        run: pg_restore --no-owner --no-acl --clean --if-exists --exit-on-error -d "$BD_DESTINO" /tmp/contabia.dump
+      - name: Comparar linhas por tabela
+        run: |
+          contar() {
+            psql -d "$1" -Atc "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY 1" |
+            while read t; do echo "$t $(psql -d "$1" -Atc "SELECT count(*) FROM \"$t\"")"; done
+          }
+          contar "$BD_ORIGEM" > /tmp/origem.txt
+          contar "$BD_DESTINO" > /tmp/destino.txt
+          cat /tmp/origem.txt
+          diff /tmp/origem.txt /tmp/destino.txt && echo "Tudo copiado: as contagens coincidem."

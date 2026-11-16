@@ -1,0 +1,46 @@
+name: Cópia de segurança diária
+
+# Todos os dias às 03:17 (UTC) exporta a base de dados de produção, cifra-a com AES-256
+# e guarda-a como artefacto deste repositório durante 30 dias. O repositório é público:
+# quem tiver conta no GitHub pode descarregar o ficheiro, mas sem a frase secreta não o abre.
+# Segredos necessários (Settings → Secrets and variables → Actions):
+#   BD_PRODUCAO   — o endereço da base de dados em uso
+#   FRASE_COPIAS  — a frase secreta que cifra as cópias (guarde-a também fora do GitHub)
+# Para recuperar: descarregar o artefacto, depois
+#   gpg -d contabia-AAAA-MM-DD.dump.gpg > contabia.dump
+#   pg_restore --no-owner --no-acl -d "<endereço>" contabia.dump
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  copia:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: postgres:18
+    env:
+      BD_PRODUCAO: ${{ secrets.BD_PRODUCAO }}
+      FRASE_COPIAS: ${{ secrets.FRASE_COPIAS }}
+    steps:
+      - name: Verificar os segredos
+        run: |
+          [ -n "$BD_PRODUCAO" ] || { echo "Falta o segredo BD_PRODUCAO" >&2; exit 1; }
+          [ -n "$FRASE_COPIAS" ] || { echo "Falta o segredo FRASE_COPIAS" >&2; exit 1; }
+      - name: Exportar e cifrar
+        run: |
+          apt-get update -qq && apt-get install -y -qq gnupg >/dev/null
+          nome="contabia-$(date -u +%F).dump"
+          mkdir -p /tmp/copia
+          pg_dump --no-owner --no-acl -Fc -d "$BD_PRODUCAO" -f "/tmp/$nome"
+          printf '%s' "$FRASE_COPIAS" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 -o "/tmp/copia/$nome.gpg" "/tmp/$nome"
+          rm "/tmp/$nome"
+          ls -l /tmp/copia
+      - name: Guardar a cópia (30 dias)
+        uses: actions/upload-artifact@v4
+        with:
+          name: copia-${{ github.run_id }}
+          path: /tmp/copia/
+          retention-days: 30
+          if-no-files-found: error
