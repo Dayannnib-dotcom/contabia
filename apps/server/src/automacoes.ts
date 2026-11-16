@@ -11,7 +11,7 @@ import { createHmac, randomUUID } from "node:crypto";
 import type { Db } from "./db.ts";
 import type { Evento } from "@contabia/shared";
 import {
-  apoiosCompativeis, proximasObrigacoes,
+  apoiosCompativeis, proximasObrigacoes, type AlertaQualidade,
   type Catalogo, type ContextoResposta, type IdResposta, type Notificacao, type Regras, type Urgencia,
 } from "@contabia/shared";
 import type { EnviarEmail } from "./email.ts";
@@ -346,5 +346,20 @@ ${botao ? `<p style="margin:20px 0 6px"><a href="${esc(botao.url)}" style="backg
     return r;
   }
 
-  return { relatorioTempo, aoWhatsApp, emitir, aoEvento, avisarConvite, lista, marcarLidas, contagem, boasVindasEmpresa, boasVindasContabilista, rotinaDiaria, validarSair };
+  /** Auditor de qualidade: avisa os contabilistas da empresa (não bloqueia a empresa). */
+  async function alertasQualidade(empresaId: string, documentoId: string, alertas: AlertaQualidade[]) {
+    if (!alertas.length) return 0;
+    const emp = await empresaDe(empresaId);
+    if (!emp) return 0;
+    let n = 0;
+    for (const cc of await ccsDe(empresaId)) {
+      for (const a of alertas) {
+        if (await notificar({ contabilistaId: cc, empresaId, tipo: `qualidade.${a.tipo}`, chave: `qual:${documentoId}:${a.tipo}`, urgencia: a.urgencia,
+          titulo: `${emp.nome}: ${a.titulo}`, corpo: a.detalhe, separador: "revisao" })) n++;
+      }
+    }
+    return n;
+  }
+
+  return { alertasQualidade, relatorioTempo, aoWhatsApp, emitir, aoEvento, avisarConvite, lista, marcarLidas, contagem, boasVindasEmpresa, boasVindasContabilista, rotinaDiaria, validarSair };
 }

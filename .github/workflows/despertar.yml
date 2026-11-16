@@ -1,0 +1,23 @@
+name: Despertar o servidor (rotina das 9h e avisos)
+
+# No plano gratuito do Render o servidor adormece após 15 minutos sem pedidos e o temporizador
+# interno da rotina diária deixa de correr. Este agendamento acorda-o: ao arrancar, o servidor
+# corre logo os avisos de prazos e a rotina diária (são idempotentes: não repetem avisos).
+# Horas em UTC: 08:05–18:05 cobre 9h–19h em Lisboa e na Madeira, no inverno e no verão.
+on:
+  schedule:
+    - cron: "5 8-18 * * *"
+  workflow_dispatch:
+
+jobs:
+  despertar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Chamar o servidor (espera o arranque, até 3 minutos)
+        run: |
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS --max-time 30 https://contabia-eu.onrender.com/v1/saude; then echo; echo "Servidor acordado."; exit 0; fi
+            echo "Ainda a arrancar ($i)…"; sleep 20
+          done
+          echo "O servidor não respondeu." >&2; exit 1

@@ -684,8 +684,12 @@ test("26. centro de avisos do contabilista, respostas rápidas, e-mails automát
   assert.equal(docs[0].resposta.id, "documentos_recebidos");
   assert.equal(docs[0].resposta.contexto.contacto, "Rita Gomes");
   assert.equal(docs[0].abrir.separador, "revisao");
-  assert.equal(av.json.contagem.normal, 1);
-  assert.equal(enviados.filter((m) => m.title.startsWith("Mar Azul, Lda.:")).length, 1, "um só push por grupo, não um por fatura");
+  // as duas faturas têm o mesmo fornecedor e o mesmo total: o auditor de qualidade avisa de possível repetição
+  const rep = av.json.avisos.filter((a: { tipo: string }) => a.tipo === "qualidade.possivel_duplicado");
+  assert.equal(rep.length, 1);
+  assert.match(rep[0].corpo, /FT 2026\/902 tem o mesmo valor \(122,00 €\) que FT 2026\/901/);
+  assert.equal(av.json.contagem.normal, 2);
+  assert.equal(enviados.filter((m) => m.title.includes("documento(s) novo(s)")).length, 1, "um só push por grupo, não um por fatura");
 
   // pedido de anulação é urgente; o contabilista não é avisado do que ele próprio faz
   const [d1] = (await chamar("GET", `/v1/empresas/${emp.json.id}/documentos`, emp.json.token)).json;

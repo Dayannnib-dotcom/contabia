@@ -431,6 +431,16 @@ const MIGRACOES: string[] = [
   ]),
   `DROP TRIGGER IF EXISTS lista_espera_sem_apagar ON lista_espera`,
   `CREATE TRIGGER lista_espera_sem_apagar BEFORE DELETE ON lista_espera FOR EACH ROW EXECUTE FUNCTION contabia_sem_apagar()`,
+  // Uso da IA por empresa e mês: limite mensal e controlo de custos (auditoria técnica, 16/11/2026)
+  `CREATE TABLE IF NOT EXISTS uso_ia (
+     empresa_id text NOT NULL,
+     mes text NOT NULL,
+     modelo text NOT NULL,
+     pedidos integer NOT NULL DEFAULT 0,
+     tokens_entrada integer NOT NULL DEFAULT 0,
+     tokens_saida integer NOT NULL DEFAULT 0,
+     PRIMARY KEY (empresa_id, mes, modelo)
+   )`,
 ];
 
 async function migrar(db: Db) {
