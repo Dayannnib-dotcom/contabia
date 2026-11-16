@@ -11,7 +11,7 @@ export default function Inicio() {
     <EcraEntrada
       papel="A contabilidade da sua empresa, em dia."
       saudacao={`${saudacao()}! Sou o Luís. Estou atento a todas as suas faturas e obrigações — trato de as organizar para o seu contabilista.`}
-      rotulo="o seu gestor virtual"
+      rotulo="assistente virtual"
       onEntrar={() => router.push("/entrar")}
       onCriarConta={() => router.push("/registar")}
     />

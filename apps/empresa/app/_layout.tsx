@@ -2,7 +2,8 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { ProvedorSessao, cor, useFontesContabia, useSessao } from "@contabia/ui";
+import { useCallback, useState } from "react";
+import { AberturaMare, ProvedorSessao, cor, useFontesContabia, useSessao } from "@contabia/ui";
 
 // Endereço da API: 1) EXPO_PUBLIC_API_URL (definido no eas.json para cada compilação);
 // 2) na web, o próprio servidor que serve a app; 3) no telemóvel, «localhost» só em
@@ -48,7 +49,17 @@ export default function Raiz() {
       <ProvedorSessao urlApi={URL_API} chave="contabia.empresa">
         <StatusBar style="dark" />
         <Navegacao />
+        <Abertura />
       </ProvedorSessao>
     </SafeAreaProvider>
   );
+}
+
+/** Abertura «A maré a baixar» (Guia 5) cada vez que a app abre; espera que a sessão e as fontes estejam prontas. */
+function Abertura() {
+  const { pronto } = useSessao();
+  const fontes = useFontesContabia();
+  const [ativa, setAtiva] = useState(true);
+  const terminar = useCallback(() => setAtiva(false), []);
+  return ativa ? <AberturaMare pronta={pronto && fontes} aoTerminar={terminar} /> : null;
 }
