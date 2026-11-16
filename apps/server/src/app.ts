@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { z, ZodError } from "zod";
 import {
   apoiosCompativeis, CATALOGO_BASE, erroCAE, normalizarCAE, seccaoDoCAE, validarCatalogo, type ApoioCompativel, type Catalogo, type Dimensao, type PedidoEstudo, type PerfilApoios,
-  ajudaNIF, lerQR, telefoneInternacional, limparNIF, normalizarUtilizador, proximasObrigacoes, qrConsistente, REGRAS_BASE, taxasEm, utilizadorValido, validarNIF,
+  ajudaNIF, auditarDocumento, lerQR, telefoneInternacional, limparNIF, normalizarUtilizador, proximasObrigacoes, qrConsistente, REGRAS_BASE, taxasEm, utilizadorValido, validarNIF,
   type Anexo, type Atividade, type RegraFornecedor, type Colaborador, type Documento, type MovimentoBancario, type Empresa, type Ligacao, type Pedido, type Regras, type ResumoEmpresa, type Sessao, type VerificacaoFecho,
 } from "@contabia/shared";
 import type { Db } from "./db.ts";
@@ -88,7 +88,15 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   };
   const tentativasLigacao = new Map<string, number[]>();
 
-  await app.register(cors, { origin: true, exposedHeaders: ["x-contabia-token"] });
+  // As apps nativas não enviam Origin; no navegador só a própria Contabia (e localhost em desenvolvimento).
+  const origensPermitidas = new Set([
+    "https://contabia-eu.onrender.com", "https://contabia.pt", "https://www.contabia.pt", "https://contabia.com", "https://www.contabia.com",
+    ...(process.env.ORIGENS_PERMITIDAS ?? "").split(",").map((x) => x.trim()).filter(Boolean),
+  ]);
+  await app.register(cors, {
+    origin: (origem, cb) => cb(null, !origem || origensPermitidas.has(origem) || (process.env.NODE_ENV !== "production" && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origem))),
+    exposedHeaders: ["x-contabia-token"],
+  });
   await app.register(websocket);
 
   // ── Sessão ──
@@ -479,6 +487,23 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   });
 
   /** Regista um documento com todas as verificações (usado pelo QR, manual e importação do e-Fatura). */
+  /** Auditor de qualidade: casos prováveis que só o contabilista decide (ver qualidade.ts). */
+  async function auditar(empresaId: string, d: Documento) {
+    const empresa = await empresaPorId(empresaId);
+    const periodo = periodoIVADoMes(d.data.slice(0, 7), empresa.regimeIVA);
+    const [semelhantes, [{ n }], [media], [sub]] = await Promise.all([
+      db.query<{ numero: string; data: string }>(
+        `SELECT numero, data FROM documentos WHERE empresa_id = $1 AND id <> $2 AND terceiro_nif = $3 AND tipo = $4 AND estado <> 'anulado'
+           AND abs(total - $5) < 0.01 AND abs(data::date - $6::date) <= 5 LIMIT 3`,
+        [empresaId, d.id, d.terceiroNif, d.tipo, d.total, d.data]),
+      db.query<{ n: number }>(`SELECT count(*)::int AS n FROM documentos WHERE empresa_id = $1 AND id <> $2 AND terceiro_nif = $3`, [empresaId, d.id, d.terceiroNif]),
+      db.query<{ m: number | null }>(`SELECT avg(total)::float AS m FROM documentos WHERE empresa_id = $1 AND tipo = 'compra' AND id <> $2 AND estado <> 'anulado'`, [empresaId, d.id]),
+      db.query<{ periodo: string }>(`SELECT periodo FROM submissoes WHERE empresa_id = $1 AND obrigacao = 'dp_iva' AND periodo = $2`, [empresaId, periodo]),
+    ]);
+    const alertas = auditarDocumento(d, { hoje: hojeISO(), semelhantes, documentosDoTerceiro: n, mediaCompras: media?.m ?? null, periodoDeclarado: sub?.periodo ?? null });
+    await A.alertasQualidade(empresaId, d.id, alertas);
+  }
+
   async function registarDocumento(id: string, a: Ator, d: Omit<Documento, "id" | "empresaId" | "estado" | "contaSugerida" | "categoria" | "ivaDedutivel" | "criadoEm">, descricao = ""): Promise<Documento> {
     // Erros "sem querer" mais comuns: data errada, período já fechado, a mesma fatura duas vezes.
     const hoje = hojeISO();
@@ -504,6 +529,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
       throw e;
     });
     await publicar(db, hub, id, "documento.criado", a.papel, { documentoId: novo.id, numero: novo.numero, total: novo.total });
+    void auditar(id, novo).catch((x) => console.warn("[auditor de qualidade]", x));
     return novo;
   }
 
@@ -1619,6 +1645,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     return reply.code(201).send({ versao: r.versao });
   });
 
+  const LIMITE_IA_MES = Number(process.env.LIMITE_IA_MES ?? 50);
   app.post("/v1/empresas/:id/assistente", async (req) => {
     const a = ator(req);
     const id = params(req).id;
@@ -1637,7 +1664,20 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
       pedidosPendentes: peds.map((p) => (p.detalhe ? `${p.tipo}: ${p.detalhe}` : p.tipo)),
       documentosPorValidar: n,
       proximoPrazo: prox.at(0) && { descricao: prox[0].descricao, prazo: prox[0].prazo },
-    }, cfg.chaveIA);
+    }, {
+      chaveApi: cfg.chaveIA,
+      // limite mensal de pedidos à IA por empresa; acima dele, o Luís responde por regras e encaminha
+      podeUsar: async () => {
+        const [u] = await db.query<{ n: number }>(`SELECT coalesce(sum(pedidos), 0)::int AS n FROM uso_ia WHERE empresa_id = $1 AND mes = $2`, [id, hojeISO().slice(0, 7)]);
+        return (u?.n ?? 0) < LIMITE_IA_MES;
+      },
+      registarUso: async (modelo, entrada, saida) => {
+        await db.query(
+          `INSERT INTO uso_ia (empresa_id, mes, modelo, pedidos, tokens_entrada, tokens_saida) VALUES ($1, $2, $3, 1, $4, $5)
+           ON CONFLICT (empresa_id, mes, modelo) DO UPDATE SET pedidos = uso_ia.pedidos + 1, tokens_entrada = uso_ia.tokens_entrada + $4, tokens_saida = uso_ia.tokens_saida + $5`,
+          [id, hojeISO().slice(0, 7), modelo, entrada, saida]);
+      },
+    });
     if (r.encaminharParaContabilista) await publicar(db, hub, id, "assistente.encaminhado", a.papel, { pergunta });
     return r;
   });
@@ -1649,7 +1689,16 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     return eventosDesde(db, id, desde, 200);
   });
 
-  app.get("/v1/saude", async () => ({ ok: true, versao: "0.1.0" }));
+  app.get("/v1/saude", async (_req, reply) => {
+    // também verifica a base de dados: se não responder, o Render vê o serviço como doente
+    try { await db.query("SELECT 1"); } catch { return reply.code(503).send({ ok: false, baseDados: false }); }
+    return { ok: true, versao: "0.1.0", baseDados: true };
+  });
+  // Custo da IA por mês (para a equipa acompanhar o gasto)
+  app.get("/v1/admin/uso-ia", async (req) => {
+    exigirAdmin(req);
+    return db.query(`SELECT mes, modelo, sum(pedidos)::int AS pedidos, sum(tokens_entrada)::int AS entrada, sum(tokens_saida)::int AS saida, count(DISTINCT empresa_id)::int AS empresas FROM uso_ia GROUP BY mes, modelo ORDER BY mes DESC, modelo`);
+  });
 
   // ═════════════ Apps web (mesma origem que a API) ═════════════
   const apps = ["empresa", "contabilista"].filter((n) => cfg.pastaWeb && existsSync(join(cfg.pastaWeb, n, "index.html")));

@@ -108,7 +108,7 @@ export default function Painel() {
           <Linha esquerda="Convite enviado ao contabilista" sub={`${dados.conviteEnviado.contabilista?.nome ?? ""} · à espera que aceite`} direita={<Chip texto="Enviado" />} onPress={() => router.push("/ligacao")} />
         ) : null}
         {(dados?.resumo.documentosPorValidar ?? 0) > 0 ? (
-          <Linha esquerda={`${dados!.resumo.documentosPorValidar} documentos por validar`} sub="A IA já sugeriu a classificação" direita={<Chip texto="Validar" tipo="erro" />} onPress={() => router.push("/(tabs)/documentos")} />
+          <Linha esquerda={`${dados!.resumo.documentosPorValidar} documentos por validar`} sub="A Contabia já sugeriu a classificação" direita={<Chip texto="Validar" tipo="erro" />} onPress={() => router.push("/(tabs)/documentos")} />
         ) : null}
         {dados?.pedidos.map((p) => (
           <Linha key={p.id} esquerda={`Pedido do contabilista: ${p.tipo}`} sub={p.detalhe || "Carregue o documento e depois toque em «Já enviei»"}
