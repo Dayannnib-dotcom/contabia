@@ -7,3 +7,7 @@ apps/server/data/
 apps/*/web-build/
 coverage/
 .DS_Store
+marca/kit/pdf/
+marca/kit/saida/
+marca/fontes/guia6/out/*.html
+marca/fontes/guia6/out/site-*.png

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Abertura da app Contabia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: calma, precisa, da marca Contabia.
+   IDEA: a maré a baixar — o ecrã de tinta recua como a maré e deixa ver a app.
+   PICTURE: um telemóvel com a animação real, em tamanho de ecrã.
+   COLOUR and TYPE: tinta #12232E, menta #3CC6A0, papel #F6F7F5; Space Grotesk + IBM Plex.
+   LAYOUT: telemóvel à esquerda, linha do tempo e controlos à direita; empilha no telemóvel. */
+:root{color-scheme:light dark;--bg:light-dark(#F6F7F5,#0B1820);--ink:light-dark(#12232E,#E8EEEC);--sec:light-dark(#4B5A63,#A9B8BF);--line:light-dark(#DDE2DF,#22394A);--card:light-dark(#FFFFFF,#12232E)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "IBM Plex Sans",system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(28px,4vw,56px) max(5vw,16px);max-width:1240px;margin:0 auto}
+h1{font:700 clamp(30px,4vw,44px)/1.05 "Space Grotesk",sans-serif;margin:0 0 10px;text-wrap:balance;letter-spacing:-.02em}
+.lead{color:var(--sec);max-width:62ch;margin:0 0 28px}
+.grid{display:grid;grid-template-columns:minmax(0,400px) minmax(0,1fr);gap:clamp(24px,4vw,56px);align-items:start}
+@media(max-width:760px){.grid{grid-template-columns:minmax(0,1fr)}}
+.phone{position:relative;width:min(100%,360px);aspect-ratio:360/740;margin:0 auto;border-radius:44px;background:#0B1820;padding:10px;box-shadow:0 30px 60px -30px rgba(18,35,46,.55)}
+.scr{position:relative;width:100%;height:100%;border-radius:34px;overflow:hidden;background:#F6F7F5;color:#12232E;cursor:pointer}
+.app{position:absolute;inset:0;padding:46px 16px 16px;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.app .t{font:700 22px/1.1 "Space Grotesk",sans-serif}
+.app .s{color:#4B5A63;font-size:11px;margin-top:2px}
+.luis{background:#12232E;color:#fff;border-radius:16px;padding:12px;display:flex;gap:10px;align-items:flex-start}
+.luis .av{flex:none;width:36px;height:36px;border-radius:50%;background:#CFE9DF}
+.luis b{display:block;color:#9FE3CF;font-size:11px;font-weight:600}
+.prazo{background:#FBEEDC;border-radius:16px;padding:12px;display:flex;gap:12px;align-items:center}
+.prazo .d{width:44px;text-align:center;font-family:"IBM Plex Mono",monospace}
+.prazo .d i{display:block;font-style:normal;font-size:10px;color:#A61B1B;letter-spacing:.1em}
+.prazo .d span{font-size:22px}
+.prazo small{display:block;color:#7A3B05}
+.card{background:#fff;border:1px solid #DDE2DF;border-radius:16px;padding:12px}
+.bars{display:flex;align-items:flex-end;gap:6px;height:70px;margin-top:8px}
+.bars div{flex:1;border-radius:4px 4px 0 0}
+.steps .row{display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid #EEF1EF}
+.bar{height:6px;border-radius:3px;background:#EEF1EF;margin:8px 0 4px;overflow:hidden}.bar i{display:block;height:6px;width:33%;background:#3CC6A0}
+.tabs{margin-top:auto;display:flex;justify-content:space-around;border-top:1px solid #DDE2DF;padding-top:10px;font-size:10px;color:#4B5A63}
+.tabs .on{color:#0B6E5B;font-weight:600}
+svg.ov{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.side h2{font:500 20px/1.2 "Space Grotesk",sans-serif;margin:0 0 12px}
+ol.tl{list-style:none;margin:0 0 24px;padding:0;border-top:1px solid var(--line)}
+ol.tl li{display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
+ol.tl time{font:500 14px/1.4 "IBM Plex Mono",monospace;color:var(--sec);white-space:nowrap}
+ol.tl li.on time{color:#0B6E5B}:root[data-theme=dark] ol.tl li.on time{color:#3CC6A0}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) ol.tl li.on time{color:#3CC6A0}}
+ol.tl b{display:block}
+.ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button{font:600 15px "IBM Plex Sans",sans-serif;min-height:44px;padding:0 18px;border-radius:14px;border:1px solid #0B6E5B;background:#0B6E5B;color:#fff;cursor:pointer}
+button.alt{background:transparent;color:var(--ink);border-color:#7C8A85}
+button:focus-visible,input:focus-visible{outline:2px solid #3CC6A0;outline-offset:2px}
+label{display:flex;gap:8px;align-items:center;min-height:44px;color:var(--sec)}
+input[type=checkbox]{width:20px;height:20px;accent-color:#0B6E5B}
+.note{color:var(--sec);font-size:13px;margin-top:18px}
+</style>
+</head>
+<body>
+<main class="band">
+  <h1>Abertura da app: a maré a baixar</h1>
+  <p class="lead">Ao abrir a Contabia, o ecrã está em tinta com o símbolo. A onda desenha-se, o símbolo fica transparente e deixa ver a app através do «C»; depois encolhe enquanto a tinta recua como a maré. Dura 2,3 segundos e um toque salta-a.</p>
+  <div class="grid">
+    <div class="phone" aria-label="Pré-visualização da animação de abertura num telemóvel">
+      <div class="scr" id="scr" role="button" tabindex="0" aria-label="Tocar para saltar a animação">
+        <div class="app" aria-hidden="true">
+          <div><div class="t">Papelaria Atlântico</div><div class="s">Sincronizado em tempo real</div></div>
+          <div class="luis"><div class="av"></div><div><b>Luís · assistente virtual</b>Bom dia! Tem 2 coisas para tratar; o próximo prazo é a 20/11.</div></div>
+          <div class="card steps"><b>Primeiros passos</b> <span style="float:right;color:#4B5A63">1 de 3</span><div class="bar"><i></i></div>
+            <div class="row"><span>Fotografar a primeira fatura</span><span style="color:#084F41">Feito</span></div>
+            <div class="row"><span>Ligar o seu contabilista</span><span>›</span></div></div>
+          <div class="prazo"><div class="d"><i>NOV</i><span>20</span></div><div><b>Declaração periódica do IVA</b><small>3.º trimestre · faltam 4 dias</small></div></div>
+          <div class="card"><b>Os seus números</b><div class="bars">
+            <div style="height:55%;background:#12917A"></div><div style="height:38%;background:#C97A1E"></div>
+            <div style="height:70%;background:#12917A"></div><div style="height:44%;background:#C97A1E"></div>
+            <div style="height:86%;background:#12917A"></div><div style="height:50%;background:#C97A1E"></div></div></div>
+          <div class="tabs"><span class="on">Painel</span><span>Documentos</span><span>Digitalizar</span><span>Assistente</span><span>Prazos</span></div>
+        </div>
+        <svg class="ov" id="ov" viewBox="0 0 340 720" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
+      </div>
+    </div>
+    <div class="side">
+      <h2>Linha do tempo</h2>
+      <ol class="tl" id="tl">
+        <li data-a="0" data-b="400"><time>0–400 ms</time><div><b>Aparece o símbolo</b>Tinta em todo o ecrã; o «C» branco surge e assenta (de 92% a 100%).</div></li>
+        <li data-a="300" data-b="1000"><time>300–1000</time><div><b>A onda desenha-se</b>A onda menta atravessa o «C», da esquerda para a direita (700 ms, como na marca).</div></li>
+        <li data-a="1100" data-b="1400"><time>1100–1400</time><div><b>O símbolo fica transparente</b>O «C» e a onda passam a janela: vê-se a app através deles.</div></li>
+        <li data-a="1400" data-b="2300"><time>1400–2300</time><div><b>A maré baixa</b>O símbolo encolhe e a tinta recua para baixo com a borda em onda, a deixar a app à vista.</div></li>
+      </ol>
+      <div class="ctl">
+        <button id="rep">Repetir</button>
+        <button id="len" class="alt" aria-pressed="false">Ver em câmara lenta</button>
+        <label><input type="checkbox" id="rm"> Reduzir movimento</label>
+      </div>
+      <p class="note">Ecrã de exemplo com dados fictícios. Com «reduzir movimento» ativo, o símbolo aparece parado e o ecrã desvanece em 300 ms.</p>
+    </div>
+  </div>
+</main>
+<script>
+{
+  const INK = "#12232E", MINT = "#3CC6A0", W = 340, H = 720, CX = 170, CY = 360;
+  const C = "M43 19a16 16 0 1 0 0 26", WAVE = "M27 32q5-5 10 0t10 0t10 0";
+  const ov = document.getElementById("ov"), scr = document.getElementById("scr");
+  const tl = [...document.querySelectorAll("#tl li")];
+  const clamp = (x) => Math.max(0, Math.min(1, x));
+  const seg = (t, a, b) => clamp((t - a) / (b - a));
+  const out = (x) => 1 - (1 - x) ** 3;
+  const io = (x) => (x < 0.5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2);
+  let lenta = false, inicio = 0, raf = 0, saltar = null;
+  const sym = (k) => `translate(${CX - 37.1 * k} ${CY - 32 * k}) scale(${k})`;
+  function borda(y, fase) {
+    // a borda da tinta: a onda da marca, em grande, a deslizar
+    let d = `M-80 ${y}`;
+    for (let x = -80 + fase; x < W + 80; x += 60) d += ` q15 -12 30 0 q15 12 30 0`;
+    return d + ` V${H + 40} H-80 Z`;
+  }
+  function frame(t, reduzir) {
+    if (reduzir) {
+      const fade = 1 - seg(t, 600, 900);
+      ov.innerHTML = `<rect width="${W}" height="${H}" fill="${INK}" opacity="${fade}"/><g transform="${sym(3)}" fill="none" stroke-linecap="round" opacity="${fade}"><path d="${C}" stroke="#fff" stroke-width="5.5"/><path d="${WAVE}" stroke="${MINT}" stroke-width="4.5"/></g>`;
+      return t < 900;
+    }
+    const k0 = 3 * (0.92 + 0.08 * out(seg(t, 0, 400)));
+    const k = t < 1400 ? k0 : 3 - 2 * io(seg(t, 1400, 2300));
+    const desenho = out(seg(t, 300, 1000));
+    const solido = (t < 400 ? out(seg(t, 0, 400)) : 1) * (1 - seg(t, 1100, 1400));
+    const mare = io(seg(t, 1550, 2300));
+    const y = -40 + mare * (H + 120);
+    const fase = (t / 18) % 60 - 60;
+    const tinta = t < 1550 ? `<rect x="-10" y="-10" width="${W + 20}" height="${H + 20}" fill="${INK}" mask="url(#jan)"/>` : `<path d="${borda(y, fase)}" fill="${INK}" mask="url(#jan)"/>`;
+    ov.innerHTML = `<defs><mask id="jan" maskUnits="userSpaceOnUse" x="-100" y="-100" width="${W + 200}" height="${H + 200}"><rect x="-100" y="-100" width="${W + 200}" height="${H + 200}" fill="#fff"/>` +
+      (t >= 1100 ? `<g transform="${sym(k)}" fill="none" stroke="#000" stroke-linecap="round"><path d="${C}" stroke-width="5.5"/><path d="${WAVE}" stroke-width="4.5"/></g>` : "") +
+      `</mask></defs>${tinta}` +
+      `<g transform="${sym(k)}" fill="none" stroke-linecap="round" opacity="${solido}"><path d="${C}" stroke="#fff" stroke-width="5.5"/><path d="${WAVE}" stroke="${MINT}" stroke-width="4.5" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${1 - desenho}"/></g>`;
+    return t < 2300;
+  }
+  function marcar(t) { tl.forEach((li) => li.classList.toggle("on", t >= +li.dataset.a && t <= +li.dataset.b)); }
+  function tocar() {
+    cancelAnimationFrame(raf); inicio = performance.now(); saltar = null;
+    const reduzir = document.getElementById("rm").checked || matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const passo = (agora) => {
+      let t = (agora - inicio) / (lenta ? 4 : 1);
+      if (saltar !== null) t = Math.max(t, 2300 - (agora - saltar) * 3);
+      marcar(t);
+      if (frame(t, reduzir)) raf = requestAnimationFrame(passo); else { ov.innerHTML = ""; marcar(-1); }
+    };
+    raf = requestAnimationFrame(passo);
+  }
+  const salta = () => { if (ov.innerHTML) { inicio = performance.now() - 2300 * (lenta ? 4 : 1); } };
+  scr.addEventListener("click", salta);
+  scr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); salta(); } });
+  document.getElementById("rep").addEventListener("click", tocar);
+  const bl = document.getElementById("len");
+  bl.addEventListener("click", () => { lenta = !lenta; bl.setAttribute("aria-pressed", String(lenta)); bl.textContent = lenta ? "Velocidade normal" : "Ver em câmara lenta"; tocar(); });
+  document.getElementById("rm").addEventListener("change", tocar);
+  setTimeout(tocar, 400);
+}
+</script>
+</body>
+</html>
