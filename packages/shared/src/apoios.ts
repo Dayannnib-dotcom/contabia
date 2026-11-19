@@ -159,24 +159,24 @@ const IDE = "https://ide.madeira.gov.pt";
 const COMPETE = "https://www.compete2030.gov.pt/avisos/";
 
 /**
- * Catálogo de partida, verificado em fontes oficiais e de consultoras a 13/11/2026 (revisto a 16/11/2026).
+ * Catálogo de partida, verificado em fontes oficiais e de consultoras a 13/11/2026 (revisto a 19/11/2026).
  * O administrador publica versões novas em POST /v1/admin/apoios.
  */
 export const CATALOGO_BASE: Catalogo = {
-  versao: "2026-11-16",
-  verificadoEm: "2026-11-16",
+  versao: "2026-11-19",
+  verificadoEm: "2026-11-19",
   linhas: [
     {
       id: "m2030-2026-38", codigo: "M2030-2026-38", nome: "Funcionamento 2030 — Outros custos de funcionamento", programa: "Madeira 2030 (FEDER) · IDE-RAM",
       resumo: "Compensa custos de funcionamento acrescidos pela ultraperiferia: Segurança Social, rendas, eletricidade e água, serviços de contabilidade.",
       regioes: ["PT-MA"], dimensoes: TODAS, estado: "aberto", inicio: "2026-10-30T15:00", fim: "2026-12-04T17:00",
-      apoio: "Não reembolsável: 30% (+10% no Porto Santo)", ligacao: IDE, nota: "Exige contabilidade organizada. Candidatura no Balcão dos Fundos.", verificadoEm: "2026-11-16",
+      apoio: "Não reembolsável: 30% (+10% no Porto Santo)", ligacao: IDE, nota: "Exige contabilidade organizada. Candidatura no Balcão dos Fundos.", verificadoEm: "2026-11-19",
     },
     {
       id: "m2030-2026-35", codigo: "M2030-2026-35", nome: "Funcionamento 2030 — Transportes", programa: "Madeira 2030 (FEDER) · IDE-RAM",
       resumo: "Compensa o custo acrescido de transportar mercadorias de e para a Madeira.",
       regioes: ["PT-MA"], dimensoes: TODAS, estado: "aberto", fim: "2026-11-20T17:00",
-      apoio: "Não reembolsável", ligacao: IDE, nota: "Candidatura no Balcão dos Fundos.", verificadoEm: "2026-11-16",
+      apoio: "Não reembolsável", ligacao: IDE, nota: "Candidatura no Balcão dos Fundos.", verificadoEm: "2026-11-19",
     },
     {
       id: "mpr-2026-6", codigo: "MPR-2026-6", nome: "SICE — Inovação Produtiva", programa: "COMPETE 2030 e programas regionais",
@@ -233,6 +233,23 @@ export const CATALOGO_BASE: Catalogo = {
       regioes: ["PT"], territorio: "as regiões Norte, Centro e Alentejo", dimensoes: TODAS, estado: "aberto", fim: "2027-01-04T17:00", ligacao: COMPETE, verificadoEm: "2026-11-16",
     },
     {
+      id: "norte2030-2026-28", codigo: "NORTE2030-2026-28", nome: "SI Base Territorial — CIM Cávado", programa: "Norte 2030 (FEDER) · CIM Cávado",
+      resumo: "Criação, modernização ou expansão de micro e pequenas empresas com estabelecimento na sub-região do Cávado (investimento de 25 mil a menos de 300 mil euros).",
+      regioes: ["PT"], territorio: "a sub-região do Cávado (NUTS III)", dimensoes: ["micro", "pequena"], divisoes: ["13", "14", "25", "26", "55", "72", "93"],
+      estado: "aberto", fim: "2026-11-30T18:00",
+      apoio: "Subvenção: 40%, ou 50% em territórios de baixa densidade; +10 pontos com a estratégia PROVERE Minho In",
+      ligacao: "https://www.cimcavado.pt/en/apresentacao-de-candidaturas-para-apoio-a-micro-e-pequenas-empresas-na-sub-regiao-do-cavado",
+      nota: "Só alguns CAE: 13, 14, 25, 26, alojamento (55, exceto 554 e 55201, só em territórios de baixa densidade e freguesias rurais), 7210 e 93293. Exige contabilidade organizada, 3 meses de atividade e pelo menos 1 posto de trabalho. Confirme no aviso.", verificadoEm: "2026-11-19",
+    },
+    {
+      id: "algarve-2026-5", codigo: "ALGARVE-2026-5", nome: "SI Base Territorial — Algarve", programa: "Algarve 2030 (FEDER)",
+      resumo: "Criação, expansão e modernização de micro e pequenas empresas da indústria e dos domínios da estratégia regional (mar, recursos endógenos, indústrias criativas, saúde e bem-estar, ambiente, digital).",
+      regioes: ["PT"], territorio: "a região do Algarve", dimensoes: ["micro", "pequena"], estado: "aberto", inicio: "2026-04-30", fim: "2027-01-15T18:00",
+      apoio: "Subvenção: cofinanciamento até 60%",
+      ligacao: "https://algarve.portugal2030.pt/2026/05/06/apoio-de-5-milhoes-de-euros-para-pme-expandirem-e-modernizarem-atividade/",
+      nota: "Candidaturas por fases; a última fecha a 15/01/2027 às 18h. Há indicação de que a 2.ª fase passou para 30/11/2026: confirme no aviso. As atividades turísticas estão excluídas: confirme a lista de CAE no aviso.", verificadoEm: "2026-11-19",
+    },
+    {
       id: "sice-qualificacao-2026", codigo: "Plano anual de avisos", nome: "SICE — Qualificação das PME", programa: "Norte 2030, Centro 2030, Alentejo 2030",
       resumo: "Organização, marketing, digitalização e outros fatores de competitividade da PME.",
       regioes: ["PT"], territorio: "as regiões Norte, Centro e Alentejo", dimensoes: PME, estado: "previsto", ligacao: "https://portugal2030.pt/avisos/",
@@ -242,7 +259,7 @@ export const CATALOGO_BASE: Catalogo = {
       id: "sibt-ram-2026", codigo: "Plano anual de avisos", nome: "Sistema de Incentivos de Base Territorial — RAM", programa: "Madeira 2030 (FEDER)",
       resumo: "Apoio ao investimento de empresas, previsto no plano anual de avisos do Madeira 2030.",
       regioes: ["PT-MA"], dimensoes: TODAS, estado: "previsto", ligacao: "https://madeira.portugal2030.pt/plano-anual-de-avisos/",
-      nota: "Ainda sem aviso publicado. O plano anual prevê-o para 30/11 a 31/12/2026. Dimensões e atividades elegíveis por confirmar no aviso.", verificadoEm: "2026-11-16",
+      nota: "Ainda sem aviso publicado. O plano anual prevê-o para 30/11 a 31/12/2026. Dimensões e atividades elegíveis por confirmar no aviso.", verificadoEm: "2026-11-19",
     },
     {
       id: "acores2030-2026-15", codigo: "ACORES2030-2026-15", nome: "Construir 2030 — Pequenos Negócios", programa: "Açores 2030",
@@ -266,7 +283,7 @@ export const CATALOGO_BASE: Catalogo = {
       regioes: ["PT-AC"], dimensoes: PME, estado: "aberto", inicio: "2026-09-01", fim: "2026-11-30T18:00",
       apoio: "Não reembolsável: 35% a 45% conforme a ilha, até 65% com prémios",
       ligacao: "https://portugal2030.pt/wp-content/uploads/sites/3/2026/09/AVISO-ACORES2030-2026-21-Base-Economica-Local.pdf",
-      nota: "Última fase: 30/11 às 17h dos Açores. Só algumas atividades CAE são elegíveis: confirme no aviso.", verificadoEm: "2026-11-13",
+      nota: "Última fase: 30/11 às 17h dos Açores. Só algumas atividades CAE são elegíveis: confirme no aviso.", verificadoEm: "2026-11-19",
     },
     {
       id: "mar2030-2026-34", codigo: "MAR2030-2026-34", nome: "Mar 2030 — GAL ADELIAÇOR MAR", programa: "Mar 2030 (FEAMPA)",
