@@ -1,7 +1,7 @@
 /**
  * Automações da Contabia, pensadas como o contabilista as quer:
  *  - Centro de avisos: tudo o que exige atenção vira um aviso com urgência e uma resposta sugerida.
- *    Urgente e Para tratar também chegam por push; Para saber fica só na lista.
+ *    Prioridade alta e Para tratar também chegam por push; Para saber fica só na lista.
  *  - Rotina diária (9h Lisboa): documentos parados, pedidos sem resposta, prazos, fundos a fechar,
  *    resumo do dia por e-mail ao contabilista e e-mails às empresas (boas-vindas, dicas, prazos).
  *  - Eventos assinados (HMAC-SHA256) para o Activepieces ou outra automação externa.
@@ -14,7 +14,7 @@ import {
   apoiosCompativeis, proximasObrigacoes, type AlertaQualidade,
   type Catalogo, type ContextoResposta, type IdResposta, type Notificacao, type Regras, type Urgencia,
 } from "@contabia/shared";
-import type { EnviarEmail } from "./email.ts";
+import { moldura, type EnviarEmail } from "./email.ts";
 
 type Avisar = (destinos: { empresaId?: string; contabilistaId?: string }, titulo: string, corpo: string, dados?: Record<string, unknown>) => Promise<number>;
 export type EnviarWebhook = (url: string, corpo: string, cabecalhos: Record<string, string>) => Promise<boolean>;
@@ -195,19 +195,6 @@ export function criarAutomacoes(c: CfgAutomacoes) {
   const ligacaoSair = (tipo: "empresa" | "contabilista", id: string) => `${url}/v1/email/sair?t=${tipo}&i=${encodeURIComponent(id)}&k=${tokenSair(tipo, id)}`;
   const validarSair = (tipo: string, id: string, k: string) => k.length === 32 && tokenSair(tipo, id) === k;
 
-  function moldura(titulo: string, paragrafos: string[], botao?: { texto: string; url: string }, rodape?: string) {
-    const html = `<div style="background:#F6F7F5;padding:24px 12px;font-family:'IBM Plex Sans',system-ui,Segoe UI,Roboto,sans-serif;color:#12232E">
-<div style="max-width:560px;margin:auto;background:#fff;border:1px solid #E3E8E5;border-radius:16px;overflow:hidden">
-<div style="background:#12232E;padding:20px 24px;color:#fff;font:700 20px 'Space Grotesk',system-ui,sans-serif">contabia <span style="color:#3CC6A0;font-size:13px;font-weight:600;margin-left:8px">A maré certa.</span></div>
-<div style="padding:24px"><h1 style="font:700 22px/28px 'Space Grotesk',system-ui,sans-serif;margin:0 0 14px">${esc(titulo)}</h1>
-${paragrafos.map((p) => `<p style="font-size:15px;line-height:23px;margin:0 0 12px">${p}</p>`).join("")}
-${botao ? `<p style="margin:20px 0 6px"><a href="${esc(botao.url)}" style="background:#0B6E5B;color:#fff;text-decoration:none;font-weight:600;padding:12px 20px;border-radius:10px;display:inline-block">${esc(botao.texto)}</a></p>` : ""}
-</div></div>
-<p style="max-width:560px;margin:14px auto 0;font-size:12px;line-height:18px;color:#5B6B73;text-align:center">Contabia · O seu contabilista, à mão.${rodape ? `<br>${rodape}` : ""}</p></div>`;
-    const texto = `${titulo}\n\n${paragrafos.map((p) => p.replace(/<[^>]+>/g, "")).join("\n\n")}${botao ? `\n\n${botao.texto}: ${botao.url}` : ""}`;
-    return { html, texto };
-  }
-
   async function enviarUmaVez(chave: string, para: string | null | undefined, assunto: string, corpo: { html: string; texto: string }) {
     if (!para || !c.enviarEmail) return false;
     const [novo] = await db.query(`INSERT INTO emails_enviados (chave, em) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING chave`, [chave, agoraISO()]);
@@ -247,7 +234,7 @@ ${botao ? `<p style="margin:20px 0 6px"><a href="${esc(botao.url)}" style="backg
     const [cc] = await db.query<{ nome: string; email: string }>(`SELECT nome, email FROM contabilistas WHERE id = $1`, [id]);
     if (!cc) return false;
     const m = moldura(`Bem-vindo à Contabia, ${cc.nome.split(" ")[0]}`, [
-      "A sua carteira passa a trabalhar por si: os clientes fotografam as faturas e o senhor recebe-as classificadas, com o ficheiro original.",
+      "A sua carteira passa a trabalhar por si: os clientes fotografam as faturas e recebe-as já classificadas, com o ficheiro original.",
       "<b>Avisos de tudo o que importa</b> — documentos novos, pedidos de anulação, perguntas dos clientes, prazos a 7 e a 2 dias, pedidos sem resposta.",
       "<b>Respostas num toque</b> — cada aviso traz a mensagem pronta para enviar por WhatsApp ou e-mail.",
       "<b>Resumo diário às 9h</b> — um e-mail com o que tem para tratar hoje.",
@@ -336,9 +323,9 @@ ${botao ? `<p style="margin:20px 0 6px"><a href="${esc(botao.url)}" style="backg
       if (!cc.resumo_diario) continue;
       const nl = (await lista(cc.id, true)).filter((n) => n.urgencia !== "info");
       if (!nl.length) continue;
-      const linhas = nl.slice(0, 15).map((n) => `<span style="display:inline-block;font:600 11px monospace;letter-spacing:.06em;padding:2px 8px;border-radius:99px;background:${n.urgencia === "alta" ? "#FBE4E1;color:#9B2C1F" : "#E3F5EE;color:#0B5446"}">${n.urgencia === "alta" ? "URGENTE" : "PARA TRATAR"}</span> <b>${esc(n.titulo)}</b><br><span style="color:#5B6B73">${esc(n.corpo)}</span>`);
+      const linhas = nl.slice(0, 15).map((n) => `<span style="display:inline-block;font:600 11px monospace;letter-spacing:.06em;padding:2px 8px;border-radius:99px;background:${n.urgencia === "alta" ? "#FBE4E1;color:#9B2C1F" : "#E3F5EE;color:#0B5446"}">${n.urgencia === "alta" ? "PRIORIDADE ALTA" : "PARA TRATAR"}</span> <b>${esc(n.titulo)}</b><br><span style="color:#5B6B73">${esc(n.corpo)}</span>`);
       const altas = nl.filter((n) => n.urgencia === "alta").length;
-      if (await enviarUmaVez(`resumo:${cc.id}:${hoje}`, cc.email, `Contabia · ${altas ? `${altas} urgente(s) e ` : ""}${nl.length} aviso(s) para hoje`, moldura(`Bom dia, ${cc.nome.split(" ")[0]}. Hoje tem ${nl.length} aviso(s) para tratar.`,
+      if (await enviarUmaVez(`resumo:${cc.id}:${hoje}`, cc.email, `Contabia · ${altas ? `${altas} prioritário(s) e ` : ""}${nl.length} aviso(s) para hoje`, moldura(`Bom dia, ${cc.nome.split(" ")[0]}. Hoje tem ${nl.length} aviso(s) para tratar.`,
         [...linhas, nl.length > 15 ? `… e mais ${nl.length - 15} na app.` : ""].filter(Boolean),
         { texto: "Abrir os avisos", url: `${url}/contabilista/avisos` },
         `Não quer o resumo diário? <a href="${ligacaoSair("contabilista", cc.id)}" style="color:#5B6B73">Deixar de receber</a>.`))) r.emails++;
