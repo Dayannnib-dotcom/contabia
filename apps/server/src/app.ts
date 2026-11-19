@@ -1747,6 +1747,10 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   app.get("/termos", async (_req, reply) =>
     temTermos ? reply.type("text/html; charset=utf-8").header("cache-control", "no-cache").sendFile("termos.html", join(cfg.pastaWeb!, "site"))
       : reply.code(404).send({ codigo: "nao_encontrado", mensagem: "Termos indisponíveis." }));
+  const temPrivacidade = !!cfg.pastaWeb && existsSync(join(cfg.pastaWeb, "site", "privacidade.html"));
+  app.get("/privacidade", async (_req, reply) =>
+    temPrivacidade ? reply.type("text/html; charset=utf-8").header("cache-control", "no-cache").sendFile("privacidade.html", join(cfg.pastaWeb!, "site"))
+      : reply.code(404).send({ codigo: "nao_encontrado", mensagem: "Política de privacidade indisponível." }));
 
   app.get("/", async (_req, reply) =>
     temSite ? reply.type("text/html; charset=utf-8").header("cache-control", "no-cache").sendFile("index.html", join(cfg.pastaWeb!, "site"))

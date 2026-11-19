@@ -13,6 +13,16 @@ export interface ContextoAssistente {
   proximoPrazo?: { descricao: string; prazo: string };
 }
 
+/**
+ * Minimização de dados (RGPD, art. 5.º; Política de Privacidade, ponto 4): ao fornecedor de IA só segue
+ * o necessário para responder — nunca o nome, NIF, e-mail, telefone ou contacto da empresa, nem anexos.
+ */
+export function contextoMinimo(ctx: ContextoAssistente) {
+  const { regiao, regimeIVA, cae, dimensao } = ctx.empresa;
+  return { empresa: { regiao, regimeIVA, cae: cae ?? null, dimensao: dimensao ?? null }, ivaPeriodo: ctx.ivaPeriodo,
+    pedidosPendentes: ctx.pedidosPendentes, documentosPorValidar: ctx.documentosPorValidar, proximoPrazo: ctx.proximoPrazo };
+}
+
 const SISTEMA = `És o Luís, assistente virtual da Contabia, uma app de contabilidade para empresas em Portugal.
 Respondes em português de Portugal (telemóvel, ecrã, ficheiro; «a + infinitivo»), em tratamento formal na 3.ª pessoa,
 sem nunca escrever «você», «tu» nem «o senhor»: usas o verbo sem sujeito ou «o seu / a sua».
@@ -77,7 +87,7 @@ const chamarModelo: ChamarModelo = async (modelo, pergunta, ctx, chave) => {
       max_tokens: 600,
       // as instruções fixas ficam em cache: cada leitura custa uma fração do preço normal
       system: [{ type: "text", text: SISTEMA, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: `Contexto da empresa: ${JSON.stringify(ctx)}\n\nPergunta: ${pergunta}` }],
+      messages: [{ role: "user", content: `Contexto da empresa: ${JSON.stringify(contextoMinimo(ctx))}\n\nPergunta: ${pergunta}` }],
     }),
   });
   if (!r.ok) throw new Error(`IA ${r.status}`);

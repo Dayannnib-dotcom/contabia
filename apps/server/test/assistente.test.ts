@@ -35,3 +35,12 @@ test("sem orçamento no mês ou com erro, volta às regras e encaminha ao contab
   const comErro = await perguntar("Como se amortiza uma carrinha usada?", ctx, { chaveApi: "k", chamar: async () => { throw new Error("tempo esgotado"); } });
   assert.equal(comErro.encaminharParaContabilista, true);
 });
+
+test("à IA só seguem dados mínimos: sem nome, NIF, e-mail nem telefone da empresa", async () => {
+  const { contextoMinimo } = await import("../src/assistente.ts");
+  const completo = { empresa: { id: "e1", utilizador: "u", nif: "512345678", nome: "Papelaria Atlântico", regiao: "madeira", regimeIVA: "trimestral", email: "a@b.pt", telefone: "+351900000000", cae: "47620", dimensao: "micro" },
+    pedidosPendentes: [], documentosPorValidar: 2 } as unknown as ContextoAssistente;
+  const enviado = JSON.stringify(contextoMinimo(completo));
+  for (const proibido of ["512345678", "Papelaria", "a@b.pt", "+351900000000", "\"u\""]) assert.ok(!enviado.includes(proibido), proibido);
+  assert.ok(enviado.includes("47620") && enviado.includes("madeira"));
+});
