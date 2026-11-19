@@ -148,4 +148,4 @@ export interface Notificacao {
   atualizadaEm: string;
 }
 
-export const NOME_URGENCIA: Record<Urgencia, string> = { alta: "Urgente", normal: "Para tratar", info: "Para saber" };
+export const NOME_URGENCIA: Record<Urgencia, string> = { alta: "Prioridade alta", normal: "Para tratar", info: "Para saber" };

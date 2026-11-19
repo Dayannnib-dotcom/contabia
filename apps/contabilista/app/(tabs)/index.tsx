@@ -37,7 +37,7 @@ export default function Carteira() {
   const prioridade = dados?.slice().sort((a, b) => (b.lancamentosPorRever + b.pedidosPendentes + (b.ivaSubmetido ? 0 : 1)) - (a.lancamentosPorRever + a.pedidosPendentes + (a.ivaSubmetido ? 0 : 1))).find((r) => r.lancamentosPorRever + r.pedidosPendentes + (r.ivaSubmetido ? 0 : 1) > 0);
   const msg = !dados ? "A preparar o resumo do dia…"
     : dados.length === 0 ? "Ainda não tem empresas. Use «Ligar empresa» com o utilizador e o NIF que a empresa lhe der."
-    : rev + ped + iva === 0 ? `Está tudo revisto e submetido ${dados.length === 1 ? "na sua empresa" : `nas suas ${dados.length} empresas`}. Bom trabalho!`
+    : rev + ped + iva === 0 ? `Está tudo revisto e submetido ${dados.length === 1 ? "na sua empresa" : `nas suas ${dados.length} empresas`}. Bom trabalho.`
     : `Hoje temos muito trabalho por ver e submeter: ${pl(rev, "lançamento", "lançamentos")} para rever, ${pl(ped, "pedido", "pedidos")} à espera das empresas e ${pl(iva, "declaração de IVA", "declarações de IVA")} por submeter.${prioridade ? ` Sugiro começar pela ${prioridade.empresa.nome.replace(/\.$/, "")}.` : ""}`;
   const primeira = dados?.find((r) => r.lancamentosPorRever > 0);
 

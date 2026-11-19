@@ -715,7 +715,7 @@ test("26. centro de avisos do contabilista, respostas rápidas, e-mails automát
   assert.match(sem.resposta.contexto.documento, /EDP outubro/);
   const resumo = emails.find((e) => e.para === "joana@gabinete.pt");
   assert.ok(resumo && /aviso\(s\) para hoje/.test(resumo.assunto), JSON.stringify(emails.map((e) => e.assunto)));
-  assert.ok(resumo!.html!.includes("URGENTE") && resumo!.html!.includes("/v1/email/sair?t=contabilista"));
+  assert.ok(resumo!.html!.includes("PRIORIDADE ALTA") && resumo!.html!.includes("/v1/email/sair?t=contabilista"));
   // a empresa já tem documentos e contabilista: não recebe dicas desnecessárias
   assert.ok(!emails.some((e) => e.para === "rita@marazul.pt" && /primeira fatura|Ligue o seu contabilista/.test(e.assunto)));
   // a rotina é idempotente: correr de novo no mesmo dia não repete nada

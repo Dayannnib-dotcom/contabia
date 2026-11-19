@@ -91,7 +91,7 @@ export default function DetalheDocumento() {
           <Chip texto={dados.ficheiros.length ? "Guardado na nuvem" : "Falta o original"} tipo={dados.ficheiros.length ? "bom" : "aviso"} />
         </View>
         {!dados.ficheiros.length ? (
-          <Texto sec tamanho={12}>{novo ? "Documento registado! Agora fotografe a fatura em papel ou junte o PDF: o original fica guardado 10 anos, como a lei exige." : "Fotografe a fatura ou junte o PDF. Assim não precisa de guardar o papel."}</Texto>
+          <Texto sec tamanho={12}>{novo ? "Documento registado. Agora fotografe a fatura em papel ou junte o PDF: o original fica guardado 10 anos, como a lei exige." : "Fotografe a fatura ou junte o PDF. Assim não precisa de guardar o papel."}</Texto>
         ) : null}
         <ListaAnexos api={api} empresaId={sessao!.id} documentoId={dados.id} anexos={dados.ficheiros} />
         <Erro texto={erroAnexo} />
