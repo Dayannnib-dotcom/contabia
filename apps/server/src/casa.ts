@@ -1,5 +1,5 @@
 /**
- * Plano Casa: contabilidade da casa para famílias sem empresa (Guia 1, v1.1).
+ * Plano Família: contabilidade da casa para famílias sem empresa (Guia 1, v1.1).
  *  - Uma conta por agregado; titulares e dependentes com o NIF de cada um.
  *  - Faturas pelo código QR ou à mão, classificadas pelas categorias de dedução do IRS.
  *  - Faturas de saúde só com consentimento expresso (dados de saúde, art. 9.º do RGPD).
@@ -59,7 +59,7 @@ export const MIGRACOES_CASA = [
 ];
 
 export const ACOES_CASA: Record<string, string> = {
-  "POST /v1/auth/casas": "criou a conta do Plano Casa",
+  "POST /v1/auth/casas": "criou a conta do Plano Família",
   "POST /v1/casa/despesas": "registou uma fatura da casa",
   "PUT /v1/casa/despesas/:did": "alterou uma fatura da casa",
   "POST /v1/casa/despesas/:did/anular": "anulou uma fatura da casa",
@@ -135,7 +135,7 @@ export function rotasCasa(app: FastifyInstance, db: Db, agora: () => Date, extra
     const nif = limparNIF(b.nif);
     if (!validarNIF(nif)) throw new ErroApp("nif_invalido", ajudaNIF(nif).mensagem);
     const [existe] = await db.query(`SELECT 1 FROM agregados WHERE email = $1`, [b.email]);
-    if (existe) throw new ErroApp("email_existe", "Este e-mail já tem conta no Plano Casa. Use «Entrar».", 409);
+    if (existe) throw new ErroApp("email_existe", "Este e-mail já tem conta no Plano Família. Use «Entrar».", 409);
     const id = novoId();
     const em = agoraISO();
     await db.query(`INSERT INTO agregados (id, email, nome, senha_hash, criado_em) VALUES ($1,$2,$3,$4,$5)`, [id, b.email, b.nome, await hashSenha(b.senha), em]);

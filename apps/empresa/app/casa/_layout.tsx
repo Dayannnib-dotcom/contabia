@@ -1,7 +1,7 @@
 import { Redirect, Stack } from "expo-router";
 import { cor, useSessao } from "@contabia/ui";
 
-/** Plano Casa: área das famílias sem empresa, dentro da mesma app. */
+/** Plano Família: área das famílias sem empresa, dentro da mesma app. */
 export default function LayoutCasa() {
   const { sessao, pronto } = useSessao();
   if (!pronto) return null;

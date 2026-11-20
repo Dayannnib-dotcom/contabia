@@ -1087,11 +1087,11 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     aoPedirIRS: async (ag, tipo) => {
       const destino = cfg.emailEstudos ?? process.env.EMAIL_ESTUDOS;
       if (!destino) { console.warn(`[casa] EMAIL_ESTUDOS em falta — pedido de IRS de ${ag.id} sem e-mail para a equipa.`); return; }
-      const { html, texto } = moldura("Pedido de serviço de IRS (Plano Casa)", [
+      const { html, texto } = moldura("Pedido de serviço de IRS (Plano Família)", [
         `${ag.nome} (${ag.email}) pediu o serviço de IRS ${tipo === "familia" ? "para a família (69 €)" : "individual (45 €)"}.`,
         "Contacte a família para combinar a revisão e a entrega da declaração.",
       ]);
-      await enviarEmail({ para: destino, assunto: `Plano Casa: pedido de IRS de ${ag.nome}`, html, texto });
+      await enviarEmail({ para: destino, assunto: `Plano Família: pedido de IRS de ${ag.nome}`, html, texto });
     },
   });
 

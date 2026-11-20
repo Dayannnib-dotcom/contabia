@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRouter } from "expo-router";
-import { View } from "react-native";
+import { Linking, Platform, View } from "react-native";
 import { Botao, Campo, Ecra, Erro, LigacaoTermos, Titulo, useSessao } from "@contabia/ui";
 
 export default function Entrar() {
@@ -27,10 +27,12 @@ export default function Entrar() {
 
   return (
     <Ecra>
-      <Titulo sub={tipo === "empresa" ? "O gestor entra com o utilizador da empresa. Os colaboradores entram com o próprio e-mail." : "Entre com o e-mail da conta do Plano Casa."}>Bem-vindo de volta</Titulo>
+      <Titulo sub={tipo === "empresa" ? "O gestor entra com o utilizador da empresa. Os colaboradores entram com o próprio e-mail." : "Entre com o e-mail da conta Família."}>Bem-vindo de volta</Titulo>
       <View style={{ flexDirection: "row", gap: 8 }} accessibilityRole="radiogroup">
         <Botao titulo="Empresa" variante={tipo === "empresa" ? "principal" : "secundario"} onPress={() => setTipo("empresa")} estilo={{ flex: 1 }} />
-        <Botao titulo="Plano Casa" variante={tipo === "casa" ? "principal" : "secundario"} onPress={() => setTipo("casa")} estilo={{ flex: 1 }} />
+        <Botao titulo="Família" variante={tipo === "casa" ? "principal" : "secundario"} onPress={() => setTipo("casa")} estilo={{ flex: 1 }} />
+        <Botao titulo="Contabilista" variante="secundario" estilo={{ flex: 1.25 }}
+          onPress={() => { if (Platform.OS === "web") window.location.href = "/contabilista/entrar"; else void Linking.openURL("https://contabia-eu.onrender.com/contabilista/entrar"); }} />
       </View>
       <Campo rotulo={tipo === "empresa" ? "Utilizador da empresa ou e-mail" : "E-mail"} value={utilizador} onChangeText={setUtilizador} autoCapitalize="none" autoCorrect={false} keyboardType={tipo === "casa" ? "email-address" : "default"} placeholder={tipo === "empresa" ? "ex.: empresa.a ou marta@empresa.pt" : "ex.: rita@exemplo.pt"} />
       <Campo rotulo="Senha" value={senha} onChangeText={setSenha} secureTextEntry />

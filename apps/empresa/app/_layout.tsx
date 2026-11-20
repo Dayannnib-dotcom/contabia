@@ -24,7 +24,7 @@ function Navegacao() {
       <Stack.Screen name="index" />
       <Stack.Screen name="entrar" options={{ headerShown: true, title: "Entrar", headerBackTitle: "Voltar" }} />
       <Stack.Screen name="registar" options={{ headerShown: true, title: "Criar conta", headerBackTitle: "Voltar" }} />
-      <Stack.Screen name="registar-casa" options={{ headerShown: true, title: "Plano Casa", headerBackTitle: "Voltar" }} />
+      <Stack.Screen name="registar-casa" options={{ headerShown: true, title: "Plano Família", headerBackTitle: "Voltar" }} />
       <Stack.Screen name="recuperar" options={{ headerShown: true, title: "Recuperar senha", headerBackTitle: "Voltar" }} />
       <Stack.Screen name="redefinir" options={{ headerShown: true, title: "Nova senha", headerBackTitle: "Voltar" }} />
       {/* Ecrãs com sessão: ao sair, desaparecem antes de lerem uma sessão vazia. */}

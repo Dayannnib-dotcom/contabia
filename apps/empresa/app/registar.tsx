@@ -57,7 +57,7 @@ export default function Registar() {
       <Titulo sub="Com isto, a Contabia ajusta prazos, taxas de IVA e o que pedir em cada mês.">Configurar a empresa</Titulo>
       <Pressable accessibilityRole="button" onPress={() => router.replace("/registar-casa")}
         style={{ borderRadius: 14, borderWidth: 1, borderColor: cor.bordaForte, backgroundColor: cor.verdeClaro, padding: 14, gap: 2 }}>
-        <Text style={{ fontWeight: "600", color: cor.texto }}>Não tem empresa? Plano Casa ›</Text>
+        <Text style={{ fontWeight: "600", color: cor.texto }}>Não tem empresa? Conta Família ›</Text>
         <Text style={{ color: cor.textoSec, fontSize: 13 }}>Faturas da família e deduções do IRS, grátis.</Text>
       </Pressable>
       <Campo rotulo="Nome da empresa" value={nome} onChangeText={setNome} placeholder="ex.: Atlântico Serviços, Lda." />
