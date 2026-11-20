@@ -1084,6 +1084,14 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   rotasServicos(app, db, agora, { aoPartilhar: async (empresaId, r) => { await auto?.relatorioTempo(empresaId, r); } });
   rotasCasa(app, db, agora, {
     sessao,
+    tokenAdmin: cfg.tokenAdmin,
+    aoApagar: async (email, nome) => {
+      const { html, texto } = moldura("A sua conta Família foi apagada", [
+        `${nome}, apagámos a sua conta Família e todos os dados: agregado, faturas e ligações a contabilistas.`,
+        "As cópias de segurança cifradas desaparecem no prazo de 30 dias. Se quiser voltar, pode criar uma conta nova quando quiser.",
+      ]);
+      await enviarEmail({ para: email, assunto: "Contabia: conta Família apagada", html, texto });
+    },
     aoPedirIRS: async (ag, tipo) => {
       const destino = cfg.emailEstudos ?? process.env.EMAIL_ESTUDOS;
       if (!destino) { console.warn(`[casa] EMAIL_ESTUDOS em falta — pedido de IRS de ${ag.id} sem e-mail para a equipa.`); return; }

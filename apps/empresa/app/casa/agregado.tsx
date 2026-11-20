@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useRouter } from "expo-router";
 import { View } from "react-native";
 import { dataPT, validarNIF } from "@contabia/shared";
 import { type LigacaoFamilia } from "@contabia/shared";
@@ -54,6 +55,7 @@ export default function AgregadoCasa() {
         <Botao titulo={consentimento ? "Retirar consentimento" : "Dou o meu consentimento"} variante={consentimento ? "secundario" : "principal"} onPress={() => fazer(() => api.casaConsentirSaude(!consentimento))} />
         {consentimento ? <Texto sec tamanho={12}>Se retirar, as faturas de saúde já guardadas ficam até pedir para as anular.</Texto> : null}
       </Cartao>
+      <ApagarConta />
     </Ecra>
   );
 }
@@ -98,6 +100,44 @@ function ContabilistaDaFamilia() {
         </>
       ) : null}
       <Erro texto={erro} />
+    </Cartao>
+  );
+}
+
+/** Apagar a conta Família e todos os dados (direito ao apagamento). Na empresa, apaga só a área Família. */
+function ApagarConta() {
+  const { api, sessao, sair } = useSessao();
+  const router = useRouter();
+  const [aberto, setAberto] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [aEnviar, setAEnviar] = useState(false);
+  const daEmpresa = sessao!.papel === "empresa";
+  async function apagar() {
+    setAEnviar(true); setErro(null);
+    try {
+      await api.casaApagar(texto);
+      if (daEmpresa) router.replace("/(tabs)");
+      else { await sair(); router.replace("/"); }
+    } catch (e) { setErro((e as Error).message); } finally { setAEnviar(false); }
+  }
+  return (
+    <Cartao>
+      <Texto forte tamanho={15}>{daEmpresa ? "Apagar a área Família" : "Apagar a conta"}</Texto>
+      <Texto tamanho={13}>{daEmpresa
+        ? "Apaga o agregado, as faturas da casa e as ligações a contabilistas da família. A empresa não é afetada."
+        : "Apaga a conta, o agregado, as faturas e as ligações a contabilistas. Não dá para desfazer."}</Texto>
+      {!aberto ? <Botao titulo={daEmpresa ? "Apagar a área Família" : "Apagar a conta"} variante="perigo" onPress={() => setAberto(true)} /> : (
+        <>
+          <Campo rotulo="Escreva APAGAR para confirmar" value={texto} onChangeText={setTexto} autoCapitalize="characters" autoCorrect={false} />
+          <Erro texto={erro} />
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Botao titulo="Cancelar" variante="secundario" estilo={{ flex: 1 }} onPress={() => { setAberto(false); setTexto(""); }} />
+            <Botao titulo="Apagar de vez" variante="perigo" estilo={{ flex: 1 }} carregando={aEnviar} desativado={texto.trim().toUpperCase() !== "APAGAR"} onPress={apagar} />
+          </View>
+        </>
+      )}
+      <Texto sec tamanho={12}>As cópias de segurança cifradas desaparecem no prazo de 30 dias.</Texto>
     </Cartao>
   );
 }

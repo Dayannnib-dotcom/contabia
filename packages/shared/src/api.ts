@@ -126,6 +126,9 @@ export class ApiContabia {
   casaConsentirSaude(consentir: boolean) {
     return this.pedido<ResumoCasa["agregado"]>("PUT", "/v1/casa/consentimento-saude", { consentir });
   }
+  casaApagar(confirmacao: string) {
+    return this.pedido<{ ok: true; mensagem: string }>("POST", "/v1/casa/apagar", { confirmacao });
+  }
   casaAtivar(d: { nome: string; nif: string }) {
     return this.pedido<ResumoCasa>("POST", "/v1/casa/ativar", d);
   }
