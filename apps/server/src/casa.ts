@@ -79,6 +79,7 @@ export const MIGRACOES_CASA = [
 export const ACOES_CASA: Record<string, string> = {
   "POST /v1/auth/casas": "criou a conta do Plano Família",
   "POST /v1/casa/despesas": "registou uma fatura da casa",
+  "POST /v1/casa/despesas/importar": "importou faturas da casa do e-Fatura",
   "PUT /v1/casa/despesas/:did": "alterou uma fatura da casa",
   "POST /v1/casa/despesas/:did/anular": "anulou uma fatura da casa",
   "POST /v1/casa/membros": "acrescentou uma pessoa ao agregado",
@@ -283,6 +284,38 @@ export function rotasCasa(app: FastifyInstance, db: Db, agora: () => Date, extra
       id, membro_id: membroId, nif_emitente: d.nif, emitente: b.emitente || null, data: d.data, total: d.total, iva: d.iva,
       categoria, origem: d.origem, numero: d.numero, anulada: false, criada_em: criada,
     }));
+  });
+
+  // ── Importar do e-Fatura (ficheiro exportado pela família no Portal das Finanças) ──
+  app.post("/v1/casa/despesas/importar", async (req) => {
+    const a = await casaDe(req);
+    const ag = await agregado(a.id);
+    const b = z.object({
+      linhas: z.array(z.object({
+        nif: z.string(), nome: z.string().max(200), numero: z.string().max(80), atcud: z.string().max(80).optional().default(""),
+        data: zData, iva: z.number().min(0), total: z.number(),
+      })).max(2000),
+    }).parse(req.body);
+    const resultados: { numero: string; estado: "importada" | "repetida" | "saude_sem_consentimento" | "erro"; categoria?: CategoriaCasa; mensagem?: string }[] = [];
+    for (const l of b.linhas) {
+      const nif = limparNIF(l.nif);
+      if (!validarNIF(nif) || l.total <= 0) { resultados.push({ numero: l.numero, estado: "erro", mensagem: "NIF ou total inválido" }); continue; }
+      const atcud = l.atcud && l.atcud !== "0" ? l.atcud : null;
+      const [rep] = await db.query(
+        atcud ? `SELECT 1 FROM despesas_casa WHERE agregado_id = $1 AND nif_emitente = $2 AND atcud = $3`
+              : `SELECT 1 FROM despesas_casa WHERE agregado_id = $1 AND nif_emitente = $2 AND numero = $3`,
+        [a.id, nif, atcud ?? l.numero]);
+      if (rep) { resultados.push({ numero: l.numero, estado: "repetida" }); continue; }
+      const categoria = categoriaCasaSugerida(l.nome);
+      if (categoria === "saude" && !ag.consentimento_saude_em) { resultados.push({ numero: l.numero, estado: "saude_sem_consentimento", categoria }); continue; }
+      await db.query(
+        `INSERT INTO despesas_casa (id, agregado_id, membro_id, nif_emitente, emitente, data, total, iva, categoria, origem, numero, atcud, criada_em)
+         VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,'efatura',$9,$10,$11)`,
+        [novoId(), a.id, nif, l.nome || null, l.data, arred(l.total), arred(l.iva), categoria, l.numero, atcud, agoraISO()]);
+      resultados.push({ numero: l.numero, estado: "importada", categoria });
+    }
+    const conta = (e: string) => resultados.filter((r) => r.estado === e).length;
+    return { importadas: conta("importada"), repetidas: conta("repetida"), saudeSemConsentimento: conta("saude_sem_consentimento"), erros: conta("erro"), resultados };
   });
 
   async function despesaDoAgregado(agregadoId: string, did: string) {

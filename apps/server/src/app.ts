@@ -270,13 +270,16 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   const MENSAGEM_RECUPERAR = "Se existir uma conta com esses dados e um e-mail associado, enviámos uma ligação para criar uma nova senha. Veja também a pasta de spam.";
 
   app.post("/v1/auth/recuperar", async (req) => {
-    const b = z.object({ papel: z.enum(["empresa", "contabilista"]), identificador: z.string().trim().min(1) }).parse(req.body);
+    const b = z.object({ papel: z.enum(["empresa", "contabilista", "casa"]), identificador: z.string().trim().min(1) }).parse(req.body);
     const ident = b.identificador.toLowerCase();
     verificarTentativas([[`recuperar:${ident}`, 3], [`ip:${req.ip}`, 20]]);
     registarFalha(`recuperar:${ident}`); // conta como tentativa para limitar abusos
     let alvo: { conta: string; colab: string | null; email: string; nome: string } | null = null;
     if (b.papel === "contabilista") {
       const [c] = await db.query<{ id: string; email: string; nome: string }>(`SELECT id, email, nome FROM contabilistas WHERE email = $1`, [ident]);
+      if (c) alvo = { conta: c.id, colab: null, email: c.email, nome: c.nome };
+    } else if (b.papel === "casa") {
+      const [c] = await db.query<{ id: string; email: string; nome: string }>(`SELECT id, email, nome FROM agregados WHERE email = $1 AND senha_hash IS NOT NULL`, [ident]);
       if (c) alvo = { conta: c.id, colab: null, email: c.email, nome: c.nome };
     } else {
       const [c] = await db.query<{ id: string; empresa_id: string; email: string; nome: string }>(`SELECT id, empresa_id, email, nome FROM colaboradores WHERE email = $1 AND ativo`, [ident]);
@@ -290,7 +293,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
       const token = randomBytes(32).toString("base64url");
       await db.query(`INSERT INTO recuperacoes (hash, papel, conta_id, colaborador_id, expira_em) VALUES ($1,$2,$3,$4,$5)`,
         [hashToken(token), b.papel, alvo.conta, alvo.colab, new Date(Date.now() + 60 * 60 * 1000).toISOString()]);
-      const ligacao = `${urlPublicoDe(req)}/${b.papel === "empresa" ? "empresa" : "contabilista"}/redefinir?token=${token}`;
+      const ligacao = `${urlPublicoDe(req)}/${b.papel === "contabilista" ? "contabilista" : "empresa"}/redefinir?token=${token}`;
       await enviarEmail({ para: alvo.email, nome: alvo.nome, ...emailRecuperacao(alvo.nome, ligacao) });
     }
     // a mesma resposta exista ou não a conta: não se revela quem está registado
@@ -307,6 +310,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const agoraTxt = new Date().toISOString();
     if (r.colaborador_id) await db.query(`UPDATE colaboradores SET senha_hash = $1, senha_mudada_em = $2 WHERE id = $3`, [hash, agoraTxt, r.colaborador_id]);
     else if (r.papel === "empresa") await db.query(`UPDATE empresas SET senha_hash = $1, senha_mudada_em = $2 WHERE id = $3`, [hash, agoraTxt, r.conta_id]);
+    else if (r.papel === "casa") await db.query(`UPDATE agregados SET senha_hash = $1, senha_mudada_em = $2 WHERE id = $3`, [hash, agoraTxt, r.conta_id]);
     else await db.query(`UPDATE contabilistas SET senha_hash = $1, senha_mudada_em = $2 WHERE id = $3`, [hash, agoraTxt, r.conta_id]);
     await db.query(`UPDATE recuperacoes SET usada = true WHERE hash = $1`, [r.hash]);
     // quem acabou de provar que é dono do e-mail pode entrar já, sem esperar pelo desbloqueio
@@ -314,7 +318,9 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
       ? await db.query<{ i: string }>(`SELECT email AS i FROM colaboradores WHERE id = $1`, [r.colaborador_id])
       : r.papel === "empresa"
         ? await db.query<{ i: string }>(`SELECT utilizador AS i FROM empresas WHERE id = $1 UNION SELECT email FROM empresas WHERE id = $1 AND email IS NOT NULL`, [r.conta_id])
-        : await db.query<{ i: string }>(`SELECT email AS i FROM contabilistas WHERE id = $1`, [r.conta_id]);
+        : r.papel === "casa"
+          ? await db.query<{ i: string }>(`SELECT email AS i FROM agregados WHERE id = $1`, [r.conta_id])
+          : await db.query<{ i: string }>(`SELECT email AS i FROM contabilistas WHERE id = $1`, [r.conta_id]);
     for (const { i } of idents) falhas.delete(`conta:${r.papel}:${i.toLowerCase()}`);
     return { ok: true, mensagem: "Nova senha guardada. Já pode entrar." };
   });

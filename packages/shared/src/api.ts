@@ -10,7 +10,7 @@ import type {
   ResumoEmpresa, Sessao, Submissao, VerificacaoFecho, Contabilista,
 } from "./tipos.ts";
 import type { Regras, Regiao, RegimeIVA } from "./regras.ts";
-import type { CategoriaCasa, DespesaCasa, FamiliaCarteira, LigacaoFamilia, MembroCasa, ResumoCasa } from "./casa.ts";
+import type { CategoriaCasa, DespesaCasa, FamiliaCarteira, LigacaoFamilia, MembroCasa, ResultadoImportacaoCasa, ResumoCasa } from "./casa.ts";
 import type { LinhaEfatura } from "./efatura.ts";
 import type { LinhaExtrato } from "./extrato.ts";
 import type { Notificacao } from "./respostas.ts";
@@ -92,7 +92,7 @@ export class ApiContabia {
   entrar(d: { papel: "empresa" | "contabilista" | "casa"; identificador: string; senha: string }) {
     return this.pedido<Sessao>("POST", "/v1/auth/sessoes", d);
   }
-  recuperarSenha(papel: "empresa" | "contabilista", identificador: string) {
+  recuperarSenha(papel: "empresa" | "contabilista" | "casa", identificador: string) {
     return this.pedido<{ ok: true; mensagem: string }>("POST", "/v1/auth/recuperar", { papel, identificador }, 2);
   }
   redefinirSenha(token: string, senha: string) {
@@ -125,6 +125,9 @@ export class ApiContabia {
   }
   casaConsentirSaude(consentir: boolean) {
     return this.pedido<ResumoCasa["agregado"]>("PUT", "/v1/casa/consentimento-saude", { consentir });
+  }
+  casaImportarEfatura(linhas: { nif: string; nome: string; numero: string; atcud: string; data: string; iva: number; total: number }[]) {
+    return this.pedido<ResultadoImportacaoCasa>("POST", "/v1/casa/despesas/importar", { linhas: linhas.map(({ nif, nome, numero, atcud, data, iva, total }) => ({ nif, nome, numero, atcud, data, iva, total })) });
   }
   casaApagar(confirmacao: string) {
     return this.pedido<{ ok: true; mensagem: string }>("POST", "/v1/casa/apagar", { confirmacao });

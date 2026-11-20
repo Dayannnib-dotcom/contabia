@@ -38,7 +38,7 @@ export default function Entrar() {
       <Campo rotulo="Senha" value={senha} onChangeText={setSenha} secureTextEntry />
       <Erro texto={erro} />
       <Botao titulo="Entrar" onPress={enviar} carregando={aEnviar} desativado={!utilizador || senha.length < 8} />
-      <Botao titulo="Esqueci-me da senha" variante="secundario" onPress={() => router.push("/recuperar")} />
+      <Botao titulo="Esqueci-me da senha" variante="secundario" onPress={() => router.push(tipo === "casa" ? "/recuperar?tipo=casa" : "/recuperar")} />
       <Botao titulo="Ainda não tenho conta — criar conta" variante="secundario" onPress={() => router.replace(tipo === "casa" ? "/registar-casa" : "/registar")} />
       <LigacaoTermos />
     </Ecra>
