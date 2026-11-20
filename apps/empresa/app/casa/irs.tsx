@@ -37,7 +37,7 @@ export default function ServicoIRS() {
         </Cartao>
       ))}
       <Erro texto={erro} />
-      <Texto sec tamanho={12}>A app do Plano Casa é grátis. O serviço de IRS paga-se à parte, depois de combinado com o contabilista.</Texto>
+      <Texto sec tamanho={12}>A app do Plano Família é grátis. O serviço de IRS paga-se à parte, depois de combinado com o contabilista.</Texto>
     </Ecra>
   );
 }

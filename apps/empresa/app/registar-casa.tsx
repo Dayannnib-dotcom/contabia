@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { ajudaNIF } from "@contabia/shared";
 import { Botao, Campo, Ecra, Erro, LigacaoTermos, MensagemLuis, Titulo, useSessao } from "@contabia/ui";
 
-/** Criar conta no Plano Casa: para famílias sem empresa. A app é grátis. */
+/** Criar conta no Plano Família: para famílias sem empresa. A app é grátis. */
 export default function RegistarCasa() {
   const { api, entrar } = useSessao();
   const router = useRouter();
@@ -30,7 +30,7 @@ export default function RegistarCasa() {
 
   return (
     <Ecra>
-      <Titulo sub="Para famílias sem empresa. A app é grátis.">Plano Casa</Titulo>
+      <Titulo sub="Para famílias sem empresa. A app é grátis.">Plano Família</Titulo>
       <MensagemLuis texto="Guardo as faturas da casa ao longo do ano e digo-lhe quanto já conta para o IRS. Quando chegar a altura, um contabilista pode entregar a declaração por si." />
       <Campo rotulo="O seu nome" value={nome} onChangeText={setNome} autoComplete="name" />
       <Campo rotulo="E-mail" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" />

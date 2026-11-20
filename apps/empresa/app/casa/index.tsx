@@ -5,7 +5,7 @@ import { Botao, CALENDARIO_PAPEL, Cartao, Ecra, Erro, Icone, Linha, MensagemLuis
 
 const MESES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
-/** Painel do Plano Casa: deduções estimadas do ano, próximos prazos e atalhos. */
+/** Painel do Plano Família: deduções estimadas do ano, próximos prazos e atalhos. */
 export default function PainelCasa() {
   const { api, sessao, sair } = useSessao();
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function PainelCasa() {
   return (
     <Ecra>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <Titulo sub="Plano Casa · IRS da família">{dados?.agregado.nome ?? sessao!.nome}</Titulo>
+        <Titulo sub="Plano Família · IRS e faturas da casa">{dados?.agregado.nome ?? sessao!.nome}</Titulo>
       </View>
       <MensagemLuis texto={msg} escuro expressao={dados && dados.despesasDoAno > 0 ? "celebrar" : "sorriso"} />
       <Erro texto={erro} />

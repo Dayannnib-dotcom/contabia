@@ -96,7 +96,7 @@ export async function exigirAcesso(db: Db, a: Ator, empresaId: string, permissao
 
 export function exigirPapel(a: Ator, papel: Papel) {
   if (a.papel !== papel)
-    throw new ErroApp("sem_permissao", papel === "contabilista" ? "Só o Contabilista Certificado pode fazer isto." : papel === "casa" ? "Isto é só para contas do Plano Casa." : "Só a empresa pode fazer isto.", 403);
+    throw new ErroApp("sem_permissao", papel === "contabilista" ? "Só o Contabilista Certificado pode fazer isto." : papel === "casa" ? "Isto é só para contas Família." : "Só a empresa pode fazer isto.", 403);
 }
 
 export const num = (v: unknown) => Number(v);

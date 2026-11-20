@@ -1,5 +1,5 @@
 /**
- * Plano Casa (Guia 1, v1.1): contabilidade da casa para famílias sem empresa.
+ * Plano Família (Guia 1, v1.1): contabilidade da casa para famílias sem empresa.
  * Classifica faturas pelas categorias de dedução do IRS e estima o valor deduzido.
  * As percentagens e limites são os das despesas de 2026 (declaradas em 2027).
  * O valor final é sempre calculado pela AT: na app falamos de «estimativa».

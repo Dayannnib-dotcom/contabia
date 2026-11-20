@@ -101,7 +101,7 @@ export class ApiContabia {
   definirEmail(email: string) {
     return this.pedido<Empresa>("PUT", "/v1/auth/email", { email });
   }
-  // ── Plano Casa ──
+  // ── Plano Família ──
   casa() {
     return this.pedido<ResumoCasa>("GET", "/v1/casa");
   }
