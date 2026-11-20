@@ -10,7 +10,7 @@ import type {
   ResumoEmpresa, Sessao, Submissao, VerificacaoFecho, Contabilista,
 } from "./tipos.ts";
 import type { Regras, Regiao, RegimeIVA } from "./regras.ts";
-import type { CategoriaCasa, DespesaCasa, MembroCasa, ResumoCasa } from "./casa.ts";
+import type { CategoriaCasa, DespesaCasa, FamiliaCarteira, LigacaoFamilia, MembroCasa, ResumoCasa } from "./casa.ts";
 import type { LinhaEfatura } from "./efatura.ts";
 import type { LinhaExtrato } from "./extrato.ts";
 import type { Notificacao } from "./respostas.ts";
@@ -125,6 +125,40 @@ export class ApiContabia {
   }
   casaConsentirSaude(consentir: boolean) {
     return this.pedido<ResumoCasa["agregado"]>("PUT", "/v1/casa/consentimento-saude", { consentir });
+  }
+  casaAtivar(d: { nome: string; nif: string }) {
+    return this.pedido<ResumoCasa>("POST", "/v1/casa/ativar", d);
+  }
+  casaLigacoes() {
+    return this.pedido<LigacaoFamilia[]>("GET", "/v1/casa/ligacoes");
+  }
+  casaConvidarContabilista(email: string) {
+    return this.pedido<LigacaoFamilia>("POST", "/v1/casa/ligacoes", { email });
+  }
+  casaResponderLigacao(id: string, acao: "aceitar" | "recusar" | "revogar") {
+    return this.pedido<LigacaoFamilia>("POST", `/v1/casa/ligacoes/${id}/${acao}`, {});
+  }
+  // ── Famílias na carteira do contabilista ──
+  familiasLigacoes() {
+    return this.pedido<LigacaoFamilia[]>("GET", "/v1/familias/ligacoes");
+  }
+  familiasPedirLigacao(email: string, nif: string) {
+    return this.pedido<LigacaoFamilia>("POST", "/v1/familias/ligacoes", { email, nif });
+  }
+  familiasResponder(id: string, acao: "aceitar" | "recusar" | "revogar") {
+    return this.pedido<LigacaoFamilia>("POST", `/v1/familias/ligacoes/${id}/${acao}`, {});
+  }
+  familias() {
+    return this.pedido<FamiliaCarteira[]>("GET", "/v1/familias");
+  }
+  familia(id: string) {
+    return this.pedido<ResumoCasa>("GET", `/v1/familias/${id}`);
+  }
+  familiaDespesas(id: string, ano?: number) {
+    return this.pedido<DespesaCasa[]>("GET", `/v1/familias/${id}/despesas${ano ? `?ano=${ano}` : ""}`);
+  }
+  familiaMudarCategoria(id: string, despesaId: string, categoria: CategoriaCasa) {
+    return this.pedido<DespesaCasa>("PUT", `/v1/familias/${id}/despesas/${despesaId}`, { categoria });
   }
   casaPedirIRS(tipo: "individual" | "familia") {
     return this.pedido<ResumoCasa["agregado"]>("POST", "/v1/casa/servico-irs", { tipo });

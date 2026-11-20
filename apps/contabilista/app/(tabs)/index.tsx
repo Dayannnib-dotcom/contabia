@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
-import { formatarNIF, saudacao } from "@contabia/shared";
+import { euros, formatarNIF, saudacao } from "@contabia/shared";
 import { PlacaPadrao, RAZAO_PAPEL, AtivarAvisos, Botao, Cartao, useAvisosPrazos, Chip, Ecra, Erro, Icone, MensagemLuis, Numero, Texto, Titulo, Vazio, cor, useDados, useSessao } from "@contabia/ui";
 
 const pl = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
@@ -11,6 +11,7 @@ export default function Carteira() {
   const router = useRouter();
   const { dados, erro } = useDados(() => api.carteira(), [sessao!.id]);
   const { dados: ligs } = useDados(() => api.ligacoes(), [sessao!.id]);
+  const { dados: familias } = useDados(() => api.familias(), [sessao!.id]);
   // Avisos dos prazos de toda a carteira, agrupados por obrigação e data (ex.: «DP IVA · 3 empresas»).
   const { dados: prazosCarteira } = useDados(async () => {
     const lista = await api.carteira();
@@ -36,7 +37,7 @@ export default function Carteira() {
   const iva = dados?.filter((r) => !r.ivaSubmetido).length ?? 0;
   const prioridade = dados?.slice().sort((a, b) => (b.lancamentosPorRever + b.pedidosPendentes + (b.ivaSubmetido ? 0 : 1)) - (a.lancamentosPorRever + a.pedidosPendentes + (a.ivaSubmetido ? 0 : 1))).find((r) => r.lancamentosPorRever + r.pedidosPendentes + (r.ivaSubmetido ? 0 : 1) > 0);
   const msg = !dados ? "A preparar o resumo do dia…"
-    : dados.length === 0 ? "Ainda não tem empresas. Use «Ligar empresa» com o utilizador e o NIF que a empresa lhe der."
+    : dados.length === 0 ? "Ainda não tem empresas. Use «Ligar cliente» com os dados que a empresa ou a família lhe der."
     : rev + ped + iva === 0 ? `Está tudo revisto e submetido ${dados.length === 1 ? "na sua empresa" : `nas suas ${dados.length} empresas`}. Bom trabalho.`
     : `Hoje temos muito trabalho por ver e submeter: ${pl(rev, "lançamento", "lançamentos")} para rever, ${pl(ped, "pedido", "pedidos")} à espera das empresas e ${pl(iva, "declaração de IVA", "declarações de IVA")} por submeter.${prioridade ? ` Sugiro começar pela ${prioridade.empresa.nome.replace(/\.$/, "")}.` : ""}`;
   const primeira = dados?.find((r) => r.lancamentosPorRever > 0);
@@ -60,7 +61,7 @@ export default function Carteira() {
         ))}
       </PlacaPadrao>
       <Texto forte tamanho={16}>Carteira</Texto>
-      {dados?.length === 0 ? <Vazio texto="Ainda não há empresas ligadas. Convide a primeira em «Ligar empresa»." /> : null}
+      {dados?.length === 0 ? <Vazio texto="Ainda não há empresas ligadas. Convide a primeira em «Ligar cliente»." /> : null}
       {dados?.map((r) => (
         <Cartao key={r.empresa.id} onPress={() => router.push({ pathname: "/empresa/[id]", params: { id: r.empresa.id } })}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -75,6 +76,19 @@ export default function Carteira() {
             {r.pedidosPendentes ? <Chip texto={`${r.pedidosPendentes} pedidos`} tipo="aviso" /> : null}
             <Chip texto={r.ivaSubmetido ? "IVA submetido" : "IVA por submeter"} tipo={r.ivaSubmetido ? "bom" : "aviso"} />
           </View>
+        </Cartao>
+      ))}
+      {familias?.length ? <Texto forte tamanho={16}>Famílias</Texto> : null}
+      {familias?.map((f) => (
+        <Cartao key={f.agregadoId} onPress={() => router.push({ pathname: "/familia/[id]", params: { id: f.agregadoId } })}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <Texto forte>{f.nome}</Texto>
+              <Texto sec tamanho={12}>{pl(f.pessoas, "pessoa", "pessoas")} · {pl(f.despesasDoAno, "fatura", "faturas")} · deduções estimadas {euros(f.deducoes)}</Texto>
+            </View>
+            <Icone nome="seguir" cor={cor.textoSec} />
+          </View>
+          {f.servicoIRS ? <Chip texto={`Pediu o IRS ${f.servicoIRS.tipo === "familia" ? "de família" : "individual"}`} tipo="aviso" /> : null}
         </Cartao>
       ))}
     </Ecra>

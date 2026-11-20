@@ -82,3 +82,46 @@ test("casa 2. conta, agregado, faturas e consentimento de saúde", async () => {
   await new Promise((ok) => setTimeout(ok, 50));
   assert.ok(emails.some((e) => e.para === "equipa@contabia.test" && e.assunto.includes("Rita Gomes")));
 });
+
+test("casa 3. contabilista ligado à família e família da empresa", async () => {
+  const cc = await chamar("POST", "/v1/auth/contabilistas", undefined, { email: "sofia@gabinete.pt", nome: "Sofia CC", numeroOCC: "4321", senha: "segredo123" });
+  const tcc = cc.json.token;
+  // sem ligação, nada se vê
+  const fam = (await chamar("GET", "/v1/casa", token)).json.agregado.id;
+  assert.equal((await chamar("GET", `/v1/familias/${fam}`, tcc)).status, 403);
+  // e-mail e NIF do titular têm de coincidir
+  assert.equal((await chamar("POST", "/v1/familias/ligacoes", tcc, { email: "rita@exemplo.pt", nif: "509999999" })).json.codigo, "sem_familia");
+  const pedido = await chamar("POST", "/v1/familias/ligacoes", tcc, { email: "rita@exemplo.pt", nif: "123456789" });
+  assert.equal(pedido.status, 201);
+  assert.equal(pedido.json.estado, "pendente");
+  // o contabilista não aceita o próprio pedido; a família aceita
+  assert.equal((await chamar("POST", `/v1/familias/ligacoes/${pedido.json.id}/aceitar`, tcc)).status, 409);
+  const lig = (await chamar("GET", "/v1/casa/ligacoes", token)).json;
+  assert.equal(lig[0].contabilista.nome, "Sofia CC");
+  assert.equal((await chamar("POST", `/v1/casa/ligacoes/${lig[0].id}/aceitar`, token)).json.estado, "ativa");
+  const carteira = (await chamar("GET", "/v1/familias", tcc)).json;
+  assert.equal(carteira.length, 1);
+  assert.equal(carteira[0].nome, "Rita Gomes");
+  const ds = (await chamar("GET", `/v1/familias/${fam}/despesas`, tcc)).json;
+  const geral = ds.find((d: { categoria: string; anulada: boolean }) => d.categoria === "gerais" && !d.anulada);
+  assert.equal((await chamar("PUT", `/v1/familias/${fam}/despesas/${geral.id}`, tcc, { categoria: "educacao" })).json.categoria, "educacao");
+  // a família termina a ligação e o acesso acaba
+  await chamar("POST", `/v1/casa/ligacoes/${lig[0].id}/revogar`, token);
+  assert.equal((await chamar("GET", `/v1/familias/${fam}`, tcc)).status, 403);
+
+  // gestor de empresa gere a casa na mesma conta, separada da empresa
+  const e = await chamar("POST", "/v1/auth/empresas", undefined, { utilizador: "loja.mar", nif: "509999999", nome: "Loja do Mar, Lda.", senha: "segredo123", regiao: "PT-MA", regimeIVA: "trimestral" });
+  const te = e.json.token;
+  assert.equal((await chamar("GET", "/v1/casa", te)).json.codigo, "sem_familia");
+  const at = await chamar("POST", "/v1/casa/ativar", te, { nome: "João Mar", nif: "123456789" });
+  assert.equal(at.status, 201);
+  assert.equal(at.json.membros[0].nome, "João Mar");
+  const f = await chamar("POST", "/v1/casa/despesas", te, { nifEmitente: "500000000", emitente: "Supermercado", data: "2026-11-01", total: 100 });
+  assert.equal(f.status, 201);
+  assert.equal((await chamar("GET", "/v1/casa", te)).json.despesasDoAno, 1);
+  // a família da empresa convida o contabilista pelo e-mail dele
+  const conv = await chamar("POST", "/v1/casa/ligacoes", te, { email: "sofia@gabinete.pt" });
+  assert.equal(conv.json.estado, "pendente");
+  assert.equal((await chamar("POST", `/v1/familias/ligacoes/${conv.json.id}/aceitar`, tcc)).json.estado, "ativa");
+  assert.equal((await chamar("GET", "/v1/familias", tcc)).json.length, 1);
+});

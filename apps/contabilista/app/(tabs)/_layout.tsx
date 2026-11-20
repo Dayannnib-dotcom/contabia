@@ -21,7 +21,7 @@ export default function Separadores() {
       <Tabs.Screen name="index" options={{ title: "Carteira", tabBarIcon: ({ color }) => <Icone nome="carteira" cor={String(color)} /> }} />
       <Tabs.Screen name="avisos" options={{ title: "Avisos", tabBarBadge: porLer ? (porLer > 99 ? "99+" : porLer) : undefined, tabBarBadgeStyle: { backgroundColor: cor.menta, color: "#0C1A22", fontWeight: "700" }, tabBarIcon: ({ color }) => <Icone nome="sino" cor={String(color)} /> }} />
       <Tabs.Screen name="horas" options={{ title: "Horas", tabBarIcon: ({ color }) => <Icone nome="relogio" cor={String(color)} /> }} />
-      <Tabs.Screen name="ligar" options={{ title: "Ligar empresa", tabBarIcon: ({ color }) => <Icone nome="ligar" cor={String(color)} /> }} />
+      <Tabs.Screen name="ligar" options={{ title: "Ligar cliente", tabBarIcon: ({ color }) => <Icone nome="ligar" cor={String(color)} /> }} />
     </Tabs>
   );
 }
