@@ -208,6 +208,15 @@ section{padding:var(--space-16) 0}
 .faq p{margin:0 0 20px;color:var(--ink-muted);max-width:42em}
 
 /* CTA final + rodapé */
+/* Padrões da Guia 2: um por secção, sempre numa faixa sem texto por cima */
+.com-padrao{position:relative}.com-padrao>.contentor{position:relative;z-index:1}
+.padrao{position:absolute;left:0;right:0;pointer-events:none}
+.padrao-mare{bottom:0;height:64px;background:url(/site/img/padroes/padrao-mare-noite.svg) repeat 0 0/33.3px 40px}
+.padrao-pontos{bottom:0;height:72px;background:url(/site/img/padroes/padrao-pontos-atlanticos-papel.svg) repeat 0 0/120px 120px;opacity:.9}
+.padrao-baixar{top:0;height:168px;background:url(/site/img/padroes/composicao-mare-a-baixar-noite.svg) repeat-x center top/720px auto}
+.final.com-padrao{padding-top:calc(var(--space-24) + 120px)}
+@media(min-width:900px){.final.com-padrao{padding-top:calc(var(--space-32) + 120px)}}
+@media(max-width:520px){.padrao-mare{height:48px}.padrao-baixar{height:132px;background-size:560px auto}.final.com-padrao{padding-top:calc(var(--space-24) + 96px)}}
 .final{text-align:center;padding:var(--space-24) 0}
 @media(min-width:900px){.final{padding:var(--space-32) 0}}
 .final .acoes{justify-content:center}
@@ -533,7 +542,8 @@ html{scroll-padding-top:76px}
 
 <main id="conteudo">
 <!-- 1. Hero -->
-<section class="hero escuro" id="inicio">
+<section class="hero escuro com-padrao" id="inicio">
+  <div class="padrao padrao-mare" aria-hidden="true"></div>
   <div class="contentor">
     <div class="revela">
       <a class="novo" href="#fundos"><b>NOVO</b>Fundos europeus pelo seu CAE <span aria-hidden="true">→</span></a>
@@ -638,7 +648,8 @@ html{scroll-padding-top:76px}
 </section>
 
 <!-- 4b. Fundos europeus pelo CAE -->
-<section id="fundos" class="faixa" aria-labelledby="t-fundos">
+<section id="fundos" class="faixa com-padrao" aria-labelledby="t-fundos">
+  <div class="padrao padrao-pontos" aria-hidden="true"></div>
   <div class="contentor fundos-grid">
     <div class="revela">
       <p class="eyebrow">Fundos europeus · Portugal 2030 e PRR</p>
@@ -893,7 +904,8 @@ html{scroll-padding-top:76px}
 </section>
 
 <!-- 9. CTA final -->
-<section class="final escuro" aria-labelledby="t-final">
+<section class="final escuro com-padrao" aria-labelledby="t-final">
+  <div class="padrao padrao-baixar" aria-hidden="true"></div>
   <div class="contentor revela">
     <h2 class="h1" id="t-final">Comece hoje. Amanhã já está <span class="onda">tudo em dia.<svg viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" vector-effect="non-scaling-stroke" d="M2 6q7.5-7 15 0t15 0t15 0t15 0t15 0t15 0t15 0t13 0"/></svg></span></h2>
     <div class="acoes">
