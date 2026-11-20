@@ -86,6 +86,8 @@ export const ACOES_CASA: Record<string, string> = {
   "PUT /v1/casa/consentimento-saude": "mudou o consentimento para faturas de saúde",
   "POST /v1/casa/servico-irs": "pediu o serviço de IRS",
   "POST /v1/casa/ativar": "ativou a área Família da empresa",
+  "POST /v1/casa/apagar": "apagou a conta Família e os dados",
+  "POST /v1/admin/familias/:fid/apagar": "apagou uma conta Família a pedido",
   "POST /v1/casa/ligacoes": "convidou um contabilista para a família",
   "POST /v1/casa/ligacoes/:lid/:acao": "respondeu a uma ligação com um contabilista",
   "POST /v1/familias/ligacoes": "pediu ligação a uma família",
@@ -116,6 +118,10 @@ const agregadoDe = (r: LinhaAgregado): ResumoCasa["agregado"] => ({
 export interface ExtrasCasa {
   /** Emite a sessão (token) da conta criada. */
   sessao: (a: Ator) => Promise<Sessao>;
+  /** Token de administração (para apagar uma família a pedido feito por e-mail). */
+  tokenAdmin?: string;
+  /** Confirma por e-mail à família que a conta foi apagada. */
+  aoApagar?: (email: string, nome: string) => Promise<void>;
   /** Avisa a equipa de que uma família pediu o serviço de IRS. */
   aoPedirIRS?: (agregado: ResumoCasa["agregado"], tipo: "individual" | "familia") => Promise<void>;
 }
@@ -454,5 +460,28 @@ export function rotasCasa(app: FastifyInstance, db: Db, agora: () => Date, extra
     exigirConsentimentoSaude(ag, b.categoria);
     await db.query(`UPDATE despesas_casa SET categoria = $2 WHERE id = $1`, [r.id, b.categoria]);
     return despesaDe({ ...r, categoria: b.categoria });
+  });
+
+  // ── Apagar a conta Família (direito ao apagamento, RGPD) ──
+  /** Apaga a família e tudo o que é dela. Ao contrário das empresas, não há obrigação legal de guardar. */
+  async function apagarFamilia(id: string) {
+    const ag = await agregado(id);
+    await db.query(`DELETE FROM ligacoes_familia WHERE agregado_id = $1`, [id]);
+    await db.query(`DELETE FROM despesas_casa WHERE agregado_id = $1`, [id]);
+    await db.query(`DELETE FROM membros_casa WHERE agregado_id = $1`, [id]);
+    await db.query(`DELETE FROM agregados WHERE id = $1`, [id]);
+    if (ag.email) void extras.aoApagar?.(ag.email, ag.nome).catch(() => undefined);
+  }
+  app.post("/v1/casa/apagar", async (req) => {
+    const a = await casaDe(req);
+    const b = z.object({ confirmacao: z.string() }).parse(req.body);
+    if (b.confirmacao.trim().toUpperCase() !== "APAGAR") throw new ErroApp("confirmacao", "Escreva APAGAR para confirmar.", 400);
+    await apagarFamilia(a.id);
+    return { ok: true, mensagem: "A conta Família e todos os dados foram apagados. As cópias de segurança desaparecem no prazo de 30 dias." };
+  });
+  app.post("/v1/admin/familias/:fid/apagar", async (req) => {
+    if (!extras.tokenAdmin || req.headers["x-admin-token"] !== extras.tokenAdmin) throw new ErroApp("sem_permissao", "Acesso reservado.", 403);
+    await apagarFamilia(p(req).fid);
+    return { ok: true };
   });
 }

@@ -125,3 +125,15 @@ test("casa 3. contabilista ligado à família e família da empresa", async () =
   assert.equal((await chamar("POST", `/v1/familias/ligacoes/${conv.json.id}/aceitar`, tcc)).json.estado, "ativa");
   assert.equal((await chamar("GET", "/v1/familias", tcc)).json.length, 1);
 });
+
+test("casa 4. apagar a conta Família", async () => {
+  assert.equal((await chamar("POST", "/v1/casa/apagar", token, { confirmacao: "sim" })).json.codigo, "confirmacao");
+  const r = await chamar("POST", "/v1/casa/apagar", token, { confirmacao: "apagar" });
+  assert.equal(r.json.ok, true);
+  const [{ n }] = await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM despesas_casa d JOIN agregados g ON g.id = d.agregado_id WHERE g.email = 'rita@exemplo.pt'`);
+  assert.equal(Number(n), 0);
+  assert.equal((await chamar("GET", "/v1/casa", token)).status, 401); // a sessão acaba
+  assert.equal((await chamar("POST", "/v1/auth/sessoes", undefined, { papel: "casa", identificador: "rita@exemplo.pt", senha: "segredo123" })).status, 401);
+  await new Promise((ok) => setTimeout(ok, 50));
+  assert.ok(emails.some((e) => e.para === "rita@exemplo.pt" && e.assunto.includes("apagada")));
+});
