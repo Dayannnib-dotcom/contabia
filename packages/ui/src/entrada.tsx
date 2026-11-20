@@ -3,7 +3,9 @@ import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { cor } from "./tema";
 import { fonte } from "./fontes";
+import { SvgXml } from "react-native-svg";
 import { Logo, Luis } from "./marca";
+import { MARE_A_BAIXAR_NOITE } from "./padroes";
 import { Botao } from "./componentes";
 
 /** Entrada animada: logótipo, nome, sinais de confiança e saudação do Luís. */
@@ -26,6 +28,10 @@ export function EcraEntrada({ papel, saudacao, onEntrar, onCriarConta, rotulo = 
   ];
   return (
     <SafeAreaView style={s.fundo}>
+      {/* Maré a baixar: faixa no topo, sem texto por cima; o logótipo fica abaixo, na zona lisa (Guia 2) */}
+      <View style={s.mare} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <SvgXml xml={MARE_A_BAIXAR_NOITE} width="100%" height="100%" preserveAspectRatio="xMidYMin slice" />
+      </View>
       <View style={s.topo}>
         <Animated.View style={{ opacity: v[0], transform: [{ scale: v[0].interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }}>
           <Logo tamanho={96} fundo={cor.tinta2} />
@@ -58,7 +64,8 @@ export function EcraEntrada({ papel, saudacao, onEntrar, onCriarConta, rotulo = 
 
 const s = StyleSheet.create({
   fundo: { flex: 1, backgroundColor: cor.tinta, padding: 28, gap: 28 },
-  topo: { alignItems: "center", gap: 12, marginTop: 48 },
+  mare: { position: "absolute", top: 0, left: 0, right: 0, height: 112 },
+  topo: { alignItems: "center", gap: 12, marginTop: 100 },
   nome: { fontSize: 38, fontFamily: fonte.titulo, color: "#FFFFFF", letterSpacing: -0.8 },
   lema: { fontSize: 16, color: "#C9D6DC", textAlign: "center" },
   confianca: { flexDirection: "row", alignItems: "center", gap: 12 },
