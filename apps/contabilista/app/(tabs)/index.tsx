@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
 import { formatarNIF, saudacao } from "@contabia/shared";
-import { AtivarAvisos, Botao, Cartao, useAvisosPrazos, Chip, Ecra, Erro, Icone, MensagemLuis, Numero, Texto, Titulo, Vazio, cor, useDados, useSessao } from "@contabia/ui";
+import { PlacaPadrao, RAZAO_PAPEL, AtivarAvisos, Botao, Cartao, useAvisosPrazos, Chip, Ecra, Erro, Icone, MensagemLuis, Numero, Texto, Titulo, Vazio, cor, useDados, useSessao } from "@contabia/ui";
 
 const pl = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
@@ -54,11 +54,11 @@ export default function Carteira() {
       ) : null}
       <MensagemLuis escuro rotulo="Luís · assistente do seu gabinete" texto={msg} acao={primeira ? <Botao titulo="Começar revisão" variante="menta" onPress={() => router.push({ pathname: "/empresa/[id]", params: { id: primeira.empresa.id, sec: "revisao" } })} estilo={{ alignSelf: "flex-start", minHeight: 40, marginTop: 6 }} /> : undefined} />
       <Erro texto={erro} />
-      <View style={{ flexDirection: "row", gap: 10 }}>
+      <PlacaPadrao mosaico={RAZAO_PAPEL} escala={0.6} estilo={{ flexDirection: "row", gap: 10 }}>
         {[["Por rever", rev], ["Pedidos", ped], ["IVA por submeter", iva]].map(([t, n]) => (
           <Cartao key={String(t)} estilo={{ flex: 1, gap: 2 }}><Texto sec tamanho={12}>{t}</Texto><Numero tamanho={26}>{n}</Numero></Cartao>
         ))}
-      </View>
+      </PlacaPadrao>
       <Texto forte tamanho={16}>Carteira</Texto>
       {dados?.length === 0 ? <Vazio texto="Ainda não há empresas ligadas. Convide a primeira em «Ligar empresa»." /> : null}
       {dados?.map((r) => (

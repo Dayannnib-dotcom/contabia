@@ -9,6 +9,9 @@ import { fonte } from "./fontes";
 import { Luis, type ExpressaoLuis } from "./marca";
 
 /** `aoInteragir`: chamado a cada toque ou deslocação (serve para medir o tempo ativo). */
+import { FaixaPadrao } from "./padrao";
+import { PONTOS_PAPEL } from "./padroes";
+
 export function Ecra({ children, rolar = true, estilo, aoInteragir }: { children: ReactNode; rolar?: boolean; estilo?: StyleProp<ViewStyle>; aoInteragir?: () => void }) {
   return (
     <SafeAreaView style={[s.ecra, estilo]} edges={["top", "left", "right"]} onTouchStart={aoInteragir}>
@@ -129,8 +132,14 @@ export function MensagemLuis({ texto, escuro, acao, rotulo = "Luís · assistent
   );
 }
 
+/** Estado vazio: faixa de Pontos atlânticos (Guia 2) e a mensagem numa área lisa por baixo. */
 export function Vazio({ texto }: { texto: string }) {
-  return <Text style={{ color: cor.textoSec, textAlign: "center", paddingVertical: espaco.xl }}>{texto}</Text>;
+  return (
+    <View style={{ alignItems: "center", paddingVertical: espaco.l, gap: espaco.m }}>
+      <FaixaPadrao mosaico={PONTOS_PAPEL} altura={40} escala={0.5} estilo={{ width: 160, borderRadius: raio.m }} />
+      <Text style={{ color: cor.textoSec, textAlign: "center" }}>{texto}</Text>
+    </View>
+  );
 }
 
 export function Erro({ texto }: { texto?: string | null }) {
