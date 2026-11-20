@@ -2,7 +2,7 @@ import { FilaPendente } from "../../components/FilaPendente";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { dataPT, diasAte, euros, nomePeriodo, saudacao } from "@contabia/shared";
-import { Botao, Cartao, GraficoMensal, useAvisosPrazos, Chip, Ecra, Erro, Icone, Linha, MensagemLuis, Numero, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
+import { ASSINATURA_NOITE, CALENDARIO_PAPEL, FaixaPadrao, PlacaPadrao, Botao, Cartao, GraficoMensal, useAvisosPrazos, Chip, Ecra, Erro, Icone, Linha, MensagemLuis, Numero, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
 
 const MESES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
@@ -44,6 +44,7 @@ export default function Painel() {
       <FilaPendente compacto />
 
       {prox ? (
+        <PlacaPadrao mosaico={CALENDARIO_PAPEL} escala={0.6}>
         <Cartao onPress={() => router.push("/(tabs)/prazos")} estilo={{ backgroundColor: cor.ambar, borderColor: cor.ambar, flexDirection: "row", alignItems: "center" }}>
           <View style={{ width: 52, alignItems: "center" }}>
             <Text style={{ fontSize: 11, fontWeight: "700", color: cor.ambarTexto }}>{MESES.at(Number(prox.prazo.slice(5, 7)) - 1)}</Text>
@@ -54,6 +55,7 @@ export default function Painel() {
             <Texto tamanho={12} cor={cor.ambarTexto}>{nomePeriodo(prox.periodo)} · faltam {diasAte(hoje, prox.prazo)} dias</Texto>
           </View>
         </Cartao>
+        </PlacaPadrao>
       ) : null}
 
       {dados?.docs.length ? (
@@ -82,7 +84,8 @@ export default function Painel() {
         const abertos = dados.apoios.apoios.filter((a) => a.apoio.estado === "aberto");
         const prox = abertos.find((a) => a.diasParaFim !== null);
         return (
-          <Cartao onPress={() => router.push("/apoios")} estilo={{ backgroundColor: cor.tinta, borderColor: cor.tinta, gap: 6 }}>
+          <Cartao onPress={() => router.push("/apoios")} estilo={{ backgroundColor: cor.tinta, borderColor: cor.tinta, gap: 6, overflow: "hidden" }}>
+            <FaixaPadrao mosaico={ASSINATURA_NOITE} altura={36} escala={0.62} desvio={[6, 9]} estilo={{ marginTop: -16, marginHorizontal: -16, marginBottom: 6, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" }} />
             <Texto tamanho={11} forte cor={cor.menta}>APOIOS EUROPEUS</Texto>
             <Texto forte tamanho={17} cor="#FFFFFF">
               {!dados.apoios.perfil.cae ? "Há fundos europeus para a sua atividade?"
