@@ -3,7 +3,7 @@ import { Botao, Campo, Ecra, Erro, MensagemLuis, Titulo } from "./componentes";
 import { useSessao } from "./sessao";
 
 /** «Esqueci-me da senha»: pede a ligação por e-mail. */
-export function EcraRecuperar({ papel, aoVoltar }: { papel: "empresa" | "contabilista"; aoVoltar: () => void }) {
+export function EcraRecuperar({ papel, aoVoltar }: { papel: "empresa" | "contabilista" | "casa"; aoVoltar: () => void }) {
   const { api } = useSessao();
   const [ident, setIdent] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
@@ -22,7 +22,7 @@ export function EcraRecuperar({ papel, aoVoltar }: { papel: "empresa" | "contabi
   }
   return (
     <Ecra>
-      <Titulo sub={papel === "empresa" ? "Escreva o utilizador da empresa ou o seu e-mail. Enviamos uma ligação para criar uma nova senha." : "Escreva o seu e-mail profissional. Enviamos uma ligação para criar uma nova senha."}>Esqueci-me da senha</Titulo>
+      <Titulo sub={papel === "empresa" ? "Escreva o utilizador da empresa ou o seu e-mail. Enviamos uma ligação para criar uma nova senha." : papel === "casa" ? "Escreva o e-mail da conta Família. Enviamos uma ligação para criar uma nova senha." : "Escreva o seu e-mail profissional. Enviamos uma ligação para criar uma nova senha."}>Esqueci-me da senha</Titulo>
       {msg ? (
         <>
           <MensagemLuis texto={msg} />

@@ -30,6 +30,7 @@ export default function PainelCasa() {
       <Erro texto={erro} />
 
       <Botao titulo="Fotografar uma fatura" onPress={() => router.push("/casa/fatura")} icone={<Icone nome="digitalizar" cor="#FFFFFF" />} />
+      <Botao titulo="Importar do e-Fatura" variante="secundario" onPress={() => router.push("/casa/importar")} />
 
       {dados ? (
         <Cartao>

@@ -16,6 +16,7 @@ export default function LayoutCasa() {
       <Stack.Screen name="agregado" options={{ title: "Agregado familiar" }} />
       <Stack.Screen name="irs" options={{ title: "Serviço de IRS" }} />
       <Stack.Screen name="ativar" options={{ title: "Área Família" }} />
+      <Stack.Screen name="importar" options={{ title: "Importar do e-Fatura" }} />
     </Stack>
   );
 }

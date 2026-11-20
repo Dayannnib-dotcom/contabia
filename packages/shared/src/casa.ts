@@ -101,7 +101,7 @@ export const PRECO_IRS_CASA = { individual: 45, familia: 69 } as const;
 export interface MembroCasa { id: string; nome: string; nif: string; tipo: "titular" | "dependente"; ativo: boolean }
 export interface DespesaCasa {
   id: string; membroId: string | null; nifEmitente: string; emitente: string | null; data: string; total: number; iva: number;
-  categoria: CategoriaCasa; origem: "qr" | "manual"; numero: string | null; anulada: boolean; criadaEm: string;
+  categoria: CategoriaCasa; origem: "qr" | "manual" | "efatura"; numero: string | null; anulada: boolean; criadaEm: string;
 }
 export interface ResumoCasa {
   agregado: { id: string; nome: string; email: string; consentimentoSaudeEm: string | null; servicoIRS: { tipo: "individual" | "familia"; pedidoEm: string } | null };
@@ -123,4 +123,9 @@ export interface LigacaoFamilia {
 export interface FamiliaCarteira {
   agregadoId: string; nome: string; pessoas: number; despesasDoAno: number; deducoes: number;
   servicoIRS: ResumoCasa["agregado"]["servicoIRS"];
+}
+
+export interface ResultadoImportacaoCasa {
+  importadas: number; repetidas: number; saudeSemConsentimento: number; erros: number;
+  resultados: { numero: string; estado: "importada" | "repetida" | "saude_sem_consentimento" | "erro"; categoria?: CategoriaCasa; mensagem?: string }[];
 }

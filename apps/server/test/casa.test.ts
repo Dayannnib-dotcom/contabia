@@ -6,7 +6,7 @@ import { estimarDeducoes, categoriaCasaSugerida } from "@contabia/shared";
 
 let db: Db;
 let app: Awaited<ReturnType<typeof criarApp>>["app"];
-const emails: { para: string; assunto: string }[] = [];
+const emails: { para: string; assunto: string; texto?: string }[] = [];
 let token = "";
 
 async function chamar(metodo: string, caminho: string, tk?: string, corpo?: unknown) {
@@ -126,6 +126,32 @@ test("casa 3. contabilista ligado à família e família da empresa", async () =
   assert.equal((await chamar("GET", "/v1/familias", tcc)).json.length, 1);
 });
 
+test("casa 3b. importar do e-Fatura e recuperar a senha", async () => {
+  const csv = "Emitente;Nº Fatura / ATCUD;Tipo;Data Emissão;Total;IVA;Base Tributável;Situação\n500000000 - Farmácia do Porto;FR 2026/9 / AB12-9;Fatura-recibo;2026-08-10;20,00;1,13;18,87;Registado\n500000000 - Supermercado Sol;FT 2026/55 / CD34-55;Fatura;2026-08-11;55,00;8,00;47,00;Registado";
+  const { lerCSVEfatura } = await import("@contabia/shared");
+  const l = lerCSVEfatura(csv);
+  assert.equal(l.linhas.length, 2);
+  await chamar("PUT", "/v1/casa/consentimento-saude", token, { consentir: false });
+  const r1 = await chamar("POST", "/v1/casa/despesas/importar", token, { linhas: l.linhas });
+  assert.equal(r1.json.importadas, 1);
+  assert.equal(r1.json.saudeSemConsentimento, 1);
+  await chamar("PUT", "/v1/casa/consentimento-saude", token, { consentir: true });
+  const r2 = await chamar("POST", "/v1/casa/despesas/importar", token, { linhas: l.linhas });
+  assert.equal(r2.json.importadas, 1);
+  assert.equal(r2.json.repetidas, 1);
+  // recuperar a senha da conta Família
+  const rec = await chamar("POST", "/v1/auth/recuperar", undefined, { papel: "casa", identificador: "rita@exemplo.pt" });
+  assert.equal(rec.status, 200);
+  await new Promise((ok) => setTimeout(ok, 50));
+  const mail = emails.filter((e) => e.para === "rita@exemplo.pt").at(-1) as { texto?: string } | undefined;
+  const tk = mail?.texto?.match(/token=([\w-]+)/)?.[1];
+  assert.ok(tk);
+  assert.equal((await chamar("POST", "/v1/auth/redefinir", undefined, { token: tk, senha: "novasenha123" })).status, 200);
+  const nova = await chamar("POST", "/v1/auth/sessoes", undefined, { papel: "casa", identificador: "rita@exemplo.pt", senha: "novasenha123" });
+  assert.equal(nova.status, 200);
+  token = nova.json.token;
+});
+
 test("casa 4. apagar a conta Família", async () => {
   assert.equal((await chamar("POST", "/v1/casa/apagar", token, { confirmacao: "sim" })).json.codigo, "confirmacao");
   const r = await chamar("POST", "/v1/casa/apagar", token, { confirmacao: "apagar" });
@@ -133,7 +159,7 @@ test("casa 4. apagar a conta Família", async () => {
   const [{ n }] = await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM despesas_casa d JOIN agregados g ON g.id = d.agregado_id WHERE g.email = 'rita@exemplo.pt'`);
   assert.equal(Number(n), 0);
   assert.equal((await chamar("GET", "/v1/casa", token)).status, 401); // a sessão acaba
-  assert.equal((await chamar("POST", "/v1/auth/sessoes", undefined, { papel: "casa", identificador: "rita@exemplo.pt", senha: "segredo123" })).status, 401);
+  assert.equal((await chamar("POST", "/v1/auth/sessoes", undefined, { papel: "casa", identificador: "rita@exemplo.pt", senha: "novasenha123" })).status, 401);
   await new Promise((ok) => setTimeout(ok, 50));
   assert.ok(emails.some((e) => e.para === "rita@exemplo.pt" && e.assunto.includes("apagada")));
 });
