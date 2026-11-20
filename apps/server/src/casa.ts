@@ -9,6 +9,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
+  type FamiliaCarteira, type LigacaoFamilia,
   ANO_FISCAL_CASA, ajudaNIF, arred, categoriaCasaSugerida, estimarDeducoes, lerQR, limparNIF, prazosCasa, qrConsistente, validarNIF,
   type CategoriaCasa, type DespesaCasa, type MembroCasa, type ResumoCasa, type Sessao,
 } from "@contabia/shared";
@@ -56,6 +57,23 @@ export const MIGRACOES_CASA = [
    )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS despesas_casa_atcud ON despesas_casa(agregado_id, nif_emitente, atcud) WHERE atcud IS NOT NULL AND atcud <> '' AND atcud <> '0'`,
   `CREATE INDEX IF NOT EXISTS despesas_casa_data ON despesas_casa(agregado_id, data)`,
+  // Família da própria empresa: o gestor gere a casa na mesma app, sem outra conta
+  `ALTER TABLE agregados ADD COLUMN IF NOT EXISTS empresa_id text`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS agregados_empresa ON agregados(empresa_id) WHERE empresa_id IS NOT NULL`,
+  `ALTER TABLE agregados ALTER COLUMN email DROP NOT NULL`,
+  `ALTER TABLE agregados ALTER COLUMN senha_hash DROP NOT NULL`,
+  // Ligação família ↔ Contabilista Certificado (as duas partes consentem)
+  `CREATE TABLE IF NOT EXISTS ligacoes_familia (
+     id text PRIMARY KEY,
+     agregado_id text NOT NULL REFERENCES agregados(id),
+     contabilista_id text NOT NULL REFERENCES contabilistas(id),
+     estado text NOT NULL,
+     iniciada_por text NOT NULL,
+     criada_em text NOT NULL,
+     ativada_em text,
+     terminada_em text
+   )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS ligacoes_familia_viva ON ligacoes_familia(agregado_id, contabilista_id) WHERE estado IN ('pendente', 'ativa')`,
 ];
 
 export const ACOES_CASA: Record<string, string> = {
@@ -67,6 +85,12 @@ export const ACOES_CASA: Record<string, string> = {
   "POST /v1/casa/membros/:mid/desativar": "retirou uma pessoa do agregado",
   "PUT /v1/casa/consentimento-saude": "mudou o consentimento para faturas de saúde",
   "POST /v1/casa/servico-irs": "pediu o serviço de IRS",
+  "POST /v1/casa/ativar": "ativou a área Família da empresa",
+  "POST /v1/casa/ligacoes": "convidou um contabilista para a família",
+  "POST /v1/casa/ligacoes/:lid/:acao": "respondeu a uma ligação com um contabilista",
+  "POST /v1/familias/ligacoes": "pediu ligação a uma família",
+  "POST /v1/familias/ligacoes/:lid/:acao": "respondeu a uma ligação com uma família",
+  "PUT /v1/familias/:fid/despesas/:did": "mudou a categoria de uma fatura de uma família",
 };
 
 const CATEGORIAS = ["gerais", "saude", "educacao", "rendas", "exigencia", "sem_deducao"] as const;
@@ -99,7 +123,17 @@ export interface ExtrasCasa {
 export function rotasCasa(app: FastifyInstance, db: Db, agora: () => Date, extras: ExtrasCasa) {
   const agoraISO = () => agora().toISOString();
   const p = (req: FastifyRequest) => req.params as Record<string, string>;
-  const casaDe = (req: FastifyRequest) => { const a = ator(req); exigirPapel(a, "casa"); return a; };
+  /** Agregado de quem pede: a conta Família, ou a família do gestor de uma empresa. */
+  async function agregadoDoAtor(a: Ator): Promise<string> {
+    if (a.papel === "casa") return a.id;
+    if (a.papel === "empresa" && a.perfil !== "colaborador") {
+      const [r] = await db.query<{ id: string }>(`SELECT id FROM agregados WHERE empresa_id = $1`, [a.id]);
+      if (!r) throw new ErroApp("sem_familia", "Ainda não ativou a área Família.", 404);
+      return r.id;
+    }
+    throw new ErroApp("sem_permissao", "Isto é só para contas Família.", 403);
+  }
+  const casaDe = async (req: FastifyRequest) => ({ id: await agregadoDoAtor(ator(req)) });
 
   async function agregado(id: string) {
     const [r] = await db.query<LinhaAgregado>(`SELECT id, email, nome, consentimento_saude_em, servico_irs, servico_irs_em FROM agregados WHERE id = $1`, [id]);
@@ -144,12 +178,10 @@ export function rotasCasa(app: FastifyInstance, db: Db, agora: () => Date, extra
   });
 
   // ── Resumo ──
-  app.get("/v1/casa", async (req): Promise<ResumoCasa> => {
-    const a = casaDe(req);
-    const ag = await agregado(a.id);
-    const ms = await membros(a.id);
-    const ano = Number((req.query as { ano?: string }).ano) || ANO_FISCAL_CASA;
-    const ds = await despesas(a.id, ano);
+  async function resumo(id: string, ano = ANO_FISCAL_CASA): Promise<ResumoCasa> {
+    const ag = await agregado(id);
+    const ms = await membros(id);
+    const ds = await despesas(id, ano);
     const titulares = ms.filter((m) => m.ativo && m.tipo === "titular").length;
     return {
       agregado: agregadoDe(ag), membros: ms, ano,
@@ -157,11 +189,15 @@ export function rotasCasa(app: FastifyInstance, db: Db, agora: () => Date, extra
       prazos: prazosCasa(ano),
       despesasDoAno: ds.filter((d) => !d.anulada).length,
     };
+  }
+  app.get("/v1/casa", async (req): Promise<ResumoCasa> => {
+    const a = await casaDe(req);
+    return resumo(a.id, Number((req.query as { ano?: string }).ano) || ANO_FISCAL_CASA);
   });
 
   // ── Membros ──
   app.post("/v1/casa/membros", async (req, reply) => {
-    const a = casaDe(req);
+    const a = await casaDe(req);
     const b = z.object({ nome: z.string().trim().min(2, "Indique o nome."), nif: z.string(), tipo: z.enum(["titular", "dependente"]) }).parse(req.body);
     const nif = limparNIF(b.nif);
     if (!validarNIF(nif)) throw new ErroApp("nif_invalido", ajudaNIF(nif).mensagem);
@@ -180,7 +216,7 @@ export function rotasCasa(app: FastifyInstance, db: Db, agora: () => Date, extra
   });
 
   app.post("/v1/casa/membros/:mid/desativar", async (req) => {
-    const a = casaDe(req);
+    const a = await casaDe(req);
     const [m] = await db.query<LinhaMembro & { agregado_id: string }>(`SELECT id, nome, nif, tipo, ativo, agregado_id FROM membros_casa WHERE id = $1`, [p(req).mid]);
     if (!m || m.agregado_id !== a.id) throw new ErroApp("membro_invalido", "Essa pessoa não faz parte do seu agregado.", 404);
     if (m.tipo === "titular") {
@@ -193,7 +229,7 @@ export function rotasCasa(app: FastifyInstance, db: Db, agora: () => Date, extra
 
   // ── Consentimento para dados de saúde ──
   app.put("/v1/casa/consentimento-saude", async (req) => {
-    const a = casaDe(req);
+    const a = await casaDe(req);
     const b = z.object({ consentir: z.boolean() }).parse(req.body);
     await db.query(`UPDATE agregados SET consentimento_saude_em = $2 WHERE id = $1`, [a.id, b.consentir ? agoraISO() : null]);
     return agregadoDe(await agregado(a.id));
@@ -201,13 +237,13 @@ export function rotasCasa(app: FastifyInstance, db: Db, agora: () => Date, extra
 
   // ── Despesas ──
   app.get("/v1/casa/despesas", async (req) => {
-    const a = casaDe(req);
+    const a = await casaDe(req);
     const ano = Number((req.query as { ano?: string }).ano) || undefined;
     return despesas(a.id, ano);
   });
 
   app.post("/v1/casa/despesas", async (req, reply) => {
-    const a = casaDe(req);
+    const a = await casaDe(req);
     const ag = await agregado(a.id);
     const b = z.object({
       qr: z.string().optional(), nifEmitente: z.string().optional(), emitente: z.string().trim().max(120).optional(),
@@ -250,7 +286,7 @@ export function rotasCasa(app: FastifyInstance, db: Db, agora: () => Date, extra
   }
 
   app.put("/v1/casa/despesas/:did", async (req) => {
-    const a = casaDe(req);
+    const a = await casaDe(req);
     const ag = await agregado(a.id);
     const r = await despesaDoAgregado(a.id, p(req).did);
     if (r.anulada) throw new ErroApp("anulada", "Esta fatura está anulada.", 409);
@@ -264,7 +300,7 @@ export function rotasCasa(app: FastifyInstance, db: Db, agora: () => Date, extra
   });
 
   app.post("/v1/casa/despesas/:did/anular", async (req) => {
-    const a = casaDe(req);
+    const a = await casaDe(req);
     const r = await despesaDoAgregado(a.id, p(req).did);
     const b = z.object({ motivo: z.string().trim().min(3, "Indique o motivo.") }).parse(req.body);
     await db.query(`UPDATE despesas_casa SET anulada = true, motivo_anulacao = $2 WHERE id = $1`, [r.id, b.motivo]);
@@ -273,11 +309,150 @@ export function rotasCasa(app: FastifyInstance, db: Db, agora: () => Date, extra
 
   // ── Serviço de IRS com Contabilista Certificado ──
   app.post("/v1/casa/servico-irs", async (req) => {
-    const a = casaDe(req);
+    const a = await casaDe(req);
     const b = z.object({ tipo: z.enum(["individual", "familia"]) }).parse(req.body);
     await db.query(`UPDATE agregados SET servico_irs = $2, servico_irs_em = $3 WHERE id = $1`, [a.id, b.tipo, agoraISO()]);
     const ag = agregadoDe(await agregado(a.id));
     void extras.aoPedirIRS?.(ag, b.tipo).catch(() => undefined);
     return ag;
+  });
+
+  // ── Família da empresa: o gestor ativa a área Família na mesma app ──
+  app.post("/v1/casa/ativar", async (req, reply) => {
+    const a = ator(req);
+    if (a.papel !== "empresa" || a.perfil === "colaborador") throw new ErroApp("so_gestor", "Só o gestor da empresa pode ativar a área Família.", 403);
+    const b = z.object({ nome: z.string().trim().min(2, "Indique o seu nome."), nif: z.string() }).parse(req.body);
+    const nif = limparNIF(b.nif);
+    if (!validarNIF(nif)) throw new ErroApp("nif_invalido", ajudaNIF(nif).mensagem);
+    const [ja] = await db.query<{ id: string }>(`SELECT id FROM agregados WHERE empresa_id = $1`, [a.id]);
+    if (ja) return resumo(ja.id);
+    const id = novoId();
+    const em = agoraISO();
+    await db.query(`INSERT INTO agregados (id, email, nome, senha_hash, criado_em, empresa_id) VALUES ($1,NULL,$2,NULL,$3,$4)`, [id, b.nome, em, a.id]);
+    await db.query(`INSERT INTO membros_casa (id, agregado_id, nome, nif, tipo, criado_em) VALUES ($1,$2,$3,$4,'titular',$5)`, [novoId(), id, b.nome, nif, em]);
+    return reply.code(201).send(await resumo(id));
+  });
+
+  // ── Ligação família ↔ Contabilista Certificado ──
+  type LinhaLig = { id: string; agregado_id: string; contabilista_id: string; estado: string; iniciada_por: string; criada_em: string; ativada_em: string | null };
+  const ligacaoDe = (l: LinhaLig, extra: Partial<LigacaoFamilia> = {}): LigacaoFamilia => ({
+    id: l.id, agregadoId: l.agregado_id, estado: l.estado as LigacaoFamilia["estado"], iniciadaPor: l.iniciada_por as LigacaoFamilia["iniciadaPor"],
+    criadaEm: l.criada_em, ativadaEm: l.ativada_em, ...extra,
+  });
+  async function ligacao(lid: string) {
+    const [l] = await db.query<LinhaLig>(`SELECT * FROM ligacoes_familia WHERE id = $1`, [lid]);
+    if (!l) throw new ErroApp("sem_ligacao", "Ligação não encontrada.", 404);
+    return l;
+  }
+  async function criarLigacao(agregadoId: string, contabilistaId: string, por: "familia" | "contabilista") {
+    const [viva] = await db.query<LinhaLig>(`SELECT * FROM ligacoes_familia WHERE agregado_id = $1 AND contabilista_id = $2 AND estado IN ('pendente','ativa')`, [agregadoId, contabilistaId]);
+    if (viva?.estado === "ativa") throw new ErroApp("ja_ligada", "Já estão ligados.", 409);
+    if (viva && viva.iniciada_por !== por) return mudarEstado(viva, "ativa"); // o outro lado já tinha convidado: os dois consentiram
+    if (viva) throw new ErroApp("ja_pedida", "O pedido já foi enviado e está à espera de resposta.", 409);
+    const l: LinhaLig = { id: novoId(), agregado_id: agregadoId, contabilista_id: contabilistaId, estado: "pendente", iniciada_por: por, criada_em: agoraISO(), ativada_em: null };
+    await db.query(`INSERT INTO ligacoes_familia (id, agregado_id, contabilista_id, estado, iniciada_por, criada_em) VALUES ($1,$2,$3,'pendente',$4,$5)`, [l.id, agregadoId, contabilistaId, por, l.criada_em]);
+    return l;
+  }
+  async function mudarEstado(l: LinhaLig, estado: "ativa" | "recusada" | "revogada") {
+    const em = agoraISO();
+    await db.query(`UPDATE ligacoes_familia SET estado = $2, ativada_em = CASE WHEN $2 = 'ativa' THEN $3 ELSE ativada_em END, terminada_em = CASE WHEN $2 <> 'ativa' THEN $3 ELSE terminada_em END WHERE id = $1`, [l.id, estado, em]);
+    return { ...l, estado, ativada_em: estado === "ativa" ? em : l.ativada_em };
+  }
+  /** Regras de resposta: quem convidou pode cancelar; o outro lado aceita ou recusa; ativa, qualquer um termina. */
+  async function responder(l: LinhaLig, lado: "familia" | "contabilista", acao: string) {
+    if (acao === "revogar") {
+      if (l.estado === "ativa" || (l.estado === "pendente" && l.iniciada_por === lado)) return mudarEstado(l, "revogada");
+    } else if (l.estado === "pendente" && l.iniciada_por !== lado) {
+      if (acao === "aceitar") return mudarEstado(l, "ativa");
+      if (acao === "recusar") return mudarEstado(l, "recusada");
+    }
+    throw new ErroApp("acao_invalida", "Esta ligação já não aceita essa ação.", 409);
+  }
+
+  // lado da família
+  app.get("/v1/casa/ligacoes", async (req) => {
+    const a = await casaDe(req);
+    const ls = await db.query<LinhaLig & { c_nome: string; c_occ: string; c_email: string }>(
+      `SELECT l.*, c.nome AS c_nome, c.numero_occ AS c_occ, c.email AS c_email FROM ligacoes_familia l JOIN contabilistas c ON c.id = l.contabilista_id
+       WHERE l.agregado_id = $1 ORDER BY l.criada_em DESC`, [a.id]);
+    return ls.map((l) => ligacaoDe(l, { contabilista: { nome: l.c_nome, numeroOCC: l.c_occ, email: l.c_email } }));
+  });
+  app.post("/v1/casa/ligacoes", async (req, reply) => {
+    const a = await casaDe(req);
+    const b = z.object({ email: z.string().trim().toLowerCase().email("O e-mail não parece válido.") }).parse(req.body);
+    const [c] = await db.query<{ id: string; nome: string; numero_occ: string; email: string }>(`SELECT id, nome, numero_occ, email FROM contabilistas WHERE email = $1`, [b.email]);
+    if (!c) throw new ErroApp("sem_contabilista", "Não há nenhum Contabilista Certificado na Contabia com este e-mail. Confirme com o seu contabilista.", 404);
+    const l = await criarLigacao(a.id, c.id, "familia");
+    return reply.code(201).send(ligacaoDe(l, { contabilista: { nome: c.nome, numeroOCC: c.numero_occ, email: c.email } }));
+  });
+  app.post("/v1/casa/ligacoes/:lid/:acao", async (req) => {
+    const a = await casaDe(req);
+    const l = await ligacao(p(req).lid);
+    if (l.agregado_id !== a.id) throw new ErroApp("sem_ligacao", "Ligação não encontrada.", 404);
+    return ligacaoDe(await responder(l, "familia", p(req).acao));
+  });
+
+  // lado do contabilista
+  const contabilistaDe = (req: FastifyRequest) => { const a = ator(req); exigirPapel(a, "contabilista"); return a; };
+  async function exigirFamilia(contabilistaId: string, agregadoId: string) {
+    const [l] = await db.query(`SELECT 1 FROM ligacoes_familia WHERE agregado_id = $1 AND contabilista_id = $2 AND estado = 'ativa'`, [agregadoId, contabilistaId]);
+    if (!l) throw new ErroApp("sem_permissao", "Sem ligação ativa a esta família.", 403);
+  }
+  async function titular(agregadoId: string) {
+    const [m] = await db.query<{ nome: string; nif: string }>(`SELECT nome, nif FROM membros_casa WHERE agregado_id = $1 AND tipo = 'titular' AND ativo ORDER BY criado_em LIMIT 1`, [agregadoId]);
+    return m ?? { nome: "", nif: "" };
+  }
+  app.get("/v1/familias/ligacoes", async (req) => {
+    const a = contabilistaDe(req);
+    const ls = await db.query<LinhaLig & { f_nome: string }>(
+      `SELECT l.*, g.nome AS f_nome FROM ligacoes_familia l JOIN agregados g ON g.id = l.agregado_id WHERE l.contabilista_id = $1 ORDER BY l.criada_em DESC`, [a.id]);
+    return Promise.all(ls.map(async (l) => { const t = await titular(l.agregado_id); return ligacaoDe(l, { familia: { nome: l.f_nome, titular: t.nome, nif: t.nif } }); }));
+  });
+  app.post("/v1/familias/ligacoes", async (req, reply) => {
+    const a = contabilistaDe(req);
+    const b = z.object({ email: z.string().trim().toLowerCase().email("O e-mail não parece válido."), nif: z.string() }).parse(req.body);
+    const nif = limparNIF(b.nif);
+    const [g] = await db.query<{ id: string; nome: string }>(
+      `SELECT g.id, g.nome FROM agregados g JOIN membros_casa m ON m.agregado_id = g.id AND m.tipo = 'titular' AND m.ativo AND m.nif = $2 WHERE g.email = $1`, [b.email, nif]);
+    if (!g) throw new ErroApp("sem_familia", "Não encontrámos uma conta Família com este e-mail e NIF de titular. Confirme os dois com a família.", 404);
+    const l = await criarLigacao(g.id, a.id, "contabilista");
+    const t = await titular(g.id);
+    return reply.code(201).send(ligacaoDe(l, { familia: { nome: g.nome, titular: t.nome, nif: t.nif } }));
+  });
+  app.post("/v1/familias/ligacoes/:lid/:acao", async (req) => {
+    const a = contabilistaDe(req);
+    const l = await ligacao(p(req).lid);
+    if (l.contabilista_id !== a.id) throw new ErroApp("sem_ligacao", "Ligação não encontrada.", 404);
+    return ligacaoDe(await responder(l, "contabilista", p(req).acao));
+  });
+  app.get("/v1/familias", async (req): Promise<FamiliaCarteira[]> => {
+    const a = contabilistaDe(req);
+    const ids = await db.query<{ agregado_id: string }>(`SELECT agregado_id FROM ligacoes_familia WHERE contabilista_id = $1 AND estado = 'ativa' ORDER BY ativada_em`, [a.id]);
+    return Promise.all(ids.map(async ({ agregado_id }) => {
+      const r = await resumo(agregado_id);
+      return { agregadoId: agregado_id, nome: r.agregado.nome, pessoas: r.membros.filter((m) => m.ativo).length, despesasDoAno: r.despesasDoAno, deducoes: r.deducoes.total, servicoIRS: r.agregado.servicoIRS };
+    }));
+  });
+  app.get("/v1/familias/:fid", async (req) => {
+    const a = contabilistaDe(req);
+    await exigirFamilia(a.id, p(req).fid);
+    return resumo(p(req).fid, Number((req.query as { ano?: string }).ano) || ANO_FISCAL_CASA);
+  });
+  app.get("/v1/familias/:fid/despesas", async (req) => {
+    const a = contabilistaDe(req);
+    await exigirFamilia(a.id, p(req).fid);
+    return despesas(p(req).fid, Number((req.query as { ano?: string }).ano) || undefined);
+  });
+  app.put("/v1/familias/:fid/despesas/:did", async (req) => {
+    const a = contabilistaDe(req);
+    const fid = p(req).fid;
+    await exigirFamilia(a.id, fid);
+    const ag = await agregado(fid);
+    const r = await despesaDoAgregado(fid, p(req).did);
+    if (r.anulada) throw new ErroApp("anulada", "Esta fatura está anulada.", 409);
+    const b = z.object({ categoria: z.enum(CATEGORIAS) }).parse(req.body);
+    exigirConsentimentoSaude(ag, b.categoria);
+    await db.query(`UPDATE despesas_casa SET categoria = $2 WHERE id = $1`, [r.id, b.categoria]);
+    return despesaDe({ ...r, categoria: b.categoria });
   });
 }

@@ -30,6 +30,7 @@ function Navegacao() {
       <Stack.Protected guard={!!sessao}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="empresa/[id]" options={{ headerShown: true, title: "Empresa", headerBackTitle: "Carteira" }} />
+        <Stack.Screen name="familia/[id]" options={{ headerShown: true, title: "Família", headerBackTitle: "Carteira" }} />
       </Stack.Protected>
     </Stack>
   );

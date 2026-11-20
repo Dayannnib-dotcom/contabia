@@ -111,3 +111,16 @@ export interface ResumoCasa {
   prazos: PrazoCasa[];
   despesasDoAno: number;
 }
+
+/** Ligação entre uma família e um Contabilista Certificado: as duas partes têm de consentir. */
+export interface LigacaoFamilia {
+  id: string; agregadoId: string; estado: "pendente" | "ativa" | "recusada" | "revogada"; iniciadaPor: "familia" | "contabilista";
+  criadaEm: string; ativadaEm: string | null;
+  contabilista?: { nome: string; numeroOCC: string; email: string };
+  familia?: { nome: string; titular: string; nif: string };
+}
+/** Uma família na carteira do contabilista. */
+export interface FamiliaCarteira {
+  agregadoId: string; nome: string; pessoas: number; despesasDoAno: number; deducoes: number;
+  servicoIRS: ResumoCasa["agregado"]["servicoIRS"];
+}

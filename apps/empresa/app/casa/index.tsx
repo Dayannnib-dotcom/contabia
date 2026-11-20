@@ -1,6 +1,6 @@
 import { View } from "react-native";
-import { useRouter } from "expo-router";
-import { dataPT, diasAte, euros, saudacao } from "@contabia/shared";
+import { Redirect, useRouter } from "expo-router";
+import { ErroApi, dataPT, diasAte, euros, saudacao } from "@contabia/shared";
 import { Botao, CALENDARIO_PAPEL, Cartao, Ecra, Erro, Icone, Linha, MensagemLuis, Numero, PlacaPadrao, Texto, Titulo, cor, useDados, useSessao } from "@contabia/ui";
 
 const MESES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
@@ -9,10 +9,14 @@ const MESES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "O
 export default function PainelCasa() {
   const { api, sessao, sair } = useSessao();
   const router = useRouter();
-  const { dados, erro } = useDados(() => api.casa(), []);
+  const daEmpresa = sessao!.papel === "empresa";
+  const { dados, erro } = useDados(async () => {
+    try { return await api.casa(); } catch (e) { if (e instanceof ErroApi && e.codigo === "sem_familia") return "ativar" as const; throw e; }
+  }, []);
+  if (dados === "ativar") return <Redirect href="/casa/ativar" />;
   const hoje = new Date().toISOString().slice(0, 10);
   const prox = dados?.prazos.find((p) => p.data >= hoje);
-  const primeiroNome = sessao!.nome.split(" ")[0];
+  const primeiroNome = (dados?.agregado.nome ?? sessao!.nome).split(" ")[0];
   const msg = !dados ? "A preparar o seu resumo…"
     : dados.despesasDoAno === 0 ? `${saudacao()}, ${primeiroNome}! Fotografe as faturas da casa e eu digo-lhe quanto já conta para o IRS.`
     : `${saudacao()}, ${primeiroNome}! Já tem ${dados.despesasDoAno} ${dados.despesasDoAno === 1 ? "fatura" : "faturas"} de ${dados.ano}. A estimativa de deduções vai em ${euros(dados.deducoes.total)}.`;
@@ -20,7 +24,7 @@ export default function PainelCasa() {
   return (
     <Ecra>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <Titulo sub="Plano Família · IRS e faturas da casa">{dados?.agregado.nome ?? sessao!.nome}</Titulo>
+        <Titulo sub={daEmpresa ? "Família · separada da empresa" : "Plano Família · IRS e faturas da casa"}>{dados?.agregado.nome ?? sessao!.nome}</Titulo>
       </View>
       <MensagemLuis texto={msg} escuro expressao={dados && dados.despesasDoAno > 0 ? "celebrar" : "sorriso"} />
       <Erro texto={erro} />
@@ -81,7 +85,9 @@ export default function PainelCasa() {
         </Cartao>
       ) : null}
 
-      <Botao titulo="Sair" variante="secundario" onPress={() => { void sair().then(() => router.replace("/")); }} />
+      {daEmpresa
+        ? <Botao titulo="Voltar à empresa" variante="secundario" onPress={() => router.replace("/(tabs)")} />
+        : <Botao titulo="Sair" variante="secundario" onPress={() => { void sair().then(() => router.replace("/")); }} />}
     </Ecra>
   );
 }

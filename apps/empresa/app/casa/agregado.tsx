@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { dataPT, validarNIF } from "@contabia/shared";
+import { type LigacaoFamilia } from "@contabia/shared";
 import { Botao, Campo, Cartao, Chip, Ecra, Erro, Linha, Texto, Titulo, useDados, useSessao } from "@contabia/ui";
 
 /** Agregado familiar: titulares (até dois) e dependentes; consentimento para faturas de saúde. */
@@ -43,6 +44,8 @@ export default function AgregadoCasa() {
         <Botao titulo="Acrescentar" desativado={nome.trim().length < 2 || !validarNIF(nif)} onPress={() => fazer(async () => { await api.casaNovoMembro({ nome, nif: nif.replace(/\s/g, ""), tipo }); setNome(""); setNif(""); })} />
       </Cartao>
 
+      <ContabilistaDaFamilia />
+
       <Cartao>
         <Texto forte tamanho={15}>Faturas de saúde</Texto>
         <Texto tamanho={13}>{consentimento
@@ -52,5 +55,49 @@ export default function AgregadoCasa() {
         {consentimento ? <Texto sec tamanho={12}>Se retirar, as faturas de saúde já guardadas ficam até pedir para as anular.</Texto> : null}
       </Cartao>
     </Ecra>
+  );
+}
+
+const ESTADO: Record<LigacaoFamilia["estado"], [string, "bom" | "aviso" | "erro" | "neutro"]> = {
+  pendente: ["Pendente", "aviso"], ativa: ["Ligado", "bom"], recusada: ["Recusada", "erro"], revogada: ["Terminada", "neutro"],
+};
+
+/** Contabilista da família: convidar pelo e-mail, aceitar o pedido dele ou terminar a ligação. */
+function ContabilistaDaFamilia() {
+  const { api } = useSessao();
+  const { dados, recarregar } = useDados(() => api.casaLigacoes(), []);
+  const [email, setEmail] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [aTratar, setATratar] = useState<string | null>(null);
+  const vivas = (dados ?? []).filter((l) => l.estado === "pendente" || l.estado === "ativa");
+  async function fazer(chave: string, f: () => Promise<unknown>) {
+    setErro(null); setATratar(chave);
+    try { await f(); await recarregar(); } catch (e) { setErro((e as Error).message); } finally { setATratar(null); }
+  }
+  return (
+    <Cartao>
+      <Texto forte tamanho={15}>Contabilista da família</Texto>
+      <Texto tamanho={13}>Um Contabilista Certificado ligado à família vê as faturas, as deduções e o agregado, e pode corrigir categorias. Pode terminar a ligação quando quiser.</Texto>
+      {vivas.map((l) => (
+        <View key={l.id} style={{ gap: 8 }}>
+          <Linha esquerda={l.contabilista?.nome ?? "Contabilista"} sub={`OCC n.º ${l.contabilista?.numeroOCC ?? ""} · ${l.contabilista?.email ?? ""}`} direita={<Chip texto={l.estado === "pendente" && l.iniciadaPor === "familia" ? "À espera dele" : ESTADO[l.estado][0]} tipo={ESTADO[l.estado][1]} />} />
+          {l.estado === "pendente" && l.iniciadaPor === "contabilista" ? (
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <Botao titulo="Recusar" variante="secundario" estilo={{ flex: 1 }} carregando={aTratar === l.id + "r"} onPress={() => fazer(l.id + "r", () => api.casaResponderLigacao(l.id, "recusar"))} />
+              <Botao titulo="Aceitar" estilo={{ flex: 2 }} carregando={aTratar === l.id + "a"} onPress={() => fazer(l.id + "a", () => api.casaResponderLigacao(l.id, "aceitar"))} />
+            </View>
+          ) : (
+            <Botao titulo={l.estado === "ativa" ? "Terminar ligação" : "Cancelar convite"} variante="perigo" carregando={aTratar === l.id + "t"} onPress={() => fazer(l.id + "t", () => api.casaResponderLigacao(l.id, "revogar"))} />
+          )}
+        </View>
+      ))}
+      {!vivas.length ? (
+        <>
+          <Campo rotulo="E-mail do contabilista" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" ajuda="O e-mail com que ele entra na Contabia." />
+          <Botao titulo="Convidar contabilista" desativado={!/\S+@\S+\.\S+/.test(email)} carregando={aTratar === "convite"} onPress={() => fazer("convite", async () => { await api.casaConvidarContabilista(email.trim()); setEmail(""); })} />
+        </>
+      ) : null}
+      <Erro texto={erro} />
+    </Cartao>
   );
 }
