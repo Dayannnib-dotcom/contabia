@@ -26,7 +26,8 @@ import { criarAutomacoes, type EnviarWebhook } from "./automacoes.ts";
 import { criarWhatsApp, type CfgWhatsApp } from "./whatsapp.ts";
 import { criarRegisto, mascararEmail } from "./registo.ts";
 import { ACOES_SERVICOS, rotasServicos } from "./servicos.ts";
-import { criarEnvioEmail, emailPedidoEstudo, emailRecuperacao, type EnviarEmail } from "./email.ts";
+import { ACOES_CASA, rotasCasa } from "./casa.ts";
+import { criarEnvioEmail, emailPedidoEstudo, emailRecuperacao, moldura, type EnviarEmail } from "./email.ts";
 import { randomBytes } from "node:crypto";
 
 export interface Config {
@@ -106,7 +107,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     const token = h?.startsWith("Bearer ") ? h.slice(7) : q;
     if (!token) return;
     const a = await tokens.verificar(token);
-    const [existe] = await db.query<{ senha_mudada_em: string | null }>(a.papel === "empresa" ? `SELECT senha_mudada_em FROM empresas WHERE id = $1` : `SELECT senha_mudada_em FROM contabilistas WHERE id = $1`, [a.id]);
+    const [existe] = await db.query<{ senha_mudada_em: string | null }>(a.papel === "empresa" ? `SELECT senha_mudada_em FROM empresas WHERE id = $1` : a.papel === "casa" ? `SELECT senha_mudada_em FROM agregados WHERE id = $1` : `SELECT senha_mudada_em FROM contabilistas WHERE id = $1`, [a.id]);
     if (!existe) throw new ErroApp("sessao_invalida", "A sua sessão terminou. Entre novamente.", 401);
     // um colaborador desativado pelo gestor sai logo, em todos os dispositivos
     const [colab] = a.colaboradorId ? await db.query<{ senha_mudada_em: string | null }>(`SELECT senha_mudada_em FROM colaboradores WHERE id = $1 AND empresa_id = $2 AND ativo`, [a.colaboradorId, a.id]) : [];
@@ -223,7 +224,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   const registarFalha = (...ks: string[]) => { for (const k of ks) falhas.set(k, [...recentes(k), Date.now()]); };
 
   app.post("/v1/auth/sessoes", async (req) => {
-    const b = z.object({ papel: z.enum(["empresa", "contabilista"]), identificador: z.string(), senha: z.string() }).parse(req.body);
+    const b = z.object({ papel: z.enum(["empresa", "contabilista", "casa"]), identificador: z.string(), senha: z.string() }).parse(req.body);
     const kConta = `conta:${b.papel}:${b.identificador.trim().toLowerCase()}`;
     const kIP = `ip:${req.ip}`;
     verificarTentativas([[kConta, 5], [kIP, 20]]);
@@ -234,7 +235,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
       throw e;
     }
   });
-  async function entrarCom(b: { papel: "empresa" | "contabilista"; identificador: string; senha: string }): Promise<Sessao> {
+  async function entrarCom(b: { papel: "empresa" | "contabilista" | "casa"; identificador: string; senha: string }): Promise<Sessao> {
     if (b.papel === "empresa" && b.identificador.includes("@")) {
       // colaborador: entra com o próprio e-mail
       const [c] = await db.query<{ id: string; nome: string; senha_hash: string; ativo: boolean; empresa_id: string; e_nome: string }>(
@@ -245,6 +246,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     }
     const sql = b.papel === "empresa"
       ? `SELECT id, nome, senha_hash FROM empresas WHERE utilizador = $1`
+      : b.papel === "casa" ? `SELECT id, nome, senha_hash FROM agregados WHERE email = $1`
       : `SELECT id, nome, senha_hash FROM contabilistas WHERE email = $1`;
     const ident = b.papel === "empresa" ? normalizarUtilizador(b.identificador) : b.identificador.trim().toLowerCase();
     const [u] = await db.query<{ id: string; nome: string; senha_hash: string }>(sql, [ident]);
@@ -1005,6 +1007,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     "GET /v1/empresas/:id/atividade.csv": "exportou o registo de atividade",
     "GET /v1/contabilista/servicos/exportar": "exportou as horas da carteira",
     ...ACOES_SERVICOS,
+    ...ACOES_CASA,
   };
   /** Rotas GET que, por mexerem em originais ou exportações, ficam registadas. */
   const CONSULTAS_REGISTADAS = new Set(["GET /v1/empresas/:id/documentos/:doc/anexos/:aid", "GET /v1/empresas/:id/atividade.csv", "GET /v1/empresas/:id/servicos/exportar", "GET /v1/contabilista/servicos/exportar"]);
@@ -1012,7 +1015,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   // o id criado num registo de conta vem na resposta: guarda-se para o registo
   app.addHook("onSend", async (req, reply, payload) => {
     const r = req.routeOptions.url;
-    if ((r === "/v1/auth/empresas" || r === "/v1/auth/contabilistas" || r === "/v1/auth/sessoes") && reply.statusCode < 300 && typeof payload === "string") {
+    if ((r === "/v1/auth/empresas" || r === "/v1/auth/contabilistas" || r === "/v1/auth/casas" || r === "/v1/auth/sessoes") && reply.statusCode < 300 && typeof payload === "string") {
       try { (req as FastifyRequest & { novaConta?: { id: string; papel: string; nome: string } }).novaConta = JSON.parse(payload); } catch { /* não é JSON */ }
     }
     return payload;
@@ -1079,6 +1082,18 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
 
   // ═════════════ Espaço de serviços e horas do contabilista ═════════════
   rotasServicos(app, db, agora, { aoPartilhar: async (empresaId, r) => { await auto?.relatorioTempo(empresaId, r); } });
+  rotasCasa(app, db, agora, {
+    sessao,
+    aoPedirIRS: async (ag, tipo) => {
+      const destino = cfg.emailEstudos ?? process.env.EMAIL_ESTUDOS;
+      if (!destino) { console.warn(`[casa] EMAIL_ESTUDOS em falta — pedido de IRS de ${ag.id} sem e-mail para a equipa.`); return; }
+      const { html, texto } = moldura("Pedido de serviço de IRS (Plano Casa)", [
+        `${ag.nome} (${ag.email}) pediu o serviço de IRS ${tipo === "familia" ? "para a família (69 €)" : "individual (45 €)"}.`,
+        "Contacte a família para combinar a revisão e a entrega da declaração.",
+      ]);
+      await enviarEmail({ para: destino, assunto: `Plano Casa: pedido de IRS de ${ag.nome}`, html, texto });
+    },
+  });
 
   // ═════════════ Regras por fornecedor (do contabilista) ═════════════
   type LinhaRegra = { nif: string; nome: string; conta: string; iva_dedutivel: boolean; auto_lancar: boolean; criada_em: string };
@@ -1763,6 +1778,7 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     if (!a) { socket.close(4401, "sessao_invalida"); return; }
     const empresas = a.papel === "empresa"
       ? [a.id]
+      : a.papel === "casa" ? []
       : (await db.query<{ empresa_id: string }>(`SELECT empresa_id FROM ligacoes WHERE contabilista_id = $1 AND estado = 'ativa'`, [a.id])).map((x) => x.empresa_id);
     hub.subscrever(socket, empresas, a.papel === "contabilista" ? a.id : undefined);
     socket.on("close", () => hub.remover(socket));

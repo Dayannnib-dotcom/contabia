@@ -3,6 +3,7 @@
  * e nos testes usa PGlite — o mesmo PostgreSQL, a correr dentro do processo.
  */
 import pg from "pg";
+import { MIGRACOES_CASA } from "./casa.ts";
 import { PGlite } from "@electric-sql/pglite";
 
 export interface Db {
@@ -444,5 +445,5 @@ const MIGRACOES: string[] = [
 ];
 
 async function migrar(db: Db) {
-  for (const sql of MIGRACOES) await db.query(sql);
+  for (const sql of [...MIGRACOES, ...MIGRACOES_CASA]) await db.query(sql);
 }

@@ -6,7 +6,7 @@ export default function Inicio() {
   const { sessao, pronto } = useSessao();
   const router = useRouter();
   if (!pronto) return null;
-  if (sessao) return <Redirect href="/(tabs)" />;
+  if (sessao) return <Redirect href={sessao.papel === "casa" ? "/casa" : "/(tabs)"} />;
   return (
     <EcraEntrada
       papel="A contabilidade da sua empresa, em dia."

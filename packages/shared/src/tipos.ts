@@ -1,7 +1,7 @@
 import type { Regiao, RegimeIVA } from "./regras.ts";
 import type { Dimensao } from "./apoios.ts";
 
-export type Papel = "empresa" | "contabilista";
+export type Papel = "empresa" | "contabilista" | "casa";
 
 export interface Empresa {
   id: string;

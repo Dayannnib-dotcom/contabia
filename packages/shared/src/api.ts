@@ -10,6 +10,7 @@ import type {
   ResumoEmpresa, Sessao, Submissao, VerificacaoFecho, Contabilista,
 } from "./tipos.ts";
 import type { Regras, Regiao, RegimeIVA } from "./regras.ts";
+import type { CategoriaCasa, DespesaCasa, MembroCasa, ResumoCasa } from "./casa.ts";
 import type { LinhaEfatura } from "./efatura.ts";
 import type { LinhaExtrato } from "./extrato.ts";
 import type { Notificacao } from "./respostas.ts";
@@ -85,7 +86,10 @@ export class ApiContabia {
   registarContabilista(d: { email: string; nome: string; numeroOCC: string; senha: string }) {
     return this.pedido<Sessao>("POST", "/v1/auth/contabilistas", d);
   }
-  entrar(d: { papel: "empresa" | "contabilista"; identificador: string; senha: string }) {
+  registarCasa(d: { nome: string; email: string; nif: string; senha: string }) {
+    return this.pedido<Sessao>("POST", "/v1/auth/casas", d);
+  }
+  entrar(d: { papel: "empresa" | "contabilista" | "casa"; identificador: string; senha: string }) {
     return this.pedido<Sessao>("POST", "/v1/auth/sessoes", d);
   }
   recuperarSenha(papel: "empresa" | "contabilista", identificador: string) {
@@ -96,6 +100,34 @@ export class ApiContabia {
   }
   definirEmail(email: string) {
     return this.pedido<Empresa>("PUT", "/v1/auth/email", { email });
+  }
+  // ── Plano Casa ──
+  casa() {
+    return this.pedido<ResumoCasa>("GET", "/v1/casa");
+  }
+  casaDespesas(ano?: number) {
+    return this.pedido<DespesaCasa[]>("GET", `/v1/casa/despesas${ano ? `?ano=${ano}` : ""}`);
+  }
+  casaNovaDespesa(d: { qr?: string; nifEmitente?: string; emitente?: string; data?: string; total?: number; iva?: number; categoria?: CategoriaCasa; membroId?: string | null; numero?: string }) {
+    return this.pedido<DespesaCasa>("POST", "/v1/casa/despesas", d);
+  }
+  casaAlterarDespesa(id: string, d: { categoria?: CategoriaCasa; membroId?: string | null; emitente?: string }) {
+    return this.pedido<DespesaCasa>("PUT", `/v1/casa/despesas/${id}`, d);
+  }
+  casaAnularDespesa(id: string, motivo: string) {
+    return this.pedido<DespesaCasa>("POST", `/v1/casa/despesas/${id}/anular`, { motivo });
+  }
+  casaNovoMembro(d: { nome: string; nif: string; tipo: "titular" | "dependente" }) {
+    return this.pedido<MembroCasa>("POST", "/v1/casa/membros", d);
+  }
+  casaDesativarMembro(id: string) {
+    return this.pedido<MembroCasa>("POST", `/v1/casa/membros/${id}/desativar`, {});
+  }
+  casaConsentirSaude(consentir: boolean) {
+    return this.pedido<ResumoCasa["agregado"]>("PUT", "/v1/casa/consentimento-saude", { consentir });
+  }
+  casaPedirIRS(tipo: "individual" | "familia") {
+    return this.pedido<ResumoCasa["agregado"]>("POST", "/v1/casa/servico-irs", { tipo });
   }
   eu() {
     return this.pedido<{ sessao: Sessao; empresa?: Empresa; contabilista?: Contabilista }>("GET", "/v1/auth/eu");

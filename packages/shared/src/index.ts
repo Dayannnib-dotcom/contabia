@@ -10,3 +10,4 @@ export * from "./apoios.ts";
 export * from "./respostas.ts";
 export * from "./servicos.ts";
 export * from "./qualidade.ts";
+export * from "./casa.ts";
