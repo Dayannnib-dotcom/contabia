@@ -209,14 +209,26 @@ section{padding:var(--space-16) 0}
 
 /* CTA final + rodapé */
 /* Padrões da Guia 2: um por secção, sempre numa faixa sem texto por cima */
+.hero .palco::before{content:"";position:absolute;z-index:-1;top:6%;left:-30%;right:-90%;height:112%;background:url(/site/img/padroes/composicao-mare-a-baixar-noite.svg) repeat-x 0 0/540px auto;pointer-events:none}
+.hero .palco{isolation:isolate}
+/* Contabilistas: o ecrã assenta numa placa com o padrão Razão (pack Gabinetes aliados) */
+.placa-razao{position:relative;padding:28px;border-radius:22px;background:#F6F7F5 url(/site/img/padroes/padrao-razao-papel.svg) repeat 0 0/180px 108px;border:1px solid var(--border)}
+@media(max-width:600px){.placa-razao{padding:14px;border-radius:16px}}
+/* IVA estimado: o cartão assenta numa placa com o padrão Calendário (pack Calendário fiscal) */
+.placa-calendario{padding:22px;border-radius:22px;background:#F6F7F5 url(/site/img/padroes/padrao-calendario-papel.svg) repeat 0 0/168px 120px;border:1px solid var(--border)}
+.placa-calendario>.numero{margin:0}
+/* Estudo: faixa Assinatura no topo do cartão, sem texto por cima */
+.relatorio.com-assinatura{padding-top:0;overflow:hidden}
+.relatorio.com-assinatura::before{content:"";display:block;height:44px;margin:0 -1px 20px;background:url(/site/img/padroes/padrao-assinatura-noite.svg) repeat 0 10px/88px 88px;border-bottom:1px solid rgba(255,255,255,.08)}
+
 .com-padrao{position:relative}.com-padrao>.contentor{position:relative;z-index:1}
 .padrao{position:absolute;left:0;right:0;pointer-events:none}
 .padrao-mare{bottom:0;height:64px;background:url(/site/img/padroes/padrao-mare-noite.svg) repeat 0 0/33.3px 40px}
 .padrao-pontos{bottom:0;height:72px;background:url(/site/img/padroes/padrao-pontos-atlanticos-papel.svg) repeat 0 0/120px 120px;opacity:.9}
-.padrao-baixar{top:0;height:168px;background:url(/site/img/padroes/composicao-mare-a-baixar-noite.svg) repeat-x center top/720px auto}
-.final.com-padrao{padding-top:calc(var(--space-24) + 120px)}
-@media(min-width:900px){.final.com-padrao{padding-top:calc(var(--space-32) + 120px)}}
-@media(max-width:520px){.padrao-mare{height:48px}.padrao-baixar{height:132px;background-size:560px auto}.final.com-padrao{padding-top:calc(var(--space-24) + 96px)}}
+.padrao-baixar{top:0;height:250px;background:url(/site/img/padroes/composicao-mare-a-baixar-noite.svg) repeat-x center top/540px auto}
+.final.com-padrao{padding-top:calc(var(--space-24) + 170px)}
+@media(min-width:900px){.final.com-padrao{padding-top:calc(var(--space-32) + 150px)}}
+@media(max-width:520px){.padrao-mare{height:48px}.padrao-baixar{height:190px;background-size:420px auto}.final.com-padrao{padding-top:calc(var(--space-24) + 130px)}}
 .final{text-align:center;padding:var(--space-24) 0}
 @media(min-width:900px){.final{padding:var(--space-32) 0}}
 .final .acoes{justify-content:center}
@@ -543,7 +555,6 @@ html{scroll-padding-top:76px}
 <main id="conteudo">
 <!-- 1. Hero -->
 <section class="hero escuro com-padrao" id="inicio">
-  <div class="padrao padrao-mare" aria-hidden="true"></div>
   <div class="contentor">
     <div class="revela">
       <a class="novo" href="#fundos"><b>NOVO</b>Fundos europeus pelo seu CAE <span aria-hidden="true">→</span></a>
@@ -637,12 +648,12 @@ html{scroll-padding-top:76px}
         <h3 class="h2">Saiba hoje o que vai pagar no fim do trimestre.</h3>
         <p class="lead" style="color:var(--ink-muted)">Cada fatura que regista atualiza o IVA estimado. Sem surpresas no dia 20 — e com tempo para falar com o seu contabilista.</p>
       </div>
-      <div class="numero revela" aria-label="Exemplo: IVA estimado do 4.º trimestre, 444,40 euros a pagar">
+      <div class="placa-calendario revela"><div class="numero" aria-label="Exemplo: IVA estimado do 4.º trimestre, 444,40 euros a pagar">
         <p class="eyebrow" style="margin:0 0 6px">IVA estimado · 4.º trimestre · exemplo</p>
         <div class="valor" data-conta="444.40" aria-hidden="true">444,40 €</div>
         <div class="dupla" aria-hidden="true"></div>
         <p class="leg" aria-hidden="true">a pagar · com o que já registou</p>
-      </div>
+      </div></div>
     </div>
   </div>
 </section>
@@ -718,7 +729,7 @@ html{scroll-padding-top:76px}
         </ul>
       </div>
 
-      <div class="relatorio revela" aria-label="Exemplo ilustrativo do resumo de um estudo de viabilidade, com valores fictícios">
+      <div class="relatorio com-assinatura revela" aria-label="Exemplo ilustrativo do resumo de um estudo de viabilidade, com valores fictícios">
         <div class="r-topo"><span class="r-tag">Exemplo ilustrativo</span><span class="r-ref mono">ESTUDO · RESUMO</span></div>
         <p class="r-proj">Esplanada e cozinha nova</p>
         <p class="r-sub">Restaurante no Funchal · micro empresa</p>
@@ -796,7 +807,7 @@ html{scroll-padding-top:76px}
       </ul>
       <div class="acoes"><a class="btn btn-primario" href="/contabilista/registar">Experimentar no meu gabinete <span aria-hidden="true">→</span></a></div>
     </div>
-    <div class="janela revela"><div class="barra" aria-hidden="true"><i></i><i></i><i></i></div><img src="/site/img/app-carteira.webp" width="2048" height="1400" loading="lazy" alt="A app do Contabilista Certificado: carteira de empresas com os lançamentos por rever, pedidos e declarações de IVA por submeter."></div>
+    <div class="placa-razao revela"><div class="janela"><div class="barra" aria-hidden="true"><i></i><i></i><i></i></div><img src="/site/img/app-carteira.webp" width="2048" height="1400" loading="lazy" alt="A app do Contabilista Certificado: carteira de empresas com os lançamentos por rever, pedidos e declarações de IVA por submeter."></div></div>
   </div>
 </section>
 
