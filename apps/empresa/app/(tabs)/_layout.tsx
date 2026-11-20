@@ -13,6 +13,7 @@ export default function Separadores() {
   const { sessao, pronto } = useSessao();
   if (!pronto) return null;
   if (!sessao) return <Redirect href="/" />;
+  if (sessao.papel === "casa") return <Redirect href="/casa" />;
   return (
     <>
     <EnvioAutomatico />

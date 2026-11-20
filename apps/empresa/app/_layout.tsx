@@ -24,11 +24,13 @@ function Navegacao() {
       <Stack.Screen name="index" />
       <Stack.Screen name="entrar" options={{ headerShown: true, title: "Entrar", headerBackTitle: "Voltar" }} />
       <Stack.Screen name="registar" options={{ headerShown: true, title: "Criar conta", headerBackTitle: "Voltar" }} />
+      <Stack.Screen name="registar-casa" options={{ headerShown: true, title: "Plano Casa", headerBackTitle: "Voltar" }} />
       <Stack.Screen name="recuperar" options={{ headerShown: true, title: "Recuperar senha", headerBackTitle: "Voltar" }} />
       <Stack.Screen name="redefinir" options={{ headerShown: true, title: "Nova senha", headerBackTitle: "Voltar" }} />
       {/* Ecrãs com sessão: ao sair, desaparecem antes de lerem uma sessão vazia. */}
       <Stack.Protected guard={!!sessao}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="casa" />
         <Stack.Screen name="documento/[id]" options={{ headerShown: true, title: "Documento", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="ligacao" options={{ headerShown: true, title: "Ligação ao contabilista", headerBackTitle: "Voltar" }} />
         <Stack.Screen name="importar" options={{ headerShown: true, title: "Importar do e-Fatura", headerBackTitle: "Voltar" }} />
