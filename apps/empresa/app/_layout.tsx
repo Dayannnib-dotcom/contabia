@@ -3,7 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useCallback, useState } from "react";
-import { AberturaMare, ProvedorSessao, cor, useFontesContabia, useSessao } from "@contabia/ui";
+import { AberturaMare, EcraErro, ProvedorSessao, cor, useFontesContabia, useSessao } from "@contabia/ui";
 
 // Endereço da API: 1) EXPO_PUBLIC_API_URL (definido no eas.json para cada compilação);
 // 2) na web, o próprio servidor que serve a app; 3) no telemóvel, «localhost» só em
@@ -65,3 +65,6 @@ function Abertura() {
   const terminar = useCallback(() => setAtiva(false), []);
   return ativa ? <AberturaMare pronta={pronto && fontes} aoTerminar={terminar} /> : null;
 }
+
+/** Se um ecrã falhar (ou faltar a internet ao abri-lo), mostra uma mensagem em vez de um ecrã em branco. */
+export { EcraErro as ErrorBoundary };

@@ -56,15 +56,17 @@ export function ProvedorSessao({ children, urlApi, chave = "contabia.sessao" }: 
   const tr = useRef<TempoReal | null>(null);
 
   useEffect(() => {
+    // Se a sessão guardada estiver estragada ou o armazenamento falhar, a app abre na
+    // entrada em vez de ficar presa na abertura.
     guardar.ler().then((v) => {
-      if (v) {
-        const s = JSON.parse(v) as Sessao;
-        api.token = s.token;
-        setSessao(s);
-        if (s.papel === "empresa") empresas.current = [s.id];
-      }
-      setPronto(true);
-    });
+      if (!v) return;
+      const s = JSON.parse(v) as Sessao;
+      if (!s?.token || !s?.id) throw new Error("sessão incompleta");
+      api.token = s.token;
+      setSessao(s);
+      if (s.papel === "empresa") empresas.current = [s.id];
+    }).catch(() => { guardar.escrever(null).catch(() => undefined); })
+      .finally(() => setPronto(true));
   }, [api, guardar]);
 
   // avisos push do servidor (só no telemóvel, com a app publicada via EAS)
@@ -105,7 +107,7 @@ export function ProvedorSessao({ children, urlApi, chave = "contabia.sessao" }: 
   // Sessão renovada pelo servidor: guarda o novo token para a sessão não expirar.
   useEffect(() => {
     api.aoTokenNovo = (token) => {
-      guardar.ler().then((v) => { if (v) void guardar.escrever(JSON.stringify({ ...(JSON.parse(v) as Sessao), token })); });
+      guardar.ler().then((v) => { if (v) void guardar.escrever(JSON.stringify({ ...(JSON.parse(v) as Sessao), token })); }).catch(() => undefined);
     };
     return () => { api.aoTokenNovo = null; };
   }, [api, guardar]);

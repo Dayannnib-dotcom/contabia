@@ -28,7 +28,7 @@
       }
     },
     "plugins": [
-      "expo-router",
+      ["expo-router", { "asyncRoutes": false }],
       "expo-secure-store",
       [
         "expo-image-picker",

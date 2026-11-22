@@ -62,7 +62,8 @@ Experimente o fluxo completo:
 ## Testes
 
 ```bash
-npm test             # testes de regras partilhadas + 10 testes de ponta a ponta da API
+npm test             # testes de regras partilhadas + testes de ponta a ponta da API
+npm run fuzz -w @contabia/server   # todas as rotas com dados errados: nenhuma pode dar erro interno
 npm run typecheck    # tipos de todos os pacotes
 ```
 
@@ -74,6 +75,7 @@ npm run server
 (cd apps/contabilista && npx expo export -p web --output-dir /tmp/web-cc) && (cd /tmp/web-cc && python3 -m http.server 8082 &)
 pip install playwright && playwright install chromium
 python3 testes/navegador_e2e.py
+python3 testes/navegador_exploratorio.py   # Plano Família, toques repetidos, dados errados, sem internet
 ```
 
 ## Produção

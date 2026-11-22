@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import { View } from "react-native";
-import { dataPT, validarNIF } from "@contabia/shared";
+import { ajudaNIF, dataPT, validarNIF } from "@contabia/shared";
 import { type LigacaoFamilia } from "@contabia/shared";
 import { Botao, Campo, Cartao, Chip, Ecra, Erro, Linha, Texto, Titulo, useDados, useSessao } from "@contabia/ui";
 
@@ -41,7 +41,7 @@ export default function AgregadoCasa() {
           ))}
         </View>
         <Campo rotulo="Nome" value={nome} onChangeText={setNome} />
-        <Campo rotulo="NIF" value={nif} onChangeText={setNif} keyboardType="number-pad" erro={nif.length >= 9 && !validarNIF(nif)} ajuda={tipo === "titular" ? "Cônjuge ou unido de facto, se entregam o IRS em conjunto." : "Filhos ou outros dependentes a seu cargo."} />
+        <Campo rotulo="NIF" value={nif} onChangeText={setNif} keyboardType="number-pad" erro={nif.length >= 9 && !validarNIF(nif)} ajuda={nif.length >= 9 && !validarNIF(nif) ? ajudaNIF(nif).mensagem : tipo === "titular" ? "Cônjuge ou unido de facto, se entregam o IRS em conjunto." : "Filhos ou outros dependentes a seu cargo."} />
         <Botao titulo="Acrescentar" desativado={nome.trim().length < 2 || !validarNIF(nif)} onPress={() => fazer(async () => { await api.casaNovoMembro({ nome, nif: nif.replace(/\s/g, ""), tipo }); setNome(""); setNif(""); })} />
       </Cartao>
 

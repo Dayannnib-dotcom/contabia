@@ -24,3 +24,4 @@ export * from "./tempo";
 export * from "./paginacao";
 export * from "./padroes";
 export * from "./padrao";
+export * from "./erro-ecra";

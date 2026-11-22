@@ -2,6 +2,7 @@
  * Tipografia da marca (Guia 2 e Guia 5): Space Grotesk nos títulos, IBM Plex Sans no texto
  * e IBM Plex Mono nos valores. Todas com licença SIL OFL. Carregadas uma vez, na raiz de cada app.
  */
+import { useEffect, useState } from "react";
 import { useFonts } from "expo-font";
 // Importar cada peso pelo seu caminho: assim a exportação web leva só estas 6 fontes.
 import { SpaceGrotesk_500Medium } from "@expo-google-fonts/space-grotesk/500Medium";
@@ -20,12 +21,20 @@ export const fonte = {
   numero: "IBMPlexMono_500Medium",
 } as const;
 
-/** Devolve `true` quando as fontes estão prontas (ou falharam: nesse caso usa-se a do sistema). */
+/**
+ * Devolve `true` quando as fontes estão prontas, falharam ou demoram mais de 4 s
+ * (rede lenta): nesses casos usa-se a do sistema e a app abre na mesma.
+ */
 export function useFontesContabia() {
   const [prontas, erro] = useFonts({
     SpaceGrotesk_500Medium, SpaceGrotesk_700Bold,
     IBMPlexSans_400Regular, IBMPlexSans_500Medium, IBMPlexSans_600SemiBold,
     IBMPlexMono_500Medium,
   });
-  return prontas || !!erro;
+  const [esgotado, setEsgotado] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setEsgotado(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+  return prontas || !!erro || esgotado;
 }

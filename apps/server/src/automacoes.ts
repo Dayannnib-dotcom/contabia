@@ -160,7 +160,7 @@ export function criarAutomacoes(c: CfgAutomacoes) {
     const emp = await empresaDe(empresaId);
     if (!emp) return;
     await notificar({ contabilistaId, empresaId, tipo: "ligacao.pedida", chave: `conv:${empresaId}`, urgencia: "normal", titulo: `${emp.nome} convidou-o para contabilista`,
-      corpo: "Aceite o convite no separador Ligar empresa.", push: false });
+      corpo: "Aceite o convite no separador Ligar cliente.", push: false });
   }
 
   async function lista(contabilistaId: string, soNaoLidas: boolean): Promise<Notificacao[]> {
@@ -238,7 +238,7 @@ export function criarAutomacoes(c: CfgAutomacoes) {
       "<b>Avisos de tudo o que importa</b> — documentos novos, pedidos de anulação, perguntas dos clientes, prazos a 7 e a 2 dias, pedidos sem resposta.",
       "<b>Respostas num toque</b> — cada aviso traz a mensagem pronta para enviar por WhatsApp ou e-mail.",
       "<b>Resumo diário às 9h</b> — um e-mail com o que tem para tratar hoje.",
-      "Para começar, ligue a primeira empresa no separador Ligar empresa.",
+      "Para começar, ligue a primeira empresa no separador Ligar cliente.",
     ], { texto: "Abrir a minha carteira", url: `${url}/contabilista/` });
     return enviarUmaVez(`boasvindas:cc:${id}`, cc.email, "Bem-vindo à Contabia — a sua carteira, em tempo real", m);
   }
