@@ -13,7 +13,7 @@ export default function FaturasCasa() {
   const total = ativas.reduce((s, d) => s + d.total, 0);
   return (
     <Ecra>
-      <Titulo sub={`${ativas.length} faturas · ${euros(total)} em ${ANO_FISCAL_CASA}`}>Faturas da casa</Titulo>
+      <Titulo sub={dados ? `${ativas.length} ${ativas.length === 1 ? "fatura" : "faturas"} · ${euros(total)} em ${ANO_FISCAL_CASA}` : erro ? undefined : "A carregar…"}>Faturas da casa</Titulo>
       <Erro texto={erro} />
       {dados && !dados.length ? <Vazio texto="Ainda não há faturas. Use «Fotografar uma fatura» no painel." /> : null}
       {dados?.map((d) => (

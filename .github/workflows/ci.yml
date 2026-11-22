@@ -15,6 +15,8 @@ jobs:
       - run: npm ci
       - name: Testes (partilhado + servidor de ponta a ponta)
         run: npm test
+      - name: Robustez (todas as rotas com dados errados; nenhuma pode dar erro interno)
+        run: npm run fuzz -w @contabia/server
       - name: Tipos (todas as apps)
         run: |
           npx tsc -p packages/shared/tsconfig.json

@@ -11,16 +11,18 @@ export default function Prazos() {
   const pendentes = (dados ?? []).filter((p) => !p.submetida && p.codigo !== "efatura" && diasAte(hoje, p.prazo) >= 0).sort((a, b) => a.prazo.localeCompare(b.prazo));
   const proximo = pendentes[0];
   const dProx = proximo ? diasAte(hoje, proximo.prazo) : null;
+  const emAtraso = (dados ?? []).filter((p) => p.atrasada && !p.submetida);
   return (
     <Ecra>
       <Titulo sub="Calculado para o seu regime e região; atualizado automaticamente quando a lei muda.">Prazos fiscais</Titulo>
       <AtivarAvisos avisos={dados ? dados.filter((p) => !p.submetida).map((p) => ({ chave: `${p.codigo}:${p.periodo}`, prazo: p.prazo, titulo: p.descricao, corpo: `Luís: termina a ${p.prazo.split("-").reverse().join("/")} (${nomePeriodo(p.periodo)}). Envie já os documentos que faltam.` })) : null} />
       <Erro texto={erro} />
+      {emAtraso.length ? <MensagemLuis expressao="alerta" texto={`Em atraso: ${emAtraso.map((p) => `${p.descricao} (${nomePeriodo(p.periodo)})`).join("; ")}. Fale já com o seu contabilista.`} /> : null}
       {dados ? (proximo && dProx !== null ? (
         dProx <= 7
           ? <MensagemLuis expressao="alerta" texto={`${dProx === 0 ? "É hoje" : `Faltam ${dProx} ${dProx === 1 ? "dia" : "dias"}`}: ${proximo.descricao} (${nomePeriodo(proximo.periodo)}). Confirme que o seu contabilista já tem todos os documentos.`} />
           : <MensagemLuis expressao="atento" texto={`O próximo prazo é ${proximo.descricao}, até ${dataPT(proximo.prazo)}. Eu aviso-o 7 e 2 dias antes.`} />
-      ) : <MensagemLuis expressao="celebrar" texto="Está tudo em dia: não há prazos por cumprir." />) : null}
+      ) : emAtraso.length ? null : <MensagemLuis expressao="celebrar" texto="Está tudo em dia: não há prazos por cumprir." />) : null}
       <Cartao estilo={{ paddingVertical: 4 }}>
         {(dados ?? []).map((p, i) => {
           const d = diasAte(hoje, p.prazo);
@@ -38,7 +40,7 @@ export default function Prazos() {
                   </View>
                 </View>
               }
-              direita={p.submetida ? <Chip texto="Submetida" tipo="bom" /> : p.codigo === "efatura" ? <Chip texto="Automático" tipo="bom" /> : <Chip texto={d === 0 ? "Hoje" : `${d} dias`} tipo={d <= 7 ? "aviso" : "neutro"} />}
+              direita={p.submetida ? <Chip texto="Submetida" tipo="bom" /> : p.codigo === "efatura" ? <Chip texto="Automático" tipo="bom" /> : <Chip texto={d < 0 ? "Em atraso" : d === 0 ? "Hoje" : `${d} dias`} tipo={d < 0 ? "erro" : d <= 7 ? "aviso" : "neutro"} />}
             />
           );
         })}

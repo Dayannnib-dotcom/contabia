@@ -1,7 +1,7 @@
 import { randomUUID, scrypt, randomBytes, timingSafeEqual } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import type { FastifyRequest } from "fastify";
-import type { Papel } from "@contabia/shared";
+import { lerQR, type Papel } from "@contabia/shared";
 import type { Db } from "./db.ts";
 
 export class ErroApp extends Error {
@@ -105,4 +105,13 @@ export const num = (v: unknown) => Number(v);
 export function exigirGestor(a: Ator) {
   if (a.papel === "empresa" && a.perfil === "colaborador")
     throw new ErroApp("so_gestor", "Só o gestor da empresa pode fazer isto. Peça-lhe que o faça na app dele.", 403);
+}
+
+/** Lê o código QR de uma fatura; um código incompleto ou estragado dá um erro claro (400), não um erro interno. */
+export function lerQRSeguro(qr: string): ReturnType<typeof lerQR> {
+  try {
+    return lerQR(qr);
+  } catch (e) {
+    throw new ErroApp("qr_invalido", `Não consegui ler o código QR desta fatura. ${(e as Error).message}`.trim(), 400);
+  }
 }

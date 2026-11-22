@@ -10,11 +10,11 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   type FamiliaCarteira, type LigacaoFamilia,
-  ANO_FISCAL_CASA, ajudaNIF, arred, categoriaCasaSugerida, estimarDeducoes, lerQR, limparNIF, prazosCasa, qrConsistente, validarNIF,
+  ANO_FISCAL_CASA, ajudaNIF, arred, categoriaCasaSugerida, estimarDeducoes, limparNIF, prazosCasa, qrConsistente, validarNIF,
   type CategoriaCasa, type DespesaCasa, type MembroCasa, type ResumoCasa, type Sessao,
 } from "@contabia/shared";
 import type { Db } from "./db.ts";
-import { ErroApp, ator, exigirPapel, hashSenha, novoId, type Ator } from "./comum.ts";
+import { ErroApp, ator, exigirPapel, hashSenha, lerQRSeguro, novoId, type Ator } from "./comum.ts";
 
 export const MIGRACOES_CASA = [
   `CREATE TABLE IF NOT EXISTS agregados (
@@ -259,7 +259,7 @@ export function rotasCasa(app: FastifyInstance, db: Db, agora: () => Date, extra
     }).parse(req.body);
     let d: { nif: string; data: string; total: number; iva: number; numero: string | null; atcud: string | null; origem: "qr" | "manual" };
     if (b.qr) {
-      const q = lerQR(b.qr);
+      const q = lerQRSeguro(b.qr);
       if (!qrConsistente(q)) throw new ErroApp("qr_inconsistente", "Os valores do código QR não batem certo. Confirme a fatura.");
       d = { nif: q.nifEmitente, data: q.data, total: q.total, iva: q.totalImpostos, numero: q.identificacao || null, atcud: q.atcud || null, origem: "qr" };
     } else {

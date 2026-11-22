@@ -22,6 +22,8 @@ with sync_playwright() as p:
         # ── Site público: a promessa e os botões levam às apps ──
         site = b.new_page(viewport={"width": 1280, "height": 900})
         site.on("pageerror", lambda e: erros.append(f"site: {e}"))
+        site.bring_to_front()
+
         site.goto(BASE + "/")
         site.get_by_role("heading", name="O seu contabilista, à mão.").wait_for(timeout=20000)
         site.get_by_role("img", name="O Painel da app Contabia", exact=False).wait_for()
@@ -53,6 +55,8 @@ with sync_playwright() as p:
         # menu móvel (iOS/Android): folha com as secções e doca fixa em baixo
         tel = b.new_page(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
         tel.on("pageerror", lambda e: erros.append(f"site-movel: {e}"))
+        tel.bring_to_front()
+
         tel.goto(BASE + "/")
         tel.get_by_role("button", name="Abrir o menu").click()
         tel.get_by_role("dialog", name="Menu").get_by_role("link", name="Fundos europeus").wait_for()
@@ -66,6 +70,8 @@ with sync_playwright() as p:
         shot(tel, "00d_site_movel")
         tel.close()
         # Descarregar a app: lojas «em breve», instruções e lista de espera
+        site.bring_to_front()
+
         site.goto(BASE + "/#descarregar")
         site.get_by_role("heading", name="Leve a Contabia no bolso.").wait_for()
         site.get_by_role("link", name="Google Play: em breve. Pedir aviso quando sair").click()
@@ -80,21 +86,29 @@ with sync_playwright() as p:
         shot(site, "00f_site_descarregar")
 
         # Termos e Condições: página própria, ligada no rodapé
+        site.bring_to_front()
+
         site.goto(BASE + "/")
         site.get_by_role("contentinfo").get_by_role("link", name="Termos e Condições").click()
         site.get_by_role("heading", name="Termos e Condições de Utilização").wait_for()
         site.get_by_text("Os serviços de contabilidade são pagos à parte.").first.wait_for()
         assert site.get_by_role("navigation", name="Índice").get_by_role("link").count() == 20
         shot(site, "00e_site_termos")
+        site.bring_to_front()
+
         site.goto(BASE + "/")
         site.get_by_role("link", name="Criar conta grátis").first.click()
         site.get_by_text("Configurar a empresa").wait_for(timeout=20000)
+        site.bring_to_front()
+
         site.goto(BASE + "/")
         site.get_by_role("link", name="Experimentar no meu gabinete").click()
         site.get_by_label("N.º de Contabilista Certificado (OCC)").wait_for(timeout=20000)
         site.close()
 
         # ── Empresa cria conta ──
+        emp.bring_to_front()
+
         emp.goto(BASE + "/empresa/")
         emp.get_by_text("Criar conta").first.wait_for(timeout=20000)
         time.sleep(2.5)
@@ -115,6 +129,8 @@ with sync_playwright() as p:
         shot(emp, "03_painel")
 
         # ── Contabilista cria conta e pede ligação ──
+        cc.bring_to_front()
+
         cc.goto(BASE + "/contabilista/")
         cc.get_by_text("Criar conta").first.wait_for(timeout=20000)
         cc.get_by_text("Criar conta").first.click()
@@ -124,7 +140,7 @@ with sync_playwright() as p:
         cc.get_by_label("Senha").fill("segredo123")
         cc.get_by_role("button", name="Criar conta").click()
         cc.get_by_text("Carteira").first.wait_for(timeout=15000)
-        cc.get_by_role("tab", name="Ligar empresa").click()
+        cc.get_by_role("tab", name="Ligar cliente").click()
         cc.get_by_label("Utilizador da empresa").fill("atlantico.servicos")
         cc.get_by_label("NIF da empresa").fill("500000000")
         cc.get_by_role("button", name="Enviar pedido de ligação").click()
@@ -307,6 +323,8 @@ with sync_playwright() as p:
         emp.get_by_text("já pode entrar na app", exact=False).wait_for(timeout=15000)
         col = b.new_page(viewport=vp)
         col.on("pageerror", lambda e: erros.append(f"colaboradora: {e}"))
+        col.bring_to_front()
+
         col.goto(BASE + "/empresa/")
         col.get_by_role("button", name="Entrar").wait_for(timeout=20000)
         col.get_by_role("button", name="Entrar").click()
@@ -318,6 +336,7 @@ with sync_playwright() as p:
         assert col.get_by_text("Banco", exact=True).count() == 0, "colaboradora não deve ver o banco"
         shot(col, "18i_colaboradora")
         # o registo de atividade mostra quem fez o quê
+        emp.bring_to_front()
         emp.reload()
         emp.get_by_text("adicionou um utilizador", exact=False).wait_for(timeout=15000)
         emp.get_by_text("Ana Ferreira (contabilista)", exact=False).first.wait_for()
@@ -338,6 +357,8 @@ with sync_playwright() as p:
         # ── Sentido inverso: uma 2.ª empresa convida o contabilista pelo n.º OCC ──
         emp2 = b.new_page(viewport=vp)
         emp2.on("pageerror", lambda e: erros.append(f"empresa2: {e}"))
+        emp2.bring_to_front()
+
         emp2.goto(BASE + "/empresa/")
         emp2.get_by_text("Criar conta").first.wait_for(timeout=20000)
         emp2.get_by_text("Criar conta").first.click()
@@ -356,6 +377,9 @@ with sync_playwright() as p:
         emp2.get_by_role("button", name="Enviar convite").click()
         emp2.get_by_text("À espera do contabilista").wait_for()
         shot(emp2, "19_empresa_convite_enviado")
+
+        cc.bring_to_front()
+
 
         cc.goto(BASE + "/contabilista/")
         cc.get_by_role("button", name="Ver convites").wait_for(timeout=15000)
@@ -389,12 +413,16 @@ with sync_playwright() as p:
         emp2.get_by_role("button", name="Enviar ligação").click()
         emp2.get_by_text("enviámos uma ligação", exact=False).wait_for(timeout=15000)
         shot(emp2, "26_recuperar")
+        emp2.bring_to_front()
+
         emp2.goto(BASE + "/empresa/redefinir")
         emp2.get_by_text("Ligação incompleta", exact=False).wait_for(timeout=20000)
 
         # ── Apoios europeus pelo CAE e pedido de estudo de viabilidade ──
+        emp.bring_to_front()
+
         emp.goto(BASE + "/empresa/")
-        emp.get_by_text("APOIOS EUROPEUS").wait_for(timeout=20000)
+        emp.get_by_text("APOIOS EUROPEUS", exact=True).wait_for(timeout=20000)
         emp.get_by_text("Há fundos europeus para a sua atividade?").wait_for()
         shot(emp, "27_painel_apoios")
         emp.get_by_text("Indicar o CAE ›").click()
@@ -425,6 +453,8 @@ with sync_playwright() as p:
         shot(emp, "30_estudo_pedido")
 
         # o contabilista vê o CAE, os apoios e o pedido da empresa
+        cc.bring_to_front()
+
         cc.goto(BASE + "/contabilista/")
         cc.get_by_text("Atlântico Serviços, Lda.", exact=True).first.click()
         cc.get_by_role("tab", name="Apoios UE").click()
@@ -434,6 +464,8 @@ with sync_playwright() as p:
         shot(cc, "31_cc_apoios")
 
         # contacto do cliente para o WhatsApp (app da empresa)
+        emp.bring_to_front()
+
         emp.goto(BASE + "/empresa/conta")
         emp.get_by_label("Nome de quem trata das contas").fill("Rita Gomes")
         emp.get_by_label("Telemóvel (WhatsApp)").fill("912 345 678")
@@ -444,6 +476,8 @@ with sync_playwright() as p:
         assert emp.get_by_role("switch", name="Lembretes por WhatsApp").is_checked()
 
         # centro de avisos do contabilista e resposta rápida pronta
+        cc.bring_to_front()
+
         cc.goto(BASE + "/contabilista/avisos")
         cc.get_by_text("pediu um estudo de viabilidade", exact=False).first.wait_for(timeout=15000)
         shot(cc, "32_cc_avisos")
@@ -459,6 +493,8 @@ with sync_playwright() as p:
         cc.get_by_text("Está tudo em dia.", exact=False).wait_for(timeout=10000)
 
         # ── Serviços e horas: plano de 2 reuniões por semana, cronómetro, registo à mão, contador da carteira ──
+        cc.bring_to_front()
+
         cc.goto(BASE + "/contabilista/")
         cc.get_by_text("Atlântico Serviços, Lda.", exact=True).first.click()
         cc.get_by_role("tab", name="Serviços e horas").click()
@@ -513,6 +549,8 @@ with sync_playwright() as p:
         cc.get_by_text("Relatório partilhado.", exact=False).wait_for(timeout=15000)
         shot(cc, "35b_cc_tempo_valor")
         # contador da carteira
+        cc.bring_to_front()
+
         cc.goto(BASE + "/contabilista/horas")
         cc.get_by_text("Por empresa").wait_for(timeout=15000)
         cc.get_by_text("Tempo investido").first.wait_for()
@@ -520,6 +558,8 @@ with sync_playwright() as p:
         cc.get_by_text("1/", exact=False).first.wait_for()
         shot(cc, "36_cc_horas")
         # a empresa vê o seu espaço (só leitura)
+        emp.bring_to_front()
+
         emp.goto(BASE + "/empresa/servicos")
         emp.get_by_text("Plano acordado com o seu contabilista").wait_for(timeout=15000)
         emp.get_by_text("Revisão do mês", exact=False).wait_for()

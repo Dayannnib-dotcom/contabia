@@ -8,12 +8,12 @@ import { join } from "node:path";
 import { z, ZodError } from "zod";
 import {
   apoiosCompativeis, CATALOGO_BASE, erroCAE, normalizarCAE, seccaoDoCAE, validarCatalogo, type ApoioCompativel, type Catalogo, type Dimensao, type PedidoEstudo, type PerfilApoios,
-  ajudaNIF, auditarDocumento, lerQR, telefoneInternacional, limparNIF, normalizarUtilizador, proximasObrigacoes, qrConsistente, REGRAS_BASE, taxasEm, utilizadorValido, validarNIF,
+  ajudaNIF, auditarDocumento, lerQR, telefoneInternacional, limparNIF, normalizarUtilizador, obrigacoesDoMes, proximasObrigacoes, qrConsistente, REGRAS_BASE, taxasEm, utilizadorValido, validarNIF,
   type Anexo, type Atividade, type RegraFornecedor, type Colaborador, type Documento, type MovimentoBancario, type Empresa, type Ligacao, type Pedido, type Regras, type ResumoEmpresa, type Sessao, type VerificacaoFecho,
 } from "@contabia/shared";
 import type { Db } from "./db.ts";
 import {
-  agoraISO, ator, criarTokens, ErroApp, exigirAcesso, exigirGestor, exigirPapel, hashSenha, novoId, PERMISSOES_PADRAO, verificarSenha, type Ator,
+  agoraISO, ator, criarTokens, ErroApp, exigirAcesso, exigirGestor, exigirPapel, hashSenha, lerQRSeguro, novoId, PERMISSOES_PADRAO, verificarSenha, type Ator,
 } from "./comum.ts";
 import { Hub, eventosDesde, publicar } from "./tempo-real.ts";
 import {
@@ -147,6 +147,13 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     if (erro instanceof ZodError) return reply.code(400).send({ codigo: "dados_invalidos", mensagem: erro.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") });
     const pgCode = (erro as { code?: string }).code;
     if (pgCode === "23505") return reply.code(409).send({ codigo: "duplicado", mensagem: "Este registo já existe." });
+    // texto com carateres que a base de dados não aceita (ex.: \u0000) ou valores fora do limite
+    if (["22021", "22P05", "22003", "22P02", "22007", "22008"].includes(pgCode ?? ""))
+      return reply.code(400).send({ codigo: "dados_invalidos", mensagem: "Há dados com um formato que não é aceite. Verifique o que escreveu." });
+    // erros do próprio Fastify com estado 4xx (JSON mal formado, envio grande demais, tipo de conteúdo)
+    const estado = (erro as { statusCode?: number }).statusCode;
+    if (estado && estado >= 400 && estado < 500)
+      return reply.code(estado).send({ codigo: estado === 413 ? "demasiado_grande" : "dados_invalidos", mensagem: estado === 413 ? "O envio é grande demais." : "O pedido não está bem formado. Tente de novo." });
     console.error(erro);
     return reply.code(500).send({ codigo: "erro_interno", mensagem: "Ocorreu um erro. Tente de novo." });
   });
@@ -339,7 +346,9 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   app.get("/v1/auth/eu", async (req) => {
     const a = ator(req);
     if (a.papel === "empresa") return { sessao: { ...a, token: "" }, empresa: await empresaPorId(a.id) };
+    if (a.papel !== "contabilista") return { sessao: { ...a, token: "" } };
     const [c] = await db.query<{ id: string; email: string; nome: string; numero_occ: string }>(`SELECT id, email, nome, numero_occ FROM contabilistas WHERE id = $1`, [a.id]);
+    if (!c) throw new ErroApp("sessao_invalida", "A sessão terminou. Entre de novo.", 401);
     return { sessao: { ...a, token: "" }, contabilista: { id: c.id, email: c.email, nome: c.nome, numeroOCC: c.numero_occ } };
   });
 
@@ -453,14 +462,41 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
   app.delete("/v1/ligacoes/:id", (req) => mudarEstado(req, "revogada"));
 
   // ═════════════ Carteira e resumo ═════════════
+  /**
+   * Declarações de IVA com prazo já passado e ainda por submeter, nos últimos 12 meses.
+   * Só conta períodos com lançamentos: são esses que a Contabia consegue declarar.
+   * Sem isto, ao passar o prazo a declaração em falta desaparecia da app.
+   */
+  const ivaEmAtraso = async (empresaId: string, regime: Empresa["regimeIVA"], regras: Regras) => {
+    const hoje = hojeISO();
+    const [a, m] = hoje.split("-").map(Number);
+    const vistas = new Set<string>();
+    const cand: (ReturnType<typeof obrigacoesDoMes>[number] & { atrasada: true })[] = [];
+    for (let k = 14; k >= 1; k--) {
+      const t = a * 12 + (m - 1) - k;
+      for (const o of obrigacoesDoMes(Math.floor(t / 12), (t % 12) + 1, regime, regras)) {
+        if (o.codigo !== "dp_iva" || o.prazo >= hoje || vistas.has(o.periodo)) continue;
+        if (Date.parse(hoje) - Date.parse(o.prazo) > 366 * 86_400_000) continue;
+        vistas.add(o.periodo);
+        cand.push({ ...o, atrasada: true });
+      }
+    }
+    if (!cand.length) return [];
+    const subs = await db.query<{ periodo: string }>(`SELECT periodo FROM submissoes WHERE empresa_id = $1 AND obrigacao = 'dp_iva'`, [empresaId]);
+    const lanc = await db.query<{ periodo: string }>(`SELECT DISTINCT periodo FROM lancamentos WHERE empresa_id = $1 AND estado <> 'proposto'`, [empresaId]);
+    const meses = new Set(lanc.map((l) => l.periodo));
+    return cand.filter((o) => !subs.some((x) => x.periodo === o.periodo) && mesesDoPeriodo(o.periodo).some((mm) => meses.has(mm)));
+  };
   const resumo = async (empresaId: string): Promise<ResumoEmpresa> => {
     const empresa = await empresaPorId(empresaId);
     const [{ d }] = await db.query<{ d: number }>(`SELECT count(*)::int AS d FROM documentos WHERE empresa_id = $1 AND estado = 'validar'`, [empresaId]);
     const [{ l }] = await db.query<{ l: number }>(`SELECT count(*)::int AS l FROM lancamentos WHERE empresa_id = $1 AND estado = 'proposto'`, [empresaId]);
     const [{ p }] = await db.query<{ p: number }>(`SELECT count(*)::int AS p FROM pedidos WHERE empresa_id = $1 AND estado = 'pendente'`, [empresaId]);
-    const prox = proximasObrigacoes(hojeISO(), empresa.regimeIVA, await regrasAtuais()).find((o) => o.codigo === "dp_iva");
+    const regras = await regrasAtuais();
+    const atraso = await ivaEmAtraso(empresaId, empresa.regimeIVA, regras);
+    const prox = proximasObrigacoes(hojeISO(), empresa.regimeIVA, regras).find((o) => o.codigo === "dp_iva");
     const [s] = prox ? await db.query(`SELECT 1 FROM submissoes WHERE empresa_id = $1 AND obrigacao = 'dp_iva' AND periodo = $2`, [empresaId, prox.periodo]) : [];
-    return { empresa, documentosPorValidar: d, lancamentosPorRever: l, pedidosPendentes: p, ivaSubmetido: !!s };
+    return { empresa, documentosPorValidar: d, lancamentosPorRever: l, pedidosPendentes: p, ivaSubmetido: !!s && atraso.length === 0 };
   };
   app.get("/v1/carteira", async (req) => {
     const a = ator(req);
@@ -547,11 +583,11 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     await exigirAcesso(db, a, id);
     const empresa = await empresaPorId(id);
     const regras = await regrasAtuais();
-    const corpo = req.body as Record<string, unknown>;
+    const corpo = (req.body && typeof req.body === "object" ? req.body : {}) as Record<string, unknown>;
     let d: Omit<Documento, "id" | "empresaId" | "estado" | "contaSugerida" | "categoria" | "ivaDedutivel" | "criadoEm">;
     if (typeof corpo.qr === "string") {
       const tipo = z.enum(["compra", "venda"]).parse(corpo.tipo ?? "compra");
-      const q = lerQR(corpo.qr);
+      const q = lerQRSeguro(corpo.qr);
       if (!qrConsistente(q)) throw new ErroApp("qr_inconsistente", "Os valores do código QR não batem certo. Verifique a fatura.");
       if (tipo === "compra" && q.nifAdquirente !== empresa.nif)
         throw new ErroApp("nif_adquirente", "Esta fatura não foi passada ao NIF da empresa. Peça uma fatura com o NIF correto.");
@@ -1658,9 +1694,11 @@ export async function criarApp(db: Db, cfg: Config): Promise<{ app: FastifyInsta
     await exigirAcesso(db, ator(req), id);
     const e = await empresaPorId(id);
     const subs = await db.query<{ obrigacao: string; periodo: string }>(`SELECT obrigacao, periodo FROM submissoes WHERE empresa_id = $1`, [id]);
-    return proximasObrigacoes(hojeISO(), e.regimeIVA, await regrasAtuais(), 10).map((o) => ({
-      ...o, submetida: subs.some((s) => s.obrigacao === o.codigo && s.periodo === o.periodo),
-    }));
+    const regras = await regrasAtuais();
+    const atraso = (await ivaEmAtraso(id, e.regimeIVA, regras)).map((o) => ({ ...o, submetida: false }));
+    return [...atraso, ...proximasObrigacoes(hojeISO(), e.regimeIVA, regras, 10).map((o) => ({
+      ...o, atrasada: false, submetida: subs.some((s) => s.obrigacao === o.codigo && s.periodo === o.periodo),
+    }))];
   });
 
   app.get("/v1/regras", async () => regrasAtuais());

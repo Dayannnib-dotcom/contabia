@@ -180,15 +180,22 @@ function Revisao({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
 
 function Iva({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
   const { api } = useSessao();
-  const { dados: prazos } = useDados(() => api.prazos(id), [id]);
-  const dp = prazos?.find((p) => p.codigo === "dp_iva");
+  const { dados: prazos, recarregar: recarregarPrazos } = useDados(() => api.prazos(id), [id]);
+  // Primeiro a declaração em atraso (se houver), depois a do período corrente.
+  const dp = prazos?.find((p) => p.codigo === "dp_iva" && !p.submetida) ?? prazos?.find((p) => p.codigo === "dp_iva");
   const periodo = dp?.periodo;
   const { dados: ap, recarregar } = useDados(async () => (periodo ? api.apuramento(id, periodo) : null), [id, periodo]);
   const [ficheiro, setFicheiro] = useState<{ nome: string; xml: string } | null>(null);
   const [comp, setComp] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [aEnviar, setAEnviar] = useState(false);
+  const [registada, setRegistada] = useState<string | null>(null);
 
+  if (registada) return <MensagemLuis expressao="celebrar" texto={`A declaração de ${nomePeriodo(registada)} já está submetida e registada.`} acao={
+    <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+      <Botao titulo="Ir para o fecho" variante="menta" onPress={() => irPara("fecho")} estilo={{ alignSelf: "flex-start", minHeight: 40 }} />
+      <Botao titulo="Ver o período seguinte" variante="contorno" onPress={() => { setRegistada(null); setFicheiro(null); setComp(""); void recarregarPrazos(); }} estilo={{ alignSelf: "flex-start", minHeight: 40 }} />
+    </View>} />;
   if (!dp || !ap) return <Texto sec>A carregar…</Texto>;
   if (dp.submetida) return <MensagemLuis expressao="celebrar" texto={`A declaração de ${nomePeriodo(dp.periodo)} já está submetida e registada.`} acao={<Botao titulo="Ir para o fecho" variante="menta" onPress={() => irPara("fecho")} estilo={{ alignSelf: "flex-start", minHeight: 40 }} />} />;
   return (
@@ -196,7 +203,7 @@ function Iva({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
       <Cartao>
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
           <Texto forte tamanho={16}>IVA · {nomePeriodo(ap.periodo)}</Texto>
-          <Chip texto={`Até ${dp.prazo.split("-").reverse().join("/")}`} tipo="aviso" />
+          <Chip texto={dp.atrasada ? `Em atraso · prazo ${dp.prazo.split("-").reverse().join("/")}` : `Até ${dp.prazo.split("-").reverse().join("/")}`} tipo={dp.atrasada ? "erro" : "aviso"} />
         </View>
         {ap.campos.length === 0 ? <Vazio texto="Sem movimentos lançados neste período." /> : null}
         {ap.campos.map((c) => (
@@ -218,7 +225,7 @@ function Iva({ id, irPara }: { id: string; irPara: (s: Sec) => void }) {
           <Texto>2. Submeta-o no Portal das Finanças e registe aqui o comprovativo.</Texto>
           <Campo rotulo="N.º do comprovativo de entrega" value={comp} onChangeText={setComp} />
           <Botao titulo="Registar submissão" carregando={aEnviar} desativado={comp.length < 3}
-            onPress={async () => { setAEnviar(true); try { await api.registarSubmissao(id, ap.periodo, comp); await recarregar(); } catch (e) { setErro((e as Error).message); } finally { setAEnviar(false); } }} />
+            onPress={async () => { setAEnviar(true); try { await api.registarSubmissao(id, ap.periodo, comp); setRegistada(ap.periodo); await recarregar(); } catch (e) { setErro((e as Error).message); } finally { setAEnviar(false); } }} />
         </Cartao>
       )}
       <Erro texto={erro} />

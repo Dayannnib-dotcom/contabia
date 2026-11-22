@@ -13,6 +13,7 @@ const C = "M43 19a16 16 0 1 0 0 26";
 const ONDA = "M27 32q5-5 10 0t10 0t10 0";
 const FIM = 2300;
 const ESPERA = 1500; // se a app ainda não estiver pronta, a animação espera aqui, com o símbolo transparente
+const LIMITE = 8000; // nunca fica mais do que isto na abertura, aconteça o que acontecer
 
 const clamp = (x: number) => Math.max(0, Math.min(1, x));
 const seg = (t: number, a: number, b: number) => clamp((t - a) / (b - a));
@@ -44,16 +45,23 @@ export function AberturaMare({ pronta, aoTerminar }: { pronta: boolean; aoTermin
     const fim = reduzir ? 900 : FIM;
     let raf = 0;
     let base = Date.now();
+    const inicio = Date.now();
+    let feito = false;
+    const terminar = () => { if (!feito) { feito = true; aoTerminar(); } };
     const passo = () => {
+      if (feito) return;
       let agora = Date.now() - base;
-      if (saltarRef.current && prontaRef.current) agora = fim;
-      if (!prontaRef.current && agora > ESPERA) { base = Date.now() - ESPERA; agora = ESPERA; }
+      const pronta = prontaRef.current || Date.now() - inicio > LIMITE;
+      if (saltarRef.current && pronta) agora = fim;
+      if (!pronta && agora > ESPERA) { base = Date.now() - ESPERA; agora = ESPERA; }
       setT(agora);
-      if (agora >= fim) { aoTerminar(); return; }
+      if (agora >= fim) { terminar(); return; }
       raf = requestAnimationFrame(passo);
     };
     raf = requestAnimationFrame(passo);
-    return () => cancelAnimationFrame(raf);
+    // Segurança: num separador escondido o navegador pausa as animações; o relógio não pára.
+    const seguro = setTimeout(terminar, LIMITE + fim);
+    return () => { feito = true; cancelAnimationFrame(raf); clearTimeout(seguro); };
   }, [reduzir, aoTerminar]);
 
   const cx = w / 2, cy = h / 2;

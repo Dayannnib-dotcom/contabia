@@ -422,7 +422,7 @@ export class ApiContabia {
     return this.pedido<VerificacaoFecho>("POST", `/v1/empresas/${empresaId}/periodos/${periodo}/fechar`, {});
   }
   prazos(empresaId: string) {
-    return this.pedido<{ codigo: string; descricao: string; periodo: string; prazo: string; submetida: boolean }[]>("GET", `/v1/empresas/${empresaId}/prazos`);
+    return this.pedido<{ codigo: string; descricao: string; periodo: string; prazo: string; submetida: boolean; atrasada?: boolean }[]>("GET", `/v1/empresas/${empresaId}/prazos`);
   }
   regras() {
     return this.pedido<Regras>("GET", "/v1/regras");
