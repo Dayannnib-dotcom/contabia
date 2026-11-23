@@ -159,24 +159,25 @@ const IDE = "https://ide.madeira.gov.pt";
 const COMPETE = "https://www.compete2030.gov.pt/avisos/";
 
 /**
- * Catálogo de partida, verificado em fontes oficiais e de consultoras a 13/11/2026 (revisto a 19/11/2026).
+ * Catálogo de partida, verificado em fontes oficiais e de consultoras a 13/11/2026 (revisto a 23/11/2026).
  * O administrador publica versões novas em POST /v1/admin/apoios.
  */
 export const CATALOGO_BASE: Catalogo = {
-  versao: "2026-11-19",
-  verificadoEm: "2026-11-19",
+  versao: "2026-11-23",
+  verificadoEm: "2026-11-23",
   linhas: [
     {
       id: "m2030-2026-38", codigo: "M2030-2026-38", nome: "Funcionamento 2030 — Outros custos de funcionamento", programa: "Madeira 2030 (FEDER) · IDE-RAM",
       resumo: "Compensa custos de funcionamento acrescidos pela ultraperiferia: Segurança Social, rendas, eletricidade e água, serviços de contabilidade.",
       regioes: ["PT-MA"], dimensoes: TODAS, estado: "aberto", inicio: "2026-10-30T15:00", fim: "2026-12-04T17:00",
-      apoio: "Não reembolsável: 30% (+10% no Porto Santo)", ligacao: IDE, nota: "Exige contabilidade organizada. Candidatura no Balcão dos Fundos.", verificadoEm: "2026-11-19",
+      apoio: "Não reembolsável: 30% (+10% no Porto Santo); montante fixo até 20 mil euros (micro) ou 25 mil euros (restantes)", ligacao: IDE,
+      nota: "Exige contabilidade organizada. Despesa elegível mínima de 7500 euros. Empresas da Zona Franca da Madeira não são elegíveis. Candidatura no Balcão dos Fundos.", verificadoEm: "2026-11-23",
     },
     {
       id: "m2030-2026-35", codigo: "M2030-2026-35", nome: "Funcionamento 2030 — Transportes", programa: "Madeira 2030 (FEDER) · IDE-RAM",
       resumo: "Compensa o custo acrescido de transportar mercadorias de e para a Madeira.",
-      regioes: ["PT-MA"], dimensoes: TODAS, estado: "aberto", fim: "2026-11-20T17:00",
-      apoio: "Não reembolsável", ligacao: IDE, nota: "Candidatura no Balcão dos Fundos.", verificadoEm: "2026-11-19",
+      regioes: ["PT-MA"], dimensoes: TODAS, estado: "fechado", fim: "2026-11-20T17:00",
+      apoio: "Não reembolsável", ligacao: IDE, nota: "Candidaturas encerradas a 20/11/2026.", verificadoEm: "2026-11-23",
     },
     {
       id: "mpr-2026-6", codigo: "MPR-2026-6", nome: "SICE — Inovação Produtiva", programa: "COMPETE 2030 e programas regionais",
@@ -259,7 +260,7 @@ export const CATALOGO_BASE: Catalogo = {
       id: "sibt-ram-2026", codigo: "Plano anual de avisos", nome: "Sistema de Incentivos de Base Territorial — RAM", programa: "Madeira 2030 (FEDER)",
       resumo: "Apoio ao investimento de empresas, previsto no plano anual de avisos do Madeira 2030.",
       regioes: ["PT-MA"], dimensoes: TODAS, estado: "previsto", ligacao: "https://madeira.portugal2030.pt/plano-anual-de-avisos/",
-      nota: "Ainda sem aviso publicado. O plano anual prevê-o para 30/11 a 31/12/2026. Dimensões e atividades elegíveis por confirmar no aviso.", verificadoEm: "2026-11-19",
+      nota: "Ainda sem aviso publicado. O plano anual prevê-o para 30/11 a 31/12/2026. Dimensões e atividades elegíveis por confirmar no aviso.", verificadoEm: "2026-11-23",
     },
     {
       id: "acores2030-2026-15", codigo: "ACORES2030-2026-15", nome: "Construir 2030 — Pequenos Negócios", programa: "Açores 2030",
@@ -283,7 +284,7 @@ export const CATALOGO_BASE: Catalogo = {
       regioes: ["PT-AC"], dimensoes: PME, estado: "aberto", inicio: "2026-09-01", fim: "2026-11-30T18:00",
       apoio: "Não reembolsável: 35% a 45% conforme a ilha, até 65% com prémios",
       ligacao: "https://portugal2030.pt/wp-content/uploads/sites/3/2026/09/AVISO-ACORES2030-2026-21-Base-Economica-Local.pdf",
-      nota: "Última fase: 30/11 às 17h dos Açores. Só algumas atividades CAE são elegíveis: confirme no aviso.", verificadoEm: "2026-11-19",
+      nota: "Última fase: 30/11 às 17h dos Açores. Só algumas atividades CAE são elegíveis: confirme no aviso.", verificadoEm: "2026-11-23",
     },
     {
       id: "mar2030-2026-34", codigo: "MAR2030-2026-34", nome: "Mar 2030 — GAL ADELIAÇOR MAR", programa: "Mar 2030 (FEAMPA)",
