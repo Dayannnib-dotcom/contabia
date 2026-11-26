@@ -159,19 +159,19 @@ const IDE = "https://ide.madeira.gov.pt";
 const COMPETE = "https://www.compete2030.gov.pt/avisos/";
 
 /**
- * Catálogo de partida, verificado em fontes oficiais e de consultoras a 13/11/2026 (revisto a 23/11/2026).
+ * Catálogo de partida, verificado em fontes oficiais e de consultoras a 13/11/2026 (revisto a 26/11/2026).
  * O administrador publica versões novas em POST /v1/admin/apoios.
  */
 export const CATALOGO_BASE: Catalogo = {
-  versao: "2026-11-23",
-  verificadoEm: "2026-11-23",
+  versao: "2026-11-26",
+  verificadoEm: "2026-11-26",
   linhas: [
     {
       id: "m2030-2026-38", codigo: "M2030-2026-38", nome: "Funcionamento 2030 — Outros custos de funcionamento", programa: "Madeira 2030 (FEDER) · IDE-RAM",
       resumo: "Compensa custos de funcionamento acrescidos pela ultraperiferia: Segurança Social, rendas, eletricidade e água, serviços de contabilidade.",
       regioes: ["PT-MA"], dimensoes: TODAS, estado: "aberto", inicio: "2026-10-30T15:00", fim: "2026-12-04T17:00",
       apoio: "Não reembolsável: 30% (+10% no Porto Santo); montante fixo até 20 mil euros (micro) ou 25 mil euros (restantes)", ligacao: IDE,
-      nota: "Exige contabilidade organizada. Despesa elegível mínima de 7500 euros. Empresas da Zona Franca da Madeira não são elegíveis. Candidatura no Balcão dos Fundos.", verificadoEm: "2026-11-23",
+      nota: "Exige contabilidade organizada. Despesa elegível mínima de 7500 euros. Empresas da Zona Franca da Madeira não são elegíveis. Candidatura no Balcão dos Fundos.", verificadoEm: "2026-11-26",
     },
     {
       id: "m2030-2026-35", codigo: "M2030-2026-35", nome: "Funcionamento 2030 — Transportes", programa: "Madeira 2030 (FEDER) · IDE-RAM",
@@ -189,19 +189,20 @@ export const CATALOGO_BASE: Catalogo = {
     {
       id: "mpr-2026-7", codigo: "MPr-2026-7", nome: "SIID — Demonstradores", programa: "COMPETE 2030",
       resumo: "Projetos de I&D que demonstram uma tecnologia ou produto novo em ambiente real.",
-      regioes: ["PT"], territorio: "as regiões Norte, Centro e Alentejo", dimensoes: TODAS, estado: "aberto", fim: "2026-12-29T17:00", ligacao: COMPETE, verificadoEm: "2026-11-13",
+      regioes: ["PT"], territorio: "as regiões Norte, Centro e Alentejo", dimensoes: TODAS, estado: "aberto", fim: "2026-12-29T17:00", ligacao: COMPETE, verificadoEm: "2026-11-26",
     },
     {
       id: "mpr-2026-4", codigo: "MPr-2026-4", nome: "SIID — I&D com parceiros europeus", programa: "COMPETE 2030",
       resumo: "Internacionalização de I&D: projetos de investigação com parceiros de outros países europeus.",
-      regioes: ["PT"], territorio: "as regiões Norte, Centro e Alentejo", dimensoes: TODAS, estado: "aberto", fim: "2026-12-29T17:00", ligacao: COMPETE, verificadoEm: "2026-11-13",
+      regioes: ["PT"], territorio: "as regiões Norte, Centro e Alentejo", dimensoes: TODAS, estado: "fechado", fim: "2026-11-25T17:00", ligacao: COMPETE,
+      nota: "Receção de candidaturas suspensa no COMPETE 2030 desde as 17h de 25/11/2026 (o prazo previsto era 29/12/2026).", verificadoEm: "2026-11-26",
     },
     {
       id: "mpr-2026-01", codigo: "MPR-2026-01", nome: "SITCE — Descarbonização (Regime Contratual de Investimento)", programa: "COMPETE 2030",
       resumo: "Grandes projetos de investimento para reduzir emissões e consumo de energia nos processos da empresa.",
       regioes: ["PT"], territorio: "as regiões Norte, Centro, Lisboa, Alentejo e Algarve", dimensoes: ["grande"], estado: "aberto", fim: "2026-12-30T18:00",
       ligacao: "https://www.compete2030.gov.pt/wp-content/uploads/2026/01/Aviso-MPR-2026-01-Apoios-a-Eficiencia-energetica-e-Descarbonizacao-Empresas-26_01_2026_Publicado.pdf",
-      nota: "Só a fase do Regime Contratual de Investimento (grandes empresas, despesa elegível mínima de 25 M€, ou 15 M€ com interesse estratégico) continua aberta. O regime geral já fechou.", verificadoEm: "2026-11-16",
+      nota: "Só a fase do Regime Contratual de Investimento (grandes empresas, despesa elegível mínima de 25 M€, ou 15 M€ com interesse estratégico) continua aberta. O regime geral já fechou.", verificadoEm: "2026-11-26",
     },
     {
       id: "mpr-2026-11", codigo: "MPr-2026-11", nome: "SIID — I&D Empresarial (individual e em copromoção)", programa: "Centro 2030, Alentejo 2030, Algarve 2030 e Lisboa 2030",
@@ -215,23 +216,23 @@ export const CATALOGO_BASE: Catalogo = {
       id: "mpr-2026-9", codigo: "MPr-2026-9", nome: "STEP — I&D&I em tecnologias digitais e biotecnologia", programa: "COMPETE 2030 (STEP)",
       resumo: "I&D e inovação em tecnologias digitais, deep tech ou biotecnologia.",
       regioes: ["PT"], territorio: "as regiões Norte, Centro e Alentejo", dimensoes: TODAS, estado: "aberto", fim: "2027-01-04T17:00", ligacao: COMPETE,
-      nota: "O projeto tem de ser nestas tecnologias, qualquer que seja o setor.", verificadoEm: "2026-11-13",
+      nota: "O projeto tem de ser nestas tecnologias, qualquer que seja o setor.", verificadoEm: "2026-11-26",
     },
     {
       id: "mpr-2026-10", codigo: "MPr-2026-10", nome: "STEP — Inovação produtiva em tecnologias digitais e biotecnologia", programa: "COMPETE 2030 (STEP)",
       resumo: "Investimento produtivo para fabricar ou desenvolver tecnologias digitais, deep tech ou biotecnologia.",
       regioes: ["PT"], territorio: "as regiões Norte, Centro, Alentejo e Algarve", dimensoes: TODAS, estado: "aberto", fim: "2027-01-04T17:00", ligacao: COMPETE,
-      nota: "No Algarve a candidatura é separada. Exige contabilidade organizada.", verificadoEm: "2026-11-16",
+      nota: "No Algarve a candidatura é separada. Exige contabilidade organizada.", verificadoEm: "2026-11-26",
     },
     {
       id: "compete2030-2026-11", codigo: "COMPETE2030-2026-11", nome: "STEP — I&D&I em tecnologias de energia limpa", programa: "COMPETE 2030 (STEP)",
       resumo: "I&D e inovação em tecnologias limpas e eficientes do ponto de vista energético.",
-      regioes: ["PT"], territorio: "as regiões Norte, Centro e Alentejo", dimensoes: TODAS, estado: "aberto", fim: "2027-01-04T17:00", ligacao: COMPETE, verificadoEm: "2026-11-13",
+      regioes: ["PT"], territorio: "as regiões Norte, Centro e Alentejo", dimensoes: TODAS, estado: "aberto", fim: "2027-01-04T17:00", ligacao: COMPETE, verificadoEm: "2026-11-26",
     },
     {
       id: "compete2030-2026-12", codigo: "COMPETE2030-2026-12", nome: "STEP — Inovação produtiva em tecnologias de energia limpa", programa: "COMPETE 2030 (STEP)",
       resumo: "Investimento produtivo em tecnologias limpas e eficientes do ponto de vista energético.",
-      regioes: ["PT"], territorio: "as regiões Norte, Centro e Alentejo", dimensoes: TODAS, estado: "aberto", fim: "2027-01-04T17:00", ligacao: COMPETE, verificadoEm: "2026-11-16",
+      regioes: ["PT"], territorio: "as regiões Norte, Centro e Alentejo", dimensoes: TODAS, estado: "aberto", fim: "2027-01-04T17:00", ligacao: COMPETE, verificadoEm: "2026-11-26",
     },
     {
       id: "norte2030-2026-28", codigo: "NORTE2030-2026-28", nome: "SI Base Territorial — CIM Cávado", programa: "Norte 2030 (FEDER) · CIM Cávado",
@@ -257,10 +258,12 @@ export const CATALOGO_BASE: Catalogo = {
       nota: "Previsto entre o 3.º quadrimestre de 2026 e o 2.º de 2027. Bom momento para preparar o projeto.", verificadoEm: "2026-11-13",
     },
     {
-      id: "sibt-ram-2026", codigo: "Plano anual de avisos", nome: "Sistema de Incentivos de Base Territorial — RAM", programa: "Madeira 2030 (FEDER)",
-      resumo: "Apoio ao investimento de empresas, previsto no plano anual de avisos do Madeira 2030.",
-      regioes: ["PT-MA"], dimensoes: TODAS, estado: "previsto", ligacao: "https://madeira.portugal2030.pt/plano-anual-de-avisos/",
-      nota: "Ainda sem aviso publicado. O plano anual prevê-o para 30/11 a 31/12/2026. Dimensões e atividades elegíveis por confirmar no aviso.", verificadoEm: "2026-11-23",
+      id: "sibt-ram-2026", codigo: "Plano anual de avisos", nome: "Base Territorial 2030 — Sistema de Incentivos de Base Territorial da RAM", programa: "Madeira 2030 (FEDER)",
+      resumo: "Apoio ao investimento de micro e pequenas empresas da Madeira (despesa elegível de 25 mil a 300 mil euros, salvo outro valor no aviso).",
+      regioes: ["PT-MA"], dimensoes: ["micro", "pequena"], excluiDivisoes: ["01", "02", "36", "50", "51", "53", "64", "65", "66", "68", "87", "88", "91", "92", "94", "97", "98", "99"],
+      estado: "previsto", apoio: "Não reembolsável: 50% (+10% em Porto Moniz, São Vicente, Santana e Porto Santo)",
+      ligacao: "https://joram.madeira.gov.pt/joram/1serie/Ano%20de%202026/ISerie-209-2026-11-18.pdf",
+      nota: "Regulamento publicado (Portaria n.º 647/2026, JORAM de 18/11/2026); o aviso ainda não foi publicado. O plano anual prevê-o para 30/11 a 31/12/2026. Há mais exclusões parciais de CAE (ex.: 35, 411, 93): confirme no aviso.", verificadoEm: "2026-11-26",
     },
     {
       id: "acores2030-2026-15", codigo: "ACORES2030-2026-15", nome: "Construir 2030 — Pequenos Negócios", programa: "Açores 2030",
